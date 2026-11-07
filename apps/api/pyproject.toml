@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "split-ranch-api"
+version = "0.1.0"
+description = "Split Ranch backend: FastAPI API + Procrastinate worker"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.8,<3",
+    "pydantic-settings>=2.4,<3",
+    "sqlalchemy>=2.0.36,<2.1",
+    "alembic>=1.13,<2",
+    "psycopg[binary,pool]>=3.2,<4",
+    "procrastinate>=3.10,<3.11",  # schema SQL is frozen in migrations/sql
+    "structlog>=24.1",
+    "PyJWT[crypto]>=2.9,<3",
+    "sentry-sdk[fastapi]>=2.10,<3",
+    "tzdata>=2024.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "hypothesis>=6.100",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pytest-cov>=5.0",
+    "pgserver>=0.1.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/split_ranch"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "S", "C4", "PT", "ASYNC"]
+ignore = [
+    "S101",   # assert is fine in tests and for type narrowing
+    "B008",   # FastAPI Depends() in defaults
+    "RUF012",
+    "PT018",  # compound asserts are fine
+    "N818",   # error classes are named after HTTP semantics (NotFound, Conflict)
+    "UP046",  # keep Generic[T] for pydantic generics
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "N802"]
+"migrations/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["split_ranch"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["split_ranch"]
+plugins = ["pydantic.mypy"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["procrastinate.*", "pgserver.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+markers = [
+    "db: tests that need a PostgreSQL database",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pgserver.*",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

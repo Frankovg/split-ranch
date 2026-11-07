@@ -1,0 +1,17 @@
+{
+  "name": "split-ranch",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "domain:test": "pnpm --filter @split-ranch/domain test",
+    "mobile:dev": "pnpm --filter @split-ranch/mobile start",
+    "api:test": "cd apps/api && uv run pytest",
+    "api:dev": "cd apps/api && uv run uvicorn split_ranch.main:app --reload --port 8000",
+    "worker:dev": "cd apps/api && uv run procrastinate --app=split_ranch.jobs.app.app worker",
+    "db:up": "supabase start",
+    "db:down": "supabase stop"
+  }
+}

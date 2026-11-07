@@ -1,0 +1,37 @@
+# Render Blueprint — FastAPI web service + Procrastinate worker (Frankfurt).
+# The database is Supabase Postgres (not managed here). Env vars come from env groups (see infra/README.md).
+services:
+  - type: web
+    name: split-ranch-api-staging
+    runtime: python
+    region: frankfurt
+    plan: starter
+    rootDir: apps/api
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    preDeployCommand: uv run --no-sync alembic upgrade head
+    startCommand: uv run --no-sync uvicorn split_ranch.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.12"
+      - fromGroup: split-ranch-staging
+
+  - type: worker
+    name: split-ranch-worker-staging
+    runtime: python
+    region: frankfurt
+    plan: starter
+    rootDir: apps/api
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: uv run --no-sync procrastinate --app=split_ranch.jobs.app.app worker
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.12"
+      - fromGroup: split-ranch-staging
+
+# Production services mirror the two above with names *-prod, env group split-ranch-prod,
+# autoDeploy: false and deploys triggered by the release-api workflow on tags api-v*.

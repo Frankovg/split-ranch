@@ -1,0 +1,8 @@
+[
+  {"name": "household_march", "nets": [{"id": "juli", "net_cents": 65666}, {"id": "franco", "net_cents": -29333}, {"id": "ana", "net_cents": -36333}], "expected": [{"from_id": "ana", "to_id": "juli", "amount_cents": 36333}, {"from_id": "franco", "to_id": "juli", "amount_cents": 29333}]},
+  {"name": "quick_dinner_payer_carlos", "nets": [{"id": "ana", "net_cents": -2188}, {"id": "bea", "net_cents": -2188}, {"id": "carlos", "net_cents": 6563}, {"id": "dani", "net_cents": -2187}], "expected": [{"from_id": "ana", "to_id": "carlos", "amount_cents": 2188}, {"from_id": "bea", "to_id": "carlos", "amount_cents": 2188}, {"from_id": "dani", "to_id": "carlos", "amount_cents": 2187}]},
+  {"name": "quick_trip", "nets": [{"id": "ana", "net_cents": 14466}, {"id": "bea", "net_cents": -10533}, {"id": "carlos", "net_cents": -3933}], "expected": [{"from_id": "bea", "to_id": "ana", "amount_cents": 10533}, {"from_id": "carlos", "to_id": "ana", "amount_cents": 3933}]},
+  {"name": "greedy_not_optimal_documented", "nets": [{"id": "a", "net_cents": 4}, {"id": "b", "net_cents": 3}, {"id": "c", "net_cents": 3}, {"id": "d", "net_cents": -6}, {"id": "e", "net_cents": -4}], "expected": [{"from_id": "d", "to_id": "a", "amount_cents": 4}, {"from_id": "e", "to_id": "b", "amount_cents": 3}, {"from_id": "d", "to_id": "c", "amount_cents": 2}, {"from_id": "e", "to_id": "c", "amount_cents": 1}]},
+  {"name": "all_zero", "nets": [{"id": "a", "net_cents": 0}, {"id": "b", "net_cents": 0}], "expected": []},
+  {"name": "unbalanced", "nets": [{"id": "a", "net_cents": 5}, {"id": "b", "net_cents": -4}], "error": "unbalanced_nets"}
+]

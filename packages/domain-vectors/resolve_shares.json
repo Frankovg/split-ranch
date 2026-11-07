@@ -1,0 +1,17 @@
+[
+  {"name": "equal_default_supermercado", "input": {"amount_cents": 10000, "payer_id": "franco", "split_type": "equal", "participants": [{"id": "juli"}, {"id": "franco"}, {"id": "ana"}]}, "expected": [{"id": "juli", "amount_cents": 3334}, {"id": "franco", "amount_cents": 3333}, {"id": "ana", "amount_cents": 3333}]},
+  {"name": "percentages_rent", "input": {"amount_cents": 120000, "payer_id": "juli", "split_type": "percentages", "participants": [{"id": "juli", "basis_points": 4000}, {"id": "franco", "basis_points": 3000}, {"id": "ana", "basis_points": 3000}]}, "expected": [{"id": "juli", "amount_cents": 48000}, {"id": "franco", "amount_cents": 36000}, {"id": "ana", "amount_cents": 36000}]},
+  {"name": "single_internet", "input": {"amount_cents": 4000, "payer_id": "franco", "split_type": "single", "participants": [{"id": "franco"}]}, "expected": [{"id": "franco", "amount_cents": 4000}]},
+  {"name": "equal_subset_override", "input": {"amount_cents": 6000, "payer_id": "ana", "split_type": "equal", "participants": [{"id": "juli"}, {"id": "ana"}]}, "expected": [{"id": "juli", "amount_cents": 3000}, {"id": "ana", "amount_cents": 3000}]},
+  {"name": "personal_goes_to_payer", "input": {"amount_cents": 3500, "payer_id": "ana", "split_type": "personal", "participants": []}, "expected": [{"id": "ana", "amount_cents": 3500}]},
+  {"name": "weights_2_1_1", "input": {"amount_cents": 12000, "payer_id": "carlos", "split_type": "weights", "participants": [{"id": "ana", "weight": 2}, {"id": "bea", "weight": 1}, {"id": "carlos", "weight": 1}]}, "expected": [{"id": "ana", "amount_cents": 6000}, {"id": "bea", "amount_cents": 3000}, {"id": "carlos", "amount_cents": 3000}]},
+  {"name": "exact_ok", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "exact", "participants": [{"id": "a", "exact_cents": 700}, {"id": "b", "exact_cents": 300}]}, "expected": [{"id": "a", "amount_cents": 700}, {"id": "b", "amount_cents": 300}]},
+  {"name": "reversal_negative_equal", "input": {"amount_cents": -10000, "payer_id": "franco", "split_type": "equal", "participants": [{"id": "juli"}, {"id": "franco"}, {"id": "ana"}]}, "expected": [{"id": "juli", "amount_cents": -3334}, {"id": "franco", "amount_cents": -3333}, {"id": "ana", "amount_cents": -3333}]},
+  {"name": "exact_mismatch", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "exact", "participants": [{"id": "a", "exact_cents": 700}, {"id": "b", "exact_cents": 200}]}, "error": "split_mismatch"},
+  {"name": "percentages_not_100", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "percentages", "participants": [{"id": "a", "basis_points": 6000}, {"id": "b", "basis_points": 3000}]}, "error": "split_mismatch"},
+  {"name": "single_needs_one", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "single", "participants": [{"id": "a"}, {"id": "b"}]}, "error": "invalid_split"},
+  {"name": "no_participants", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "equal", "participants": []}, "error": "invalid_split"},
+  {"name": "zero_amount", "input": {"amount_cents": 0, "payer_id": "a", "split_type": "equal", "participants": [{"id": "a"}]}, "error": "invalid_amount"},
+  {"name": "weights_missing", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "weights", "participants": [{"id": "a", "weight": 1}, {"id": "b"}]}, "error": "invalid_split"},
+  {"name": "duplicate_participant", "input": {"amount_cents": 1000, "payer_id": "a", "split_type": "equal", "participants": [{"id": "a"}, {"id": "a"}]}, "error": "invalid_split"}
+]

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "household_march_example",
+    "member_order": ["juli", "franco", "ana"],
+    "expenses": [
+      {"payer_id": "juli", "amount_cents": 120000, "shares": [{"id": "juli", "amount_cents": 48000}, {"id": "franco", "amount_cents": 36000}, {"id": "ana", "amount_cents": 36000}]},
+      {"payer_id": "franco", "amount_cents": 10000, "shares": [{"id": "juli", "amount_cents": 3334}, {"id": "franco", "amount_cents": 3333}, {"id": "ana", "amount_cents": 3333}]},
+      {"payer_id": "franco", "amount_cents": 4000, "shares": [{"id": "franco", "amount_cents": 4000}]},
+      {"payer_id": "ana", "amount_cents": 6000, "shares": [{"id": "juli", "amount_cents": 3000}, {"id": "ana", "amount_cents": 3000}]},
+      {"payer_id": "ana", "amount_cents": 3500, "personal": true, "shares": [{"id": "ana", "amount_cents": 3500}]}
+    ],
+    "expected": [
+      {"id": "juli", "paid_cents": 120000, "owed_cents": 54334, "net_cents": 65666},
+      {"id": "franco", "paid_cents": 14000, "owed_cents": 43333, "net_cents": -29333},
+      {"id": "ana", "paid_cents": 6000, "owed_cents": 42333, "net_cents": -36333}
+    ]
+  },
+  {
+    "name": "quick_trip_example",
+    "member_order": ["ana", "bea", "carlos"],
+    "expenses": [
+      {"payer_id": "ana", "amount_cents": 30000, "shares": [{"id": "ana", "amount_cents": 10000}, {"id": "bea", "amount_cents": 10000}, {"id": "carlos", "amount_cents": 10000}]},
+      {"payer_id": "bea", "amount_cents": 5000, "shares": [{"id": "ana", "amount_cents": 2500}, {"id": "bea", "amount_cents": 2500}]},
+      {"payer_id": "carlos", "amount_cents": 9100, "shares": [{"id": "ana", "amount_cents": 3034}, {"id": "bea", "amount_cents": 3033}, {"id": "carlos", "amount_cents": 3033}]}
+    ],
+    "expected": [
+      {"id": "ana", "paid_cents": 30000, "owed_cents": 15534, "net_cents": 14466},
+      {"id": "bea", "paid_cents": 5000, "owed_cents": 15533, "net_cents": -10533},
+      {"id": "carlos", "paid_cents": 9100, "owed_cents": 13033, "net_cents": -3933}
+    ]
+  },
+  {
+    "name": "adjustment_reversal_and_correction",
+    "member_order": ["juli", "franco", "ana"],
+    "expenses": [
+      {"payer_id": "franco", "amount_cents": -10000, "shares": [{"id": "juli", "amount_cents": -3334}, {"id": "franco", "amount_cents": -3333}, {"id": "ana", "amount_cents": -3333}]},
+      {"payer_id": "franco", "amount_cents": 13000, "shares": [{"id": "juli", "amount_cents": 4334}, {"id": "franco", "amount_cents": 4333}, {"id": "ana", "amount_cents": 4333}]}
+    ],
+    "expected": [
+      {"id": "juli", "paid_cents": 0, "owed_cents": 1000, "net_cents": -1000},
+      {"id": "franco", "paid_cents": 3000, "owed_cents": 1000, "net_cents": 2000},
+      {"id": "ana", "paid_cents": 0, "owed_cents": 1000, "net_cents": -1000}
+    ]
+  },
+  {
+    "name": "shares_mismatch_error",
+    "member_order": ["a", "b"],
+    "expenses": [
+      {"payer_id": "a", "amount_cents": 1000, "shares": [{"id": "a", "amount_cents": 500}, {"id": "b", "amount_cents": 400}]}
+    ],
+    "error": "split_mismatch"
+  }
+]

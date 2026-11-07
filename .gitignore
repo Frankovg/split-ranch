@@ -1,0 +1,22 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+coverage/
+.expo/
+*.log
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# Native
+android/
+ios/
+*.jks
+*.keystore
+# Supabase local CLI temp files (contain local secrets)
+supabase/.temp/
