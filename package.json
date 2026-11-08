@@ -11,7 +11,11 @@
     "api:test": "cd apps/api && uv run pytest",
     "api:dev": "cd apps/api && uv run uvicorn split_ranch.main:app --reload --port 8000",
     "worker:dev": "cd apps/api && uv run procrastinate --app=split_ranch.jobs.app.app worker",
+    "backend:dev": "concurrently --kill-others-on-fail --names api,worker --prefix-colors cyan,magenta \"pnpm api:dev\" \"pnpm worker:dev\"",
     "db:up": "supabase start",
     "db:down": "supabase stop"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
   }
 }
