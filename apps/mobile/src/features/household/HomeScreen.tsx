@@ -23,17 +23,19 @@ import {
   usePeriods,
 } from './api';
 import { activeMembers, ErrorScreen, ExpenseRow, LoadingScreen, memberName } from './components';
-import { currentMonth, monthLabel } from './dates';
+import { periodDates } from './dates';
 import { OnboardingScreen } from './OnboardingScreen';
+import { StartPeriodButton } from './StartPeriodButton';
 
 export function HomeScreen() {
   const { t } = useTranslation();
   const me = useActiveMembership();
   const householdId = me.membership?.household_id;
-  const month = currentMonth();
   const household = useHousehold(householdId);
-  const balance = useBalance(householdId, month);
-  const expenses = useExpenses(householdId, month);
+  // "current" = the latest period: the open one, or the last closed one until someone
+  // starts the next period.
+  const balance = useBalance(householdId, 'current');
+  const expenses = useExpenses(householdId, 'current');
   const categories = useCategories(householdId);
   const invite = useCreateInvitation(householdId ?? '');
   const periods = usePeriods(householdId);
@@ -60,7 +62,9 @@ export function HomeScreen() {
   const period = balance.data.period;
   const categoryName = (id: string | null) => categories.data?.find((c) => c.id === id)?.name;
   const recent = (expenses.data?.items ?? []).slice(0, 5);
-  const pastMonths = (periods.data?.items ?? []).filter((p) => p.month < month);
+  const pastPeriods = (periods.data?.items ?? []).filter((p) => p.seq < period.seq);
+  const isOpen = period.status === 'open';
+  const dates = periodDates(period, locale, h.timezone);
   const refreshing = household.isRefetching || balance.isRefetching || expenses.isRefetching;
 
   const onInvite = () =>
@@ -97,7 +101,12 @@ export function HomeScreen() {
         <Card>
           <CardHeader>
             <Text className="text-muted-foreground">
-              {t('home.yourBalance', { month: monthLabel(month, locale) })}
+              {t('home.yourBalance', { seq: period.seq })}
+            </Text>
+            <Text className="text-sm text-muted-foreground">
+              {dates.to
+                ? t('period.range', { from: dates.from, to: dates.to })
+                : t('period.since', { from: dates.from })}
             </Text>
           </CardHeader>
           <CardContent className="gap-1">
@@ -119,17 +128,28 @@ export function HomeScreen() {
             <Button
               variant="outline"
               className="mt-3"
-              onPress={() => router.push({ pathname: '/period/[month]', params: { month } })}>
-              <Text>{t('period.viewMonth')}</Text>
+              onPress={() =>
+                router.push({ pathname: '/period/[seq]', params: { seq: String(period.seq) } })
+              }>
+              <Text>{t(isOpen ? 'period.viewPeriod' : 'period.viewPayments')}</Text>
               <Icon as={ChevronRight} size={18} />
             </Button>
           </CardContent>
         </Card>
 
-        <Button size="lg" onPress={() => router.push('/expense/new')}>
-          <Icon as={Plus} size={20} />
-          <Text>{t('expenses.add')}</Text>
-        </Button>
+        {isOpen ? (
+          <Button size="lg" onPress={() => router.push('/expense/new')}>
+            <Icon as={Plus} size={20} />
+            <Text>{t('expenses.add')}</Text>
+          </Button>
+        ) : (
+          <View className="gap-2">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('period.noOpenPeriod', { seq: period.seq })}
+            </Text>
+            <StartPeriodButton householdId={h.id} latest={period} />
+          </View>
+        )}
 
         <Card>
           <CardHeader className="flex-row items-center justify-between">
@@ -179,22 +199,32 @@ export function HomeScreen() {
           </Card>
         ) : null}
 
-        {pastMonths.length > 0 ? (
+        {pastPeriods.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>{t('period.pastMonths')}</CardTitle>
+              <CardTitle>{t('period.pastPeriods')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {pastMonths.map((p, i) => (
+              {pastPeriods.map((p, i) => (
                 <View key={p.id}>
                   {i > 0 ? <Separator /> : null}
                   <Pressable
                     accessibilityRole="button"
                     onPress={() =>
-                      router.push({ pathname: '/period/[month]', params: { month: p.month } })
+                      router.push({ pathname: '/period/[seq]', params: { seq: String(p.seq) } })
                     }
                     className="flex-row items-center gap-3 py-3 active:opacity-70">
-                    <Text className="flex-1 capitalize">{monthLabel(p.month, locale)}</Text>
+                    <View className="flex-1 gap-0.5">
+                      <Text>{t('period.title', { seq: p.seq })}</Text>
+                      <Text className="text-sm text-muted-foreground">
+                        {(() => {
+                          const d = periodDates(p, locale, h.timezone);
+                          return d.to
+                            ? t('period.range', { from: d.from, to: d.to })
+                            : t('period.since', { from: d.from });
+                        })()}
+                      </Text>
+                    </View>
                     <Badge variant={p.status === 'settled' ? 'default' : 'secondary'}>
                       <Text>{t(`home.period_${p.status}`)}</Text>
                     </Badge>

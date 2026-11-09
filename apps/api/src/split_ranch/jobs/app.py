@@ -1,6 +1,7 @@
-"""Procrastinate app for the worker process.
+"""Procrastinate app for the worker.
 
-Run with:  procrastinate --app=split_ranch.jobs.app.app worker
+Run standalone with:  procrastinate --app=split_ranch.jobs.app.app worker
+or inside the API process with RUN_WORKER_IN_API=true (free hosting, see infra/README.md).
 The worker needs a session-mode/direct connection (LISTEN/NOTIFY): DATABASE_URL_SESSION.
 """
 
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.logging import configure_logging
 from split_ranch.core.settings import get_settings, libpq_url
-from split_ranch.use_cases import idempotency, periods
+from split_ranch.use_cases import idempotency
 
 log = structlog.get_logger(__name__)
 
@@ -25,7 +26,17 @@ def _connector() -> procrastinate.PsycopgConnector:
     # Procrastinate's tables live in `app`; its SQL uses unqualified names.
     return procrastinate.PsycopgConnector(
         conninfo=libpq_url(settings.session_database_url),
-        kwargs={"options": "-c search_path=app,public"},
+        kwargs={
+            "options": "-c search_path=app,public",
+            # A stalled attempt against the Supabase session pooler fails fast and the
+            # pool retries it, instead of hanging until the pool's own timeout.
+            "connect_timeout": 10,
+        },
+        # psycopg_pool defaults to opening 4 connections up front; the session pooler
+        # sometimes stalls on that burst. One worker (concurrency 1) needs one or two.
+        min_size=1,
+        max_size=4,
+        timeout=60,
     )
 
 
@@ -41,21 +52,23 @@ def _session_factory() -> sessionmaker[Session]:
     return create_session_factory(create_db_engine(engine_settings))
 
 
-@app.periodic(cron="*/15 * * * *", periodic_id="auto_close")
-@app.task(queue="periodic", queueing_lock="auto_close_due_periods", pass_context=False)
-def auto_close_due_periods(timestamp: int) -> int:
-    """Close every open period whose closes_at passed (system actor)."""
-    with _session_factory()() as session:
-        closed = periods.auto_close_due_periods(session)
-    log.info("auto_close_done", closed=closed, timestamp=timestamp)
-    return closed
-
-
 @app.periodic(cron="17 * * * *", periodic_id="purge_idempotency")
 @app.task(queue="periodic", pass_context=False)
 def purge_idempotency_keys(timestamp: int) -> int:
     with _session_factory()() as session:
         return idempotency.purge_expired(session)
+
+
+@app.periodic(cron="*/10 * * * *", periodic_id="retry_stalled_jobs")
+@app.task(queue="periodic", queueing_lock="retry_stalled_jobs", pass_context=False)
+async def retry_stalled_jobs(timestamp: int) -> int:
+    """Requeue jobs left in `doing` by a worker that died (e.g. a free instance spun down)."""
+    stalled = list(await app.job_manager.get_stalled_jobs())
+    for job in stalled:
+        await app.job_manager.retry_job(job)
+    if stalled:
+        log.warning("stalled_jobs_retried", count=len(stalled))
+    return len(stalled)
 
 
 @app.task(name="sync_period_tab", queue="sheets")

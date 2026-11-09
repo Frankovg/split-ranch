@@ -19,8 +19,8 @@ split-ranch/
 ├── supabase/
 │   └── config.toml             # Supabase CLI local stack: auth providers, JWT settings, exposed schemas
 ├── infra/
-│   ├── render.yaml             # Render blueprint: web + worker (staging/prod); DB lives in Supabase
-│   └── README.md               # runbooks: Supabase project settings checklist, secrets rotation, restore drill, Google Workspace setup
+│   ├── render.yaml             # Render blueprint: one Free web service (API + in-process worker); DB lives in Supabase
+│   └── README.md               # free-tier setup checklist, limits, secrets rotation, restore drill, Google Sheets setup
 ├── docs/                       # these documents
 ├── .github/workflows/
 ├── .env.example
@@ -45,7 +45,7 @@ The local stack is the **Supabase CLI** (`supabase start`), which runs Postgres 
 
 - Local Postgres: `postgresql://postgres:postgres@localhost:54322/postgres` (the CLI's default port; Alembic creates the `app` schema and the `split_api` role).
 - Local Auth: Google provider configured in `config.toml` with the dev web client ID (secret via `env()`), `skip_nonce_check = false`.
-- Signing in from the Android dev build against the local stack requires the device to reach the host (`adb reverse tcp:54321 tcp:54321`). For day-to-day mobile work it is simpler to point the dev build at the **staging** Supabase project and a local or staging API.
+- Signing in from the Android dev build against the local stack requires the device to reach the host (`adb reverse tcp:54321 tcp:54321`). There is no staging project (free tier, see [01](01-architecture.md#hosting-and-environments)), so mobile work uses the local stack.
 - Backend tests don't need Supabase: CI uses a plain `postgres` container and signs test JWTs with a local ES256 key served by a fake JWKS.
 
 Root scripts (`package.json`):
@@ -64,20 +64,21 @@ Root scripts (`package.json`):
 | `pnpm lint` / `typecheck` | all workspaces |
 | `pnpm vectors:gen` | regenerate random parity vectors (seeded) |
 
-Physical device → local API: use `adb reverse tcp:8000 tcp:8000` or point the dev build at the staging API via `EXPO_PUBLIC_API_URL`.
+Physical device → local API: use `adb reverse tcp:8000 tcp:8000`.
 
 ## Environment variables (`.env.example`)
 
 ```
 # API (transaction pooler in cloud; local stack uses the direct port)
 DATABASE_URL=postgresql+psycopg://split_api:split_api@localhost:54322/postgres
-# worker + migrations (session pooler / direct in cloud: needs LISTEN/NOTIFY)
+# worker + migrations (session pooler in cloud, IPv4: needs LISTEN/NOTIFY)
 DATABASE_URL_SESSION=postgresql+psycopg://split_api:split_api@localhost:54322/postgres
+RUN_WORKER_IN_API=false         # true in prod (Render Free has no background workers)
 SUPABASE_URL=http://localhost:54321
 SUPABASE_JWT_ISSUER=http://localhost:54321/auth/v1
 SUPABASE_SECRET_KEY=            # worker only (account deletion)
 GOOGLE_SERVICE_ACCOUNT_JSON_B64=
-GOOGLE_SHARED_DRIVE_ID=
+GOOGLE_SHEETS_SPREADSHEET_ID=   # user-owned spreadsheet shared with the service account
 SENTRY_DSN=
 APP_ENV=dev
 # supabase/config.toml reads these for the local Google provider

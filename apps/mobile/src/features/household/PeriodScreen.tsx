@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, RefreshControl, ScrollView, View } from 'react-native';
@@ -18,23 +18,29 @@ import {
   useBalance,
   useClosePeriod,
   useHousehold,
+  usePeriods,
   useReopenPeriod,
   useSettlement,
   useTransferAction,
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
-import { monthLabel } from './dates';
-import type { Household, Period, Transfer } from './types';
+import { periodDates } from './dates';
+import { StartPeriodButton } from './StartPeriodButton';
+import type { Household, Period, PeriodKey, Transfer } from './types';
 
-/** One month: balances, close, settlement transfers (sent → confirmed) and reopen. */
-export function PeriodScreen({ month }: { month: string }) {
+/** One period: balances, close, settlement transfers (sent → confirmed), next period, reopen. */
+export function PeriodScreen({ periodKey }: { periodKey: PeriodKey }) {
   const { t } = useTranslation();
   const me = useActiveMembership();
   const householdId = me.membership?.household_id;
   const household = useHousehold(householdId);
-  const balance = useBalance(householdId, month);
-  const settlement = useSettlement(householdId, month);
-  const title = monthLabel(month, currentMoneyLocale());
+  const balance = useBalance(householdId, periodKey);
+  const settlement = useSettlement(householdId, periodKey);
+  const periods = usePeriods(householdId);
+  const loaded = settlement.data?.period;
+  const title = loaded ? t('period.title', { seq: loaded.seq }) : '';
+  // Only the latest period can be reopened or followed by a new one.
+  const latestSeq = periods.data?.items[0]?.seq;
 
   let body: React.ReactNode;
   if (me.isPending || household.isPending || balance.isPending || settlement.isPending) {
@@ -52,6 +58,7 @@ export function PeriodScreen({ month }: { month: string }) {
   } else {
     const h = household.data;
     const period = settlement.data.period;
+    const isLatest = latestSeq === undefined || latestSeq === period.seq;
     body = (
       <SafeAreaView edges={['bottom']} className="flex-1 bg-background">
         <ScrollView
@@ -106,7 +113,14 @@ export function PeriodScreen({ month }: { month: string }) {
           ) : (
             <>
               <TransfersCard household={h} transfers={settlement.data.transfers} period={period} />
-              <ReopenSection household={h} period={period} />
+              {isLatest ? (
+                <StartPeriodButton
+                  householdId={h.id}
+                  latest={period}
+                  onStarted={() => router.dismissTo('/')}
+                />
+              ) : null}
+              {isLatest ? <ReopenSection household={h} period={period} /> : null}
             </>
           )}
         </ScrollView>
@@ -124,11 +138,11 @@ export function PeriodScreen({ month }: { month: string }) {
 
 function SummaryCard({ household, period, title }: { household: Household; period: Period; title: string }) {
   const { t } = useTranslation();
-  const locale = currentMoneyLocale();
+  const dates = periodDates(period, currentMoneyLocale(), household.timezone);
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="capitalize">{title}</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <Badge variant={period.status === 'settled' ? 'default' : 'secondary'}>
           <Text>{t(`home.period_${period.status}`)}</Text>
         </Badge>
@@ -136,16 +150,13 @@ function SummaryCard({ household, period, title }: { household: Household; perio
       <CardContent className="gap-1">
         <Text className="text-muted-foreground">{t('period.total')}</Text>
         <MoneyText cents={period.total_cents} size="3xl" />
+        <Text className="text-sm text-muted-foreground">
+          {dates.to
+            ? t('period.range', { from: dates.from, to: dates.to })
+            : t('period.since', { from: dates.from })}
+        </Text>
         {period.status === 'open' ? (
-          <Text className="text-sm text-muted-foreground">
-            {t('period.autoClose', {
-              date: new Date(period.closes_at).toLocaleDateString(locale, {
-                day: 'numeric',
-                month: 'long',
-                timeZone: household.timezone,
-              }),
-            })}
-          </Text>
+          <Text className="text-sm text-muted-foreground">{t('period.manualClose')}</Text>
         ) : null}
       </CardContent>
     </Card>
@@ -154,12 +165,10 @@ function SummaryCard({ household, period, title }: { household: Household; perio
 
 function CloseSection({ household, period, title }: { household: Household; period: Period; title: string }) {
   const { t } = useTranslation();
-  const close = useClosePeriod(household.id, period.month);
-  if (household.my_role !== 'admin') {
-    return <Text className="text-center text-sm text-muted-foreground">{t('period.onlyAdminCloses')}</Text>;
-  }
+  // Any member closes the period; the settlement is computed right away.
+  const close = useClosePeriod(household.id, period.seq);
   const onClose = () =>
-    Alert.alert(t('period.closeTitle', { month: title }), t('period.closeBody'), [
+    Alert.alert(t('period.closeTitle', { title }), t('period.closeBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('period.closeNow'),
@@ -246,7 +255,7 @@ function ReopenSection({ household, period }: { household: Household; period: Pe
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [reason, setReason] = React.useState('');
-  const reopen = useReopenPeriod(household.id, period.month);
+  const reopen = useReopenPeriod(household.id, period.seq);
 
   if (household.my_role !== 'admin') return null;
   if (period.locked) {

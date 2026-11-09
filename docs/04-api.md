@@ -13,7 +13,7 @@ Base URL `https://api.<domain>/v1`. JSON, UTF-8, `snake_case`. OpenAPI 3.1 gener
 | Money | `{"amount_cents": 1250, "currency": "EUR"}` |
 | Dates | `expense_date: "2026-03-14"`; timestamps ISO-8601 UTC |
 | Pagination | Keyset/cursor: `?limit=50&cursor=<opaque>` → `{"items": [...], "next_cursor": "..." | null}`. Default 50, max 200 |
-| Filtering | `?period=2026-03&category_id=…&payer_member_id=…&q=text&status=draft` |
+| Filtering | `?period=3&category_id=…&payer_member_id=…&q=text&status=draft` (`period` is a period number or `current`) |
 | Optimistic locking | Responses carry `ETag: "<version>"`; `PATCH`/`DELETE` require `If-Match: "<version>"` → `412` if stale (body includes the current resource) |
 | Idempotency | `POST` endpoints that create things accept `Idempotency-Key` (UUID). Same key + same body → stored response replayed; same key + different body → `422 idempotency_key_reuse`. Keys kept 48 h |
 | Errors | RFC 9457 `application/problem+json`: `{type, title, status, detail, code, errors?: [{loc, msg, type}]}` |
@@ -49,7 +49,7 @@ Error codes added: `unauthenticated` (missing/invalid token), `token_expired` (t
 |---|---|---|---|
 | POST | `/households` | any user | `{name, timezone?}` → creator becomes admin; default categories and rule created |
 | GET | `/households/{hid}` | member | settings, members |
-| PATCH | `/households/{hid}` | admin | `{name?, grace_days?, auto_close?, timezone?}` + If-Match |
+| PATCH | `/households/{hid}` | admin | `{name?, timezone?}` + If-Match |
 | POST | `/households/{hid}/invitations` | admin | `{expires_in_days=7, max_uses=5, start_period}` → `{code, url}` |
 | DELETE | `/households/{hid}/invitations/{id}` | admin | revoke |
 | GET | `/invitations/{code}` | authenticated | preview `{household_name, inviter, member_count}` |
@@ -87,7 +87,7 @@ Pydantic models use a **discriminated union on `split_type`** (`EqualSplit`, `We
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/households/{hid}/expenses` | filters + cursor; drafts only visible to their creator |
-| POST | `/households/{hid}/expenses` | create (status `confirmed` by default; `draft` allowed) |
+| POST | `/households/{hid}/expenses` | create (status `confirmed` by default; `draft` allowed). Goes to the open period; optional `period_seq` targets a closed (unlocked) one with `reason`. `409 no_open_period` when none is open |
 | GET | `/households/{hid}/expenses/{eid}` | includes shares, `split_origin`, `rule_fallback`, `can_edit`, `edit_requires_reason`, `edit_mode` (`in_place` / `adjustment`) |
 | PATCH | `/households/{hid}/expenses/{eid}` | If-Match; `reason` required when period not open; returns `409 period_locked` with `{adjustment_preview}` if the period is locked |
 | DELETE | `/households/{hid}/expenses/{eid}` | If-Match; soft delete; reason rules as PATCH |
@@ -137,14 +137,17 @@ Response (excerpt):
 
 ## Periods, balance, settlement
 
+`{period}` is a period number (`1`, `2`, …) or `current` (the latest period, open or not).
+
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/households/{hid}/periods?cursor=` | member | list with totals |
-| GET | `/households/{hid}/periods/{month}` | member | `month = 2026-03`; status, closes_at, totals per category |
-| GET | `/households/{hid}/periods/{month}/balance` | member | live nets per member (computed) + current snapshot if closed + `drift` flag |
-| POST | `/households/{hid}/periods/{month}/close` | admin | Idempotent; `If-Match` on period version |
-| POST | `/households/{hid}/periods/{month}/reopen` | admin | `{reason}`; `409 period_locked` if any transfer sent/confirmed |
-| GET | `/households/{hid}/periods/{month}/settlement` | member | current snapshot + transfers + previous snapshots summary |
+| GET | `/households/{hid}/periods?cursor=` | member | newest first, with totals; `cursor` = period number |
+| POST | `/households/{hid}/periods` | member | Start the next period → `201`; `409 period_open` while one is open |
+| GET | `/households/{hid}/periods/{period}` | member | status, `seq`, `started_at`, `closed_at`, totals per category |
+| GET | `/households/{hid}/periods/{period}/balance` | member | live nets per member (computed) + current snapshot if closed + `drift` flag |
+| POST | `/households/{hid}/periods/{period}/close` | member | Idempotent; optional `If-Match` on period version |
+| POST | `/households/{hid}/periods/{period}/reopen` | admin | `{reason}`; latest period only (`409 period_not_latest`); `409 period_locked` if any transfer sent/confirmed |
+| GET | `/households/{hid}/periods/{period}/settlement` | member | current snapshot + transfers + previous snapshots summary |
 | POST | `/households/{hid}/transfers/{tid}/sent` | debtor | `{method?: "bizum"|"paypal"|"cash"|"other", note?}` |
 | POST | `/households/{hid}/transfers/{tid}/confirm` | creditor (or admin with note if creditor left) | |
 | POST | `/households/{hid}/transfers/{tid}/dispute` | creditor | `{note}` |

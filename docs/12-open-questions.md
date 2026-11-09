@@ -5,24 +5,24 @@ Each item has a **default** that the plan already assumes. Change the default by
 ## Already decided (2026-11-07)
 | Question | Decision |
 |---|---|
-| Who closes the period? | Automatic at month end + grace days; admin can close early/reopen |
+| Who closes the period? | Any member, by hand; any member starts the next period. No automatic close (changed 2026-11-09). Admins reopen the latest period |
 | Who confirms a payment? | The receiver (creditor) |
-| Mid-month joins/leaves | Full-month membership |
+| Joins/leaves during a period | Whole-period membership |
 | Hosting | Supabase (Postgres + Auth, Frankfurt) + Render Frankfurt for the FastAPI web service and worker |
 | Auth | Supabase Auth with native Google sign-in |
 | Receipt photos | Out of scope (no file storage) |
 | Docs language | English |
 
 ## Household and rules
-1. **Retroactive re-split on mid-month join.** With full-month membership, a member joining on the 20th changes earlier default-split expenses (e.g. the 1st's groceries). **Default:** invitation asks "starts this month / next month"; `current` is preselected only in the first 10 days. Re-resolution applies only to `participant_mode='all'` expenses of the open period.
-2. **Leaving mid-month.** Full month means the leaver pays their share of the whole month, including expenses after they left. **Default:** yes (consistent, simple); admins can exclude them per expense with an override.
+1. **Retroactive re-split when someone joins an open period.** With whole-period membership, a member joining late changes earlier default-split expenses of the open period. **Default:** invitation asks "starts in the current period / the next one" (`current` by default). Re-resolution applies only to `participant_mode='all'` expenses of the open period.
+2. **Leaving during a period.** The leaver pays their share of the whole current period, including expenses after they left. **Default:** yes (consistent, simple); admins can exclude them per expense with an override.
 3. **Who can edit others' expenses?** **Default:** only admins (and the author).
 4. **Can members (not only admins) change category rules?** **Default:** admins only.
 5. **Should the payer default to "me"?** **Default:** yes.
 6. **Cent tie-break fairness.** The leftover cent always goes to the earliest member in canonical order when remainders tie (max 1 cent per expense). **Default:** accept. Alternative: rotate the starting member by a hash of the expense id (still deterministic, needs vector updates).
 7. **Optimal settlement solver** (bitmask DP) instead of greedy. **Default:** greedy in MVP; revisit if households complain about an extra transfer.
 8. **Lock trigger.** Lock the closed period at the first `sent` or `confirmed` transfer (our proposal) vs only at `confirmed`. **Default:** first `sent` or `confirmed`.
-9. **Grace days default.** **Default:** 3 days; configurable 0–15.
+9. ~~Grace days default~~ — obsolete: there is no automatic close.
 10. **Expense date in a locked period** (forgotten expense). **Default:** create it in the current open period with a note; no recalculation of the locked one.
 11. **Approval flow** (post-MVP): when enabled, do unapproved expenses count in the live balance? **Default:** no; they count once approved.
 
@@ -38,9 +38,9 @@ Each item has a **default** that the plan already assumes. Change the default by
 18. **Convert a quick event into household expenses?** **Default:** not planned.
 
 ## Google Sheets
-19. **Workspace subscription for the Shared Drive** (≈ €7/month). **Default:** yes. Alternative: per-household admin OAuth with `drive.file` (free, more code).
-20. **Layout:** four tabs per month vs one tab with four blocks. **Default:** four tabs (`2026-03 Resumen`, …).
-21. **Incremental sync of the open month.** **Default:** off (sync at close + changes after close); a household setting can enable it.
+19. ~~Workspace subscription for the Shared Drive~~ **Decided 2026-11-09:** no paid services. The admin owns the spreadsheet and shares it with the service account as Editor (see [06](06-google-sheets.md)).
+20. **Layout:** four tabs per period vs one tab with four blocks. **Default:** four tabs (`P3 Resumen`, …).
+21. ~~Incremental sync of the open period~~ **Decided 2026-11-09:** never. Only closed periods are exported (at close, and again after an edit to a closed period).
 
 ## Technical
 22. **Google Sign-In library**: paid Universal Sign-In vs free Credential-Manager library. **Default:** decide in spike T-0.4; abstraction either way.
@@ -52,8 +52,8 @@ Each item has a **default** that the plan already assumes. Change the default by
 28. **App UI language**: Spanish first, English second. **Default:** yes.
 
 ## Supabase
-29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Default:** Render Frankfurt. Alternative: Fly.io (Frankfurt/Amsterdam).
+29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Decided 2026-11-09:** one Render **Free** web service in Frankfurt, with the worker inside the API process; we accept the ~1 min cold start after 15 min idle. Revisit (Render Starter, or a separate worker) only if more households join.
 30. **Supabase anonymous sign-ins** to let Quick-split users save/share events without a Google account. **Default:** disabled in MVP (saving requires Google); revisit with the share-link feature.
-31. **PITR add-on for prod.** **Default:** daily backups of the Pro plan at launch; enable PITR once real households depend on it.
+31. ~~PITR add-on for prod~~ **Decided 2026-11-09:** Supabase Free plan (no backups, no PITR). A daily encrypted `supabase db dump` runs in GitHub Actions (`.github/workflows/db-backup.yml`), so the worst case is losing the last day of data.
 32. **Use Supabase Realtime** for live balance updates between members. **Default:** no; TanStack Query refetch on focus + push notifications are enough, and Realtime on our private schema would require exposing it.
 33. **Access-token lifetime.** **Default:** Supabase's 1 h; revocation is not instant for that window (see [08](08-security-and-privacy.md)).

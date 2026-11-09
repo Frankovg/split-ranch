@@ -13,7 +13,7 @@ export default function AppLayout() {
         name="expense/new"
         options={{ headerShown: true, title: t('expenses.add'), presentation: 'modal' }}
       />
-      <Stack.Screen name="period/[month]" options={{ headerShown: true, title: '' }} />
+      <Stack.Screen name="period/[seq]" options={{ headerShown: true, title: '' }} />
     </Stack>
   );
 }

@@ -8,20 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
-import { currentMoneyLocale } from '@/i18n';
-import { useActiveMembership, useCategories, useExpenses, useHousehold } from './api';
+import { useActiveMembership, useBalance, useCategories, useExpenses, useHousehold } from './api';
 import { ErrorScreen, ExpenseRow, LoadingScreen } from './components';
-import { currentMonth, monthLabel } from './dates';
 import { OnboardingScreen } from './OnboardingScreen';
 
-/** Expenses of the current month, newest first. */
+/** Expenses of the current (latest) period, newest first. */
 export function ExpensesScreen() {
   const { t } = useTranslation();
   const me = useActiveMembership();
   const householdId = me.membership?.household_id;
-  const month = currentMonth();
   const household = useHousehold(householdId);
-  const expenses = useExpenses(householdId, month);
+  const expenses = useExpenses(householdId, 'current');
+  const period = useBalance(householdId, 'current').data?.period;
   const categories = useCategories(householdId);
 
   if (me.isPending) return <LoadingScreen />;
@@ -46,13 +44,17 @@ export function ExpensesScreen() {
         }
         ListHeaderComponent={
           <View className="gap-3 pb-2">
-            <Text className="text-lg font-semibold capitalize" role="heading">
-              {monthLabel(month, currentMoneyLocale())}
-            </Text>
-            <Button onPress={() => router.push('/expense/new')}>
-              <Icon as={Plus} size={20} />
-              <Text>{t('expenses.add')}</Text>
-            </Button>
+            {period ? (
+              <Text className="text-lg font-semibold" role="heading">
+                {t('period.title', { seq: period.seq })}
+              </Text>
+            ) : null}
+            {period?.status === 'open' ? (
+              <Button onPress={() => router.push('/expense/new')}>
+                <Icon as={Plus} size={20} />
+                <Text>{t('expenses.add')}</Text>
+              </Button>
+            ) : null}
           </View>
         }
         ItemSeparatorComponent={Separator}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Header, Query, Response
 from fastapi.responses import JSONResponse
 
 from split_ranch.api.deps import HouseholdActorDep, IfMatchDep, SessionDep, etag
-from split_ranch.schemas.common import MonthStr, Page, ReasonIn, parse_month
+from split_ranch.schemas.common import Page, ReasonIn
 from split_ranch.schemas.expenses import (
     AdjustmentCreate,
     AdjustmentRead,
@@ -32,7 +32,8 @@ def list_expenses(
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     cursor: str | None = None,
-    period: MonthStr | None = None,
+    # A period number or "current" (the latest period).
+    period: Annotated[str | None, Query(pattern=r"^(current|[1-9][0-9]{0,6})$")] = None,
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
@@ -43,7 +44,7 @@ def list_expenses(
         actor,
         limit=limit,
         cursor=cursor,
-        month=parse_month(period) if period else None,
+        period=None if period is None else "current" if period == "current" else int(period),
         category_id=category_id,
         payer_member_id=payer_member_id,
         q=q,

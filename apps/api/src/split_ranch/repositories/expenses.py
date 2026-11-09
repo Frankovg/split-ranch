@@ -138,10 +138,34 @@ def revisions(session: Session, household_id: UUID, expense_id: UUID) -> Sequenc
 # ---------------------------------------------------------------- periods
 
 
-def get_period_by_month(
-    session: Session, household_id: UUID, month: date, *, for_update: bool = False
+def get_period_by_seq(
+    session: Session, household_id: UUID, seq: int, *, for_update: bool = False
 ) -> Period | None:
-    stmt = select(Period).where(Period.household_id == household_id, Period.month == month)
+    stmt = select(Period).where(Period.household_id == household_id, Period.seq == seq)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt).first()
+
+
+def get_latest_period(
+    session: Session, household_id: UUID, *, for_update: bool = False
+) -> Period | None:
+    """The most recently started period (the open one, if any: only the latest can be open)."""
+    stmt = (
+        select(Period)
+        .where(Period.household_id == household_id)
+        .order_by(Period.seq.desc())
+        .limit(1)
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    return session.scalars(stmt).first()
+
+
+def get_open_period(
+    session: Session, household_id: UUID, *, for_update: bool = False
+) -> Period | None:
+    stmt = select(Period).where(Period.household_id == household_id, Period.status == "open")
     if for_update:
         stmt = stmt.with_for_update()
     return session.scalars(stmt).first()
@@ -157,12 +181,12 @@ def get_period(
 
 
 def list_periods(
-    session: Session, household_id: UUID, *, limit: int, before_month: date | None = None
+    session: Session, household_id: UUID, *, limit: int, before_seq: int | None = None
 ) -> Sequence[Period]:
     stmt = select(Period).where(Period.household_id == household_id)
-    if before_month is not None:
-        stmt = stmt.where(Period.month < before_month)
-    return session.scalars(stmt.order_by(Period.month.desc()).limit(limit)).all()
+    if before_seq is not None:
+        stmt = stmt.where(Period.seq < before_seq)
+    return session.scalars(stmt.order_by(Period.seq.desc()).limit(limit)).all()
 
 
 def current_snapshot(

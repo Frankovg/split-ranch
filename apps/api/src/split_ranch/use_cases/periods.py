@@ -4,20 +4,16 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Sequence
-from datetime import date, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import and_, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from split_ranch.core import clock
 from split_ranch.core.actor import HouseholdActor
 from split_ranch.core.errors import Conflict, Forbidden, NotFound, Unprocessable
-from split_ranch.core.ids import uuid7
 from split_ranch.domain import Balance, LedgerExpense, NetEntry, Share, compute_balances, settle
 from split_ranch.jobs.queue import enqueue
 from split_ranch.models import (
@@ -29,7 +25,6 @@ from split_ranch.models import (
 )
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as hrepo
-from split_ranch.schemas.common import month_to_str
 from split_ranch.schemas.expenses import (
     BalanceRead,
     PeriodBalanceRead,
@@ -47,38 +42,26 @@ from split_ranch.use_cases.common import audit, check_version, require_active, r
 log = structlog.get_logger(__name__)
 
 PeriodState = Literal["open", "closed", "locked"]
+# A period is addressed by its number, or "current" for the latest one.
+PeriodKey = int | Literal["current"]
 
 
 # ------------------------------------------------------------- lifecycle
 
 
-def closes_at_for(household: Household, month: date) -> datetime:
-    """First day of next month 00:00 in the household time zone, plus grace days."""
-    nm = clock.next_month(month)
-    local = datetime(nm.year, nm.month, nm.day, tzinfo=ZoneInfo(household.timezone))
-    return local + timedelta(days=household.grace_days)
+def create_first_period(session: Session, household: Household) -> Period:
+    """A new household starts with period 1 open."""
+    period = Period(household_id=household.id, seq=1, status="open", started_at=clock.now())
+    session.add(period)
+    session.flush()
+    return period
 
 
-def get_or_create_period(
-    session: Session, household: Household, month: date, *, for_update: bool = True
-) -> Period:
-    """Periods are created lazily, one per calendar month."""
-    period = erepo.get_period_by_month(session, household.id, month, for_update=for_update)
-    if period is not None:
-        return period
-    session.execute(
-        insert(Period)
-        .values(
-            id=uuid7(),
-            household_id=household.id,
-            month=month,
-            status="open",
-            closes_at=closes_at_for(household, month),
-        )
-        .on_conflict_do_nothing(index_elements=[Period.household_id, Period.month])
-    )
-    period = erepo.get_period_by_month(session, household.id, month, for_update=for_update)
-    assert period is not None
+def require_open_period(session: Session, household_id: UUID) -> Period:
+    """The period new expenses go to. Members start it by hand after closing the last one."""
+    period = erepo.get_open_period(session, household_id, for_update=True)
+    if period is None:
+        raise Conflict("There is no open period: start a new one first", code="no_open_period")
     return period
 
 
@@ -92,8 +75,8 @@ def period_state(session: Session, period: Period) -> PeriodState:
     return "closed"
 
 
-def _member_order(session: Session, household_id: UUID, month: date) -> list[str]:
-    return [str(m.id) for m in hrepo.period_members(session, household_id, month)]
+def _member_order(session: Session, household_id: UUID, seq: int) -> list[str]:
+    return [str(m.id) for m in hrepo.period_members(session, household_id, seq)]
 
 
 def compute_period_ledger(
@@ -110,7 +93,7 @@ def compute_period_ledger(
         )
         for e in expenses
     ]
-    balances = compute_balances(_member_order(session, household_id, period.month), ledger)
+    balances = compute_balances(_member_order(session, household_id, period.seq), ledger)
     digest = hashlib.sha256(
         "|".join(sorted(f"{e.id}:{e.version}" for e in expenses)).encode()
     ).hexdigest()
@@ -149,14 +132,14 @@ def _mark_settled(session: Session, household_id: UUID, period: Period) -> None:
         select(HouseholdMember).where(
             HouseholdMember.household_id == household_id,
             HouseholdMember.status == "leaving",
-            HouseholdMember.left_period <= period.month,
+            HouseholdMember.left_period_seq <= period.seq,
         )
     ):
         open_or_closed = session.scalars(
             select(Period.id).where(
                 Period.household_id == household_id,
-                Period.month <= period.month,
-                Period.month >= m.joined_period,
+                Period.seq <= period.seq,
+                Period.seq >= m.joined_period_seq,
                 Period.status != "settled",
                 Period.id != period.id,
             )
@@ -259,9 +242,9 @@ def _period_read(session: Session, household_id: UUID, period: Period) -> Period
         by_cat[e.category_id] = by_cat.get(e.category_id, 0) + e.amount_cents
     return PeriodRead(
         id=period.id,
-        month=month_to_str(period.month),
+        seq=period.seq,
         status=period.status,
-        closes_at=period.closes_at,
+        started_at=period.started_at,
         closed_at=period.closed_at,
         settled_at=period.settled_at,
         reopened_count=period.reopened_count,
@@ -274,45 +257,38 @@ def _period_read(session: Session, household_id: UUID, period: Period) -> Period
     )
 
 
-def load_period_for_read(session: Session, household: Household, month: date) -> Period:
-    """Existing period, or lazily created when the month is plausible for the household."""
-    period = erepo.get_period_by_month(session, household.id, month, for_update=False)
-    if period is not None:
-        return period
-    current = clock.month_start(clock.today_in(household.timezone))
-    first = min(
-        (m.joined_period for m in hrepo.list_members(session, household.id)), default=current
-    )
-    if month < first or month > clock.next_month(current):
+def load_period(
+    session: Session, household_id: UUID, key: PeriodKey, *, for_update: bool = False
+) -> Period:
+    if key == "current":
+        period = erepo.get_latest_period(session, household_id, for_update=for_update)
+    else:
+        period = erepo.get_period_by_seq(session, household_id, key, for_update=for_update)
+    if period is None:
         raise NotFound("Period not found")
-    period = get_or_create_period(session, household, month, for_update=False)
-    session.commit()
     return period
 
 
 def list_periods(
-    session: Session, actor: HouseholdActor, *, limit: int, before: date | None
+    session: Session, actor: HouseholdActor, *, limit: int, before: int | None
 ) -> tuple[list[PeriodRead], str | None]:
-    rows = erepo.list_periods(session, actor.household_id, limit=limit + 1, before_month=before)
+    rows = erepo.list_periods(session, actor.household_id, limit=limit + 1, before_seq=before)
     items = [_period_read(session, actor.household_id, p) for p in rows[:limit]]
-    next_cursor = month_to_str(rows[limit - 1].month) if len(rows) > limit else None
+    next_cursor = str(rows[limit - 1].seq) if len(rows) > limit else None
     return items, next_cursor
 
 
-def get_period(session: Session, actor: HouseholdActor, month: date) -> PeriodRead:
-    household = _household(session, actor.household_id)
-    return _period_read(
-        session, actor.household_id, load_period_for_read(session, household, month)
-    )
+def get_period(session: Session, actor: HouseholdActor, key: PeriodKey) -> PeriodRead:
+    return _period_read(session, actor.household_id, load_period(session, actor.household_id, key))
 
 
 def _snapshot_read(s: SettlementSnapshot) -> SnapshotRead:
     return SnapshotRead.model_validate(s)
 
 
-def get_balance(session: Session, actor: HouseholdActor, month: date) -> PeriodBalanceRead:
+def get_balance(session: Session, actor: HouseholdActor, key: PeriodKey) -> PeriodBalanceRead:
     household = _household(session, actor.household_id)
-    period = load_period_for_read(session, household, month)
+    period = load_period(session, household.id, key)
     balances, digest = compute_period_ledger(session, household.id, period)
     snapshot = erepo.current_snapshot(session, household.id, period.id)
     return PeriodBalanceRead(
@@ -331,9 +307,9 @@ def get_balance(session: Session, actor: HouseholdActor, month: date) -> PeriodB
     )
 
 
-def get_settlement(session: Session, actor: HouseholdActor, month: date) -> SettlementRead:
+def get_settlement(session: Session, actor: HouseholdActor, key: PeriodKey) -> SettlementRead:
     household = _household(session, actor.household_id)
-    period = load_period_for_read(session, household, month)
+    period = load_period(session, household.id, key)
     all_snapshots = erepo.snapshots(session, household.id, period.id)
     current = next((s for s in reversed(all_snapshots) if s.superseded_at is None), None)
     transfers = (
@@ -351,14 +327,12 @@ def get_settlement(session: Session, actor: HouseholdActor, month: date) -> Sett
 
 
 def close_period(
-    session: Session, actor: HouseholdActor, month: date, if_match: int | None
+    session: Session, actor: HouseholdActor, key: PeriodKey, if_match: int | None
 ) -> PeriodRead:
-    """Admin closes early. Idempotent: closing a closed/settled period returns it as is."""
-    require_admin(actor)
+    """Any active member closes the period. Idempotent on a closed/settled period."""
+    require_active(actor)
     household = _household(session, actor.household_id)
-    load_period_for_read(session, household, month)
-    period = erepo.get_period_by_month(session, household.id, month, for_update=True)
-    assert period is not None
+    period = load_period(session, household.id, key, for_update=True)
     if period.status != "open":
         return _period_read(session, household.id, period)
     check_version(if_match, period.version, required=False)
@@ -370,22 +344,60 @@ def close_period(
         entity_id=period.id,
         actor_user_id=actor.user_id,
         action="close",
-        diff={"month": month_to_str(month)},
+        diff={"seq": period.seq},
     )
     session.commit()
     return _period_read(session, household.id, period)
 
 
+def start_period(session: Session, actor: HouseholdActor) -> PeriodRead:
+    """Any active member starts the next period once the latest one is closed."""
+    require_active(actor)
+    # Lock the household row so two members starting at once cannot both succeed.
+    household = hrepo.get_household(session, actor.household_id, for_update=True)
+    if household is None:
+        raise NotFound("Household not found")
+    latest = erepo.get_latest_period(session, household.id)
+    if latest is not None and latest.status == "open":
+        raise Conflict(
+            "Close the current period before starting a new one",
+            code="period_open",
+            extra={"seq": latest.seq},
+        )
+    period = Period(
+        household_id=household.id,
+        seq=(latest.seq if latest else 0) + 1,
+        status="open",
+        started_at=clock.now(),
+    )
+    session.add(period)
+    session.flush()
+    audit(
+        session,
+        household_id=household.id,
+        entity="period",
+        entity_id=period.id,
+        actor_user_id=actor.user_id,
+        action="start",
+        diff={"seq": period.seq},
+    )
+    session.commit()
+    log.info("period_started", household_id=str(household.id), seq=period.seq)
+    return _period_read(session, household.id, period)
+
+
 def reopen_period(
-    session: Session, actor: HouseholdActor, month: date, data: ReopenIn
+    session: Session, actor: HouseholdActor, key: PeriodKey, data: ReopenIn
 ) -> PeriodRead:
+    """Admin reopens the latest period while nobody has paid it yet."""
     require_admin(actor)
     household = _household(session, actor.household_id)
-    period = erepo.get_period_by_month(session, household.id, month, for_update=True)
-    if period is None:
-        raise NotFound("Period not found")
+    period = load_period(session, household.id, key, for_update=True)
     if period.status == "open":
         raise Conflict("Period is already open", code="period_state_changed")
+    latest = erepo.get_latest_period(session, household.id)
+    if latest is not None and latest.id != period.id:
+        raise Conflict("Only the latest period can be reopened", code="period_not_latest")
     if period_state(session, period) == "locked":
         raise Conflict(
             "Period has sent or confirmed transfers and cannot be reopened", code="period_locked"
@@ -397,10 +409,6 @@ def reopen_period(
     period.settled_at = None
     period.reopened_count += 1
     period.version += 1
-    # Give the household time to fix things before auto-close kicks in again.
-    period.closes_at = max(
-        period.closes_at, clock.now() + timedelta(days=max(household.grace_days, 1))
-    )
     audit(
         session,
         household_id=household.id,
@@ -412,34 +420,6 @@ def reopen_period(
     )
     session.commit()
     return _period_read(session, household.id, period)
-
-
-def auto_close_due_periods(session: Session, *, batch: int = 100) -> int:
-    """Close every open period whose `closes_at` passed (system actor). One tx per period."""
-    closed = 0
-    for _ in range(batch):
-        period = session.scalars(
-            select(Period)
-            .join(Household, and_(Household.id == Period.household_id))
-            .where(
-                Period.status == "open",
-                Period.closes_at <= clock.now(),
-                Household.auto_close.is_(True),
-                Household.deleted_at.is_(None),
-            )
-            .order_by(Period.closes_at)
-            .limit(1)
-            .with_for_update(of=Period, skip_locked=True)
-        ).first()
-        if period is None:
-            break
-        household = hrepo.get_household(session, period.household_id)
-        assert household is not None
-        _close(session, household, period, None)
-        session.commit()
-        closed += 1
-        log.info("period_auto_closed", period_id=str(period.id), household_id=str(household.id))
-    return closed
 
 
 # -------------------------------------------------------------- transfers
@@ -532,19 +512,20 @@ def dispute_transfer(
 
 __all__ = [
     "after_edit_in_closed_period",
-    "auto_close_due_periods",
     "close_period",
-    "closes_at_for",
     "compute_period_ledger",
     "confirm_transfer",
+    "create_first_period",
     "dispute_transfer",
     "get_balance",
-    "get_or_create_period",
     "get_period",
     "get_settlement",
     "list_periods",
+    "load_period",
     "mark_transfer_sent",
     "period_state",
     "reopen_period",
+    "require_open_period",
+    "start_period",
     "write_snapshot",
 ]

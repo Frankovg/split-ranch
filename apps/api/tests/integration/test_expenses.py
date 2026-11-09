@@ -121,13 +121,13 @@ def test_update_with_if_match(client: TestClient, house: House) -> None:
     assert revs[1]["before"]["amount_cents"] == 1000 and revs[1]["after"]["amount_cents"] == 1200
     assert revs[1]["after"]["shares"][0]["amount_cents"] == 400
 
-    # Move to another month: period changes.
+    # A new date does not move the expense to another period.
     moved = ok(
         client.patch(
             url, json={"expense_date": "2026-04-01"}, headers=house.h("Juli", **{"If-Match": '"2"'})
         )
     )
-    assert moved["period"]["month"] == "2026-04"
+    assert moved["expense_date"] == "2026-04-01" and moved["period"]["seq"] == 1
 
 
 def test_override_kept_on_amount_change(client: TestClient, house: House) -> None:
@@ -181,7 +181,7 @@ def test_drafts(client: TestClient, house: House) -> None:
         len(ok(client.get(house.url("/expenses?status=draft"), headers=house.h("Ana")))["items"])
         == 1
     )
-    bal = ok(client.get(house.url("/periods/2026-03/balance"), headers=house.h("Ana")))
+    bal = ok(client.get(house.url("/periods/1/balance"), headers=house.h("Ana")))
     assert all(b["net_cents"] == 0 for b in bal["balances"])
     confirmed = ok(
         client.post(
@@ -207,13 +207,15 @@ def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
             description=f"Gasto {day}",
             category="Ocio" if day == 3 else None,
         )
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
+    ok(client.post(house.url("/periods"), headers=house.h("Juli")), 201)
     add_expense(
         client, house, "Juli", amount=999, payer="Juli", date="2026-04-01", description="Abril"
     )
     seen: list[str] = []
     cursor = None
     while True:
-        q = "/expenses?limit=3&period=2026-03" + (f"&cursor={cursor}" if cursor else "")
+        q = "/expenses?limit=3&period=1" + (f"&cursor={cursor}" if cursor else "")
         page = ok(client.get(house.url(q), headers=house.h("Ana")))
         seen += [i["description"] for i in page["items"]]
         cursor = page["next_cursor"]
@@ -273,18 +275,22 @@ def test_payer_and_members_validation(
 
 def test_new_expense_in_closed_period(client: TestClient, house: House) -> None:
     add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-03-03")
-    ok(client.post(house.url("/periods/2026-03/close"), headers=house.h("Juli")))
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
     r = client.post(house.url("/expenses"), json=_body(house), headers=house.h("Franco"))
+    assert r.status_code == 409 and r.json()["code"] == "no_open_period"
+    r = client.post(
+        house.url("/expenses"), json=_body(house, period_seq=1), headers=house.h("Franco")
+    )
     assert r.status_code == 409 and r.json()["code"] == "reason_required"
     ok(
         client.post(
             house.url("/expenses"),
-            json=_body(house, reason="Se me olvidó"),
+            json=_body(house, period_seq=1, reason="Se me olvidó"),
             headers=house.h("Franco"),
         ),
         201,
     )
-    settlement = ok(client.get(house.url("/periods/2026-03/settlement"), headers=house.h("Juli")))
+    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
     assert settlement["snapshot"]["seq"] == 2
-    bal = ok(client.get(house.url("/periods/2026-03/balance"), headers=house.h("Juli")))
+    bal = ok(client.get(house.url("/periods/1/balance"), headers=house.h("Juli")))
     assert bal["drift"] is False

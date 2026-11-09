@@ -27,8 +27,9 @@ export interface Member {
   role: string;
   status: string;
   sort_key: number;
-  joined_period: string;
-  left_period: string | null;
+  /** Period numbers the member takes part in (left = null while still a member). */
+  joined_period_seq: number;
+  left_period_seq: number | null;
 }
 
 export interface Household {
@@ -36,8 +37,6 @@ export interface Household {
   name: string;
   timezone: string;
   currency: string;
-  grace_days: number;
-  auto_close: boolean;
   version: number;
   created_at: string;
   members: Member[];
@@ -72,7 +71,7 @@ export interface Share {
 export interface Expense {
   id: string;
   version: number;
-  period: { id: string; month: string; status: string };
+  period: { id: string; seq: number; status: string };
   category_id: string | null;
   payer_member_id: string;
   amount_cents: number;
@@ -92,11 +91,15 @@ export interface Page<T> {
 
 export type PeriodStatus = 'open' | 'closed' | 'settled';
 
+/** A period number, or "current" for the latest period (open or not). */
+export type PeriodKey = number | 'current';
+
+/** Members close a period and start the next one by hand: periods are numbered, not months. */
 export interface Period {
   id: string;
-  month: string;
+  seq: number;
   status: PeriodStatus;
-  closes_at: string;
+  started_at: string;
   closed_at: string | null;
   settled_at: string | null;
   version: number;
@@ -146,6 +149,4 @@ export interface ExpenseCreateInput {
   expense_date: string;
   /** Omitted = household rule; otherwise equal split between these members. */
   participants?: string[];
-  /** Required by the API when the expense lands in a closed (not yet locked) month. */
-  reason?: string;
 }

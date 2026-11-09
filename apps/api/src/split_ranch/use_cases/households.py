@@ -21,6 +21,7 @@ from split_ranch.models import (
     SplitRule,
     User,
 )
+from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as repo
 from split_ranch.schemas.households import (
     HouseholdCreate,
@@ -34,6 +35,7 @@ from split_ranch.schemas.households import (
     MemberRoleUpdate,
 )
 from split_ranch.use_cases.common import audit, check_version, require_active, require_admin
+from split_ranch.use_cases.periods import create_first_period
 
 # Default categories copied into every new household (Spanish first; UI translates by icon).
 DEFAULT_CATEGORIES: tuple[tuple[str, str, str], ...] = (
@@ -52,7 +54,6 @@ DEFAULT_CATEGORIES: tuple[tuple[str, str, str], ...] = (
 )
 
 INVITE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"  # base32
-AUTO_CURRENT_UNTIL_DAY = 10
 
 
 def _validate_timezone(tz: str) -> None:
@@ -71,8 +72,6 @@ def _household_read(
         name=household.name,
         timezone=household.timezone,
         currency=household.currency,
-        grace_days=household.grace_days,
-        auto_close=household.auto_close,
         version=household.version,
         created_at=household.created_at,
         members=[
@@ -83,8 +82,8 @@ def _household_read(
                 role=m.role,
                 status=m.status,
                 sort_key=m.sort_key,
-                joined_period=m.joined_period,
-                left_period=m.left_period,
+                joined_period_seq=m.joined_period_seq,
+                left_period_seq=m.left_period_seq,
             )
             for m, u in members
         ],
@@ -106,14 +105,14 @@ def create_household(session: Session, actor: Actor, data: HouseholdCreate) -> H
     household = Household(name=data.name.strip(), timezone=data.timezone, created_by=actor.user_id)
     session.add(household)
     session.flush()
-    month = clock.month_start(clock.today_in(data.timezone))
+    first = create_first_period(session, household)
     member = HouseholdMember(
         household_id=household.id,
         user_id=actor.user_id,
         role="admin",
         status="active",
         sort_key=0,
-        joined_period=month,
+        joined_period_seq=first.seq,
     )
     session.add(member)
     for i, (name, icon, color) in enumerate(DEFAULT_CATEGORIES):
@@ -285,12 +284,13 @@ def accept_invitation(
             extra={"household_id": str(household.id), "member_id": str(existing.id)},
         )
 
-    today = clock.today_in(household.timezone)
-    current = clock.month_start(today)
-    start = data.start_period or inv.start_period
-    if start is None:
-        start = "current" if today.day <= AUTO_CURRENT_UNTIL_DAY else "next"
-    joined = current if start == "current" else clock.next_month(current)
+    start = data.start_period or inv.start_period or "current"
+    latest = erepo.get_latest_period(session, household.id, for_update=True)
+    latest_seq = latest.seq if latest else 0
+    # With no open period, "current" also means the next one: a closed period's balance
+    # must not change because someone joined.
+    open_now = latest is not None and latest.status == "open"
+    joined = latest_seq if start == "current" and open_now else latest_seq + 1
 
     max_sort = session.scalar(
         select(func.max(HouseholdMember.sort_key)).where(
@@ -302,8 +302,8 @@ def accept_invitation(
         member = existing
         member.status = "active"
         member.role = "member"
-        member.joined_period = joined
-        member.left_period = None
+        member.joined_period_seq = joined
+        member.left_period_seq = None
         member.sort_key = sort_key
     else:
         member = HouseholdMember(
@@ -312,7 +312,7 @@ def accept_invitation(
             role="member",
             status="active",
             sort_key=sort_key,
-            joined_period=joined,
+            joined_period_seq=joined,
         )
         session.add(member)
     inv.uses += 1
@@ -326,8 +326,8 @@ def accept_invitation(
         action="join",
         diff={"invitation_id": str(inv.id), "start_period": start},
     )
-    if start == "current":
-        # Full-month membership: "all members" expenses of the open period include them now.
+    if start == "current" and open_now:
+        # Whole-period membership: "all members" expenses of the open period include them now.
         reresolve_open_expenses(
             session,
             household.id,
@@ -403,10 +403,10 @@ def _start_leaving(session: Session, actor: HouseholdActor, member: HouseholdMem
     )
     if member.role == "admin" and _admin_count(session, actor.household_id) <= 1 and others:
         raise Conflict("Promote another admin before leaving", code="last_admin")
-    current = clock.month_start(clock.today_in(household.timezone))
+    latest = erepo.get_latest_period(session, household.id)
     member.status = "leaving"
-    # Full-month rule: the member stays in the current period and must settle it.
-    member.left_period = max(current, member.joined_period)
+    # Whole-period rule: the member stays in the current (latest) period and settles it.
+    member.left_period_seq = max(latest.seq if latest else 1, member.joined_period_seq)
     audit(
         session,
         household_id=actor.household_id,
@@ -414,7 +414,7 @@ def _start_leaving(session: Session, actor: HouseholdActor, member: HouseholdMem
         entity_id=member.id,
         actor_user_id=actor.user_id,
         action="leave",
-        diff={"left_period": member.left_period.isoformat()},
+        diff={"left_period_seq": member.left_period_seq},
     )
 
 

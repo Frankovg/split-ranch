@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     db_pool_size: int = 5
     db_max_overflow: int = 5
 
+    # Run the Procrastinate worker inside the API process (free hosting: no separate
+    # worker service). Jobs then run only while the API instance is awake.
+    run_worker_in_api: bool = False
+
     supabase_url: str = "http://localhost:54321"
     supabase_jwt_issuer: str | None = None
     supabase_jwks_url: str | None = None

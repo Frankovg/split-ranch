@@ -4,22 +4,22 @@ The database is the source of truth. The spreadsheet is a **read-only mirror** f
 
 ## Ownership: the service-account problem
 
-Service accounts have **no Drive storage quota** of their own: creating spreadsheets in a service account's "My Drive" fails with `403 storageQuotaExceeded` (widely reported for service accounts since 2025). Options:
+Service accounts have **no Drive storage quota** of their own: creating spreadsheets in a service account's "My Drive" fails with `403 storageQuotaExceeded` (widely reported for service accounts since 2025). A file's owner is whoever creates it, and it counts against the owner's quota. So a service account *can* edit a file that a person owns and has shared with it. Options:
 
 | Option | How | Pros | Cons |
 |---|---|---|---|
-| **A. Shared Drive (recommended)** | Project owns a Google Workspace account (Business Starter ≈ €7/month) with one Shared Drive "Split Ranch Households". The service account is a *Content manager* of it. Spreadsheets are created there and shared (reader) with members' emails | No end-user OAuth; files survive member changes; central control; matches the "service account" design | Requires a Workspace subscription; external sharing must be allowed in the Workspace admin console; data processed under the project's Workspace account (DPA) |
-| B. Admin's own Drive (`drive.file` scope) | A household admin connects their Google account once with the non-sensitive `drive.file` scope; backend stores an encrypted refresh token and creates/updates the file in the admin's Drive | Free; data lives in the household's own Drive | Token lifecycle (revocation, admin leaves), extra OAuth consent screen, more code |
-| C. Domain-wide delegation | Service account impersonates a Workspace user | — | Same Workspace requirement as A with more risk; no benefit here |
+| **A. User-owned spreadsheet shared with the service account (chosen)** | A household admin creates the spreadsheet in their own Drive and shares it with the service account's email as **Editor** (and with the other members as Viewer). The backend only gets the spreadsheet ID (`GOOGLE_SHEETS_SPREADSHEET_ID` while there is a single household) | Free; no Workspace; no end-user OAuth or tokens; data lives in the household's own Drive | The backend cannot create the file or manage sharing, so the admin does both by hand once; if the admin deletes the file or removes the share, sync fails until they fix it |
+| B. Shared Drive | Project owns a Google Workspace account (Business Starter ≈ €7/month) with a Shared Drive; the service account is *Content manager* and creates one file per household | Fully automatic creation and sharing; scales to many households | Paid subscription; external sharing must be allowed in the Workspace admin console |
+| C. Admin's own Drive via OAuth (`drive.file`) | Admin connects their Google account; backend stores an encrypted refresh token and creates the file for them | Free and automatic | Token lifecycle (revocation, admin leaves), extra consent screen, more code |
 
-**Decision:** A for MVP. Keep the `integrations/google_sheets.py` interface (`ensure_spreadsheet`, `write_tab`) independent of ownership so B can be added if a household wants the file in its own Drive.
+**Decision (2026-11-09):** A. The app is for one household, and there is no budget for paid services. Keep the `integrations/google_sheets.py` interface (`ensure_spreadsheet`, `write_tab`) independent of ownership, so B or C can be added if more households ever join.
 
 ## Quotas (Sheets API, current)
 - 300 read + 300 write requests/min **per project**; **60 read + 60 write requests/min per user per project**. A service account counts as **one user** → effective budget ≈ **60 writes/min** for all households.
 - A `spreadsheets.batchUpdate` with many sub-requests counts as **one** request.
 - `429` → exponential backoff; quotas refill every minute.
 
-Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting), so ~20 tab syncs/min. The worker uses a **dedicated queue `sheets` with concurrency 1** and a token bucket (50 writes/min) to stay under the limit.
+Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting). We only sync closed periods, so a household makes a handful of requests per month. A **dedicated queue `sheets`** (concurrency 1) plus backoff on 429 is enough. The token bucket is only needed if many households ever share one service account.
 
 ## Spreadsheet layout
 
@@ -33,44 +33,43 @@ One spreadsheet per household: `Split Ranch — <Household name>`.
 | `2026-03 Por categoría` | Category × member matrix + totals; budget vs actual when budgets exist |
 | `2026-03 Liquidación` | Transfers: from, to, amount, status, sent_at, confirmed_at; previous snapshots summarised |
 
-The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per month** (prefixed by month) is the recommended layout. A single tab with four stacked blocks is the fallback if the household prefers fewer tabs (it only changes the renderer).
+The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per period** (prefixed by the period number, e.g. `P3`; periods are started by hand, not calendar months) is the recommended layout. A single tab with four stacked blocks is the fallback if the household prefers fewer tabs (it only changes the renderer).
 
 Personal expenses are excluded. Amounts are written as numbers with currency format (`#,##0.00 €`), never formulas that depend on other cells (the file must be reproducible from the DB alone).
 
 ## Triggers
 
+**Only closed periods are exported.** The open period is never written: it changes on every expense, and the app is where people look at it. Every sync is triggered by a new settlement snapshot, which only exists for a closed period (`write_snapshot` in `use_cases/periods.py`).
+
 | Event | Job |
 |---|---|
-| Household created / first close | `ensure_household_spreadsheet` (create file, `Léeme`, share with members) |
-| Period closed (auto or manual) | `sync_period_tab(period_id)` for all four tabs |
-| Edit after close, adjustment, transfer status change | `sync_period_tab` for the affected period(s) (an adjustment touches the current period; its original stays untouched) |
-| Member joined / left | update sharing (add reader / remove permission after `left`) |
-| Optional incremental sync (setting, default **off**) | debounced `sync_period_tab` for the open period at most once every 10 min |
-| Nightly reconciliation | re-sync any tab whose `content_hash` differs from the DB rendering (catches manual edits or missed jobs) |
+| Period closed (manual) | `sync_period_tab(period_id)` for all four tabs (first run also runs `ensure_household_spreadsheet`: verify access, write `Léeme`) |
+| Edit in an already closed period (unlocked) | `sync_period_tab` for that period, since the edit writes a new snapshot |
 
-All jobs are enqueued **inside the business transaction** (Procrastinate), so a close and its sync request commit or roll back together.
+Not synced: transfer status changes (`Liquidación` shows the transfers as of the last snapshot; the app shows their live status), member joins/leaves (sharing is managed by hand in Drive), the open period, and nightly reconciliation (nothing runs on a schedule while the free API instance sleeps).
+
+All jobs are enqueued **inside the business transaction** (Procrastinate), so a close and its sync request commit or roll back together. On the free hosting the worker runs inside the API process (`RUN_WORKER_IN_API`). A job enqueued by the close request therefore runs a few seconds later, while that same instance is still awake.
 
 ## Idempotency
 
-- `household_spreadsheets` stores `spreadsheet_id`; `ensure_*` first checks the row, then searches the Shared Drive by an `appProperties` key (`split_ranch_household_id`) before creating, so a crash between "create" and "save id" doesn't create duplicates.
+- `household_spreadsheets` stores the configured `spreadsheet_id`; the backend never creates files, so duplicates cannot happen.
 - Each tab is located by **title** and its `sheetId` saved in `sheet_tabs`; missing tab → `addSheet`; existing → `updateCells`/`values.batchUpdate` replacing the full range + clearing trailing rows. Never `append`.
 - The renderer is a pure function `render_period(period_data) -> TabContent`; `content_hash = sha256(TabContent)`. If the hash equals `sheet_tabs.content_hash`, the job does nothing.
 - Procrastinate `queueing_lock = f"sheets:{period_id}"` collapses duplicate pending jobs for the same period.
 
 ## Retries and failures
 - Retry on 429/5xx/timeouts: exponential backoff with jitter (2 s, 4 s, 8 s … max 10 min), up to 8 attempts; honour `Retry-After`.
-- Non-retryable (403 permission, 404 file deleted): mark `sheet_tabs.status = 'error'`, Sentry alert; a deleted file is recreated on the next run (new id saved).
+- Non-retryable (403 permission removed, 404 file deleted): mark `sheet_tabs.status = 'error'` and send a Sentry alert. The admin re-shares the file, or creates a new one and updates the ID; the next close (or a manual retry) syncs again.
 - Sheets failures never block the business flow: the app shows "Sheets: actualizado hace 3 min / pendiente / error".
 
 ## Sharing
-- Members are added as `reader` (`permissions.create`, `sendNotificationEmail=false` for re-shares, true on first share with a short message).
-- `left` members are removed after their last period settles. Admins can disable Sheets for the household (file kept, sharing removed).
-- Users can opt out of being shared (privacy setting); they still appear in the data.
+- Managed by the file's owner in Google Drive, not by the backend: the service account is **Editor**, and other members are **Viewer**.
+- Sheets is disabled when no spreadsheet ID is configured (jobs log and return).
 
 ## Read-only enforcement
-- Members only have `reader` permission. A protected-range is unnecessary for readers; if a household asks for editor access (not offered in MVP) all generated ranges would be protected with a warning.
+- Members other than the owner have Viewer permission. The owner can still edit by hand; the `Léeme` tab warns that generated tabs are overwritten on the next sync.
 
 ## Testing
 - Renderer tested with snapshot tests (pure function).
-- Integration test against a sandbox Shared Drive in staging (nightly CI job, not on every PR).
-- Quota simulation: unit tests of the token bucket and backoff with a fake client.
+- Integration test against a sandbox spreadsheet shared with a test service account (manual or nightly CI job, not on every PR).
+- Backoff unit-tested with a fake client.

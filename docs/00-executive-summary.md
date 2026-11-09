@@ -16,7 +16,7 @@ A second, independent tool — **Quick splits** — solves the dinner/trip case:
 - Categories (defaults + custom).
 - Expense CRUD with split rules: equal, weights/percentages, exact amounts, single person (not split), personal (excluded from settlement). Subset of members per expense.
 - Rule precedence: expense override → category/recurring rule → household default.
-- Live balance, automatic month-end close (with grace days), settlement with minimal transfers, transfer confirmation by the receiver.
+- Live balance, period close by any member (manual, no automatic close), settlement with minimal transfers, transfer confirmation by the receiver.
 - Change history (revisions, soft delete, optimistic locking, settlement snapshots).
 - Automatic Google Sheets export per household.
 - **Quick splits** (modes 1 and 2), computed locally, shareable as text.
@@ -42,15 +42,15 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 | DB | **Supabase Postgres** (Frankfurt, `eu-central-1`), our tables in a private `app` schema managed by Alembic | Source of truth; same provider as auth; the Supabase Data API is not used |
 | Jobs | **Procrastinate** (Postgres-backed queue) instead of Celery + Redis | Transactional enqueue (job is created in the same transaction as the period close), periodic tasks, retries; one less infrastructure piece. Celery/Dramatiq remain options if volume grows |
 | Auth | **Supabase Auth**: native Google ID token (Credential Manager on Android) → `supabase.auth.signInWithIdToken` → Supabase session (access + refresh handled by `supabase-js`). FastAPI verifies the Supabase JWT locally against the project JWKS (asymmetric keys) | No token issuing/rotation code of our own; Apple sign-in later is configuration. Legacy Google Sign-In on Android is deprecated, so a Credential Manager library is still needed |
-| Sheets | Google Sheets + Drive API with a service account **writing into a Shared Drive** (requires a Google Workspace account owned by the project) | Service accounts have no Drive storage of their own and cannot own files in "My Drive" |
+| Sheets | Google Sheets API with a service account **editing a spreadsheet owned by the household admin**, who shares it with the service account; only closed periods are exported | Service accounts have no Drive storage of their own, but they can edit a file a person owns; free, no Workspace |
 | Push | Expo Push Service (FCM v1 credentials via EAS) | Simple, free, iOS-ready |
-| Hosting | **Supabase** (Postgres + Auth, Frankfurt) + **Render, Frankfurt** for the FastAPI web service and the worker (Supabase cannot run a Python service) | Two managed EU providers, no database to operate; Fly.io as alternative for the Python processes |
-| CI/CD | GitHub Actions + EAS Build/Submit/Update; Render auto-deploy from `main` (staging) and tags (prod); Alembic migrations against the Supabase project before deploy | Low ops |
+| Hosting | **Free tiers only (€0/month)**: **Supabase Free** (Postgres + Auth, Frankfurt) + one **Render Free** web service in Frankfurt running FastAPI with the worker in-process (Supabase cannot run a Python service) | One household of two people; no staging environment. Trade-offs (cold starts, project pausing, no managed backups) are covered in `infra/README.md` |
+| CI/CD | GitHub Actions + EAS Build/Update; Render auto-deploy from `main` when CI passes, with Alembic migrations in the build; daily encrypted DB dump in GitHub Actions | Low ops, no cost |
 | Observability | Sentry (mobile + API, EU data region), structured JSON logs (structlog) | Fast feedback with little setup |
 
 ## Decisions taken with the product owner (2026-11-07)
-- **Period close is automatic**: at 00:00 (household time zone) on day 1 + `grace_days` (default 3) the previous period closes. Admins may close earlier or reopen. The **receiver confirms** each transfer.
-- **Membership is evaluated per full month**: whoever belongs to the household during a period participates in that period's default splits. Leaving takes effect at the end of the current period. See [03](03-business-rules.md#membership-changes) and the trade-offs in [12](12-open-questions.md).
+- **Periods are closed and started by hand** (decided 2026-11-09, replaces the automatic month-end close): any member closes the open period, which computes the settlement, and any member starts the next one. Periods are numbered (1, 2, 3…) rather than calendar months; new expenses always go to the open period. Admins may reopen the latest period while nobody has paid. The **receiver confirms** each transfer.
+- **Membership is evaluated per whole period**: whoever belongs to the household during a period participates in that period's default splits. Leaving takes effect at the end of the current period; joining applies to the open period (or the next one, if the invitation says so).
 - **Hosting**: simple PaaS in the EU.
 - **Documentation language**: English.
 - **Supabase** for authentication and the database (replaces own JWT issuing and Render Postgres).
@@ -60,15 +60,15 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 1. Households are small (2–8 members); a few hundred expenses per month at most.
 2. Members are adults with a Google account; Spain is the primary market (EUR, Spanish locale, Bizum culture).
 3. The app UI will be Spanish first, with i18n in place from day one (English second).
-4. One project-owned Google Workspace account is acceptable (≈ €7/month) to host the Shared Drive for spreadsheets.
+4. No paid services (decided 2026-11-09): the app is for the developer's own household, so every provider runs on its free tier.
 5. No regulated payment flows: the app never moves money, it only calculates and records.
 
 ## Critical review of the original brief (summary)
 - **Celery + Redis** is more than needed: Procrastinate gives transactional, idempotent job creation on the database we already run. Redis can be added later for rate limiting/caching.
-- **Service-account-owned spreadsheets** no longer work reliably (zero Drive quota). Use a Shared Drive, or alternatively let a household admin connect their own Google account with the `drive.file` scope. See [06](06-google-sheets.md).
+- **Service-account-owned spreadsheets** no longer work reliably (zero Drive quota). The household admin owns the spreadsheet and shares it with the service account. See [06](06-google-sheets.md).
 - **Bizum has no public P2P API or deep link with a pre-filled amount.** The "pay" button becomes "copy amount + phone, open your bank app", plus real pre-filled links for providers that support them (e.g. PayPal.me). See [03](03-business-rules.md#payment-button).
 - **Editing a closed period after partial payments**: model transfers as ledger entries so a recalculation yields residual transfers; keep the "freeze + adjustment in next period" rule as the product behaviour. See [03](03-business-rules.md#critical-review-of-the-edit-model).
-- **"Full month" membership** retroactively changes default splits when someone joins mid-month. Offer "starts this month / starts next month" at join time. See [12](12-open-questions.md).
+- **"Whole period" membership** retroactively changes default splits of the open period when someone joins. Invitations offer "starts in the current period / next period". See [12](12-open-questions.md).
 - **Settlement minimisation** is NP-hard in the exact sense; a deterministic greedy algorithm guarantees at most _n − 1_ transfers, which is optimal enough for households. An exact solver for _n ≤ 10_ is optional.
 
 ## Top risks
@@ -76,4 +76,4 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 2. Google Sign-In library landscape (legacy API deprecated; the maintained Credential Manager option of `react-native-google-signin` is paid) → spike and thin abstraction. Supabase does not remove this: it consumes the ID token the native library returns.3. Google Sheets quotas (60 writes/min per user; a service account counts as one user) → batching, one `batchUpdate` per tab, queue throttling.
 4. Edits after close producing confusing results → strict state machine, snapshots and clear UI diffs.
 5. Scope creep across many post-MVP features → strict phase gates.
-6. Supabase specifics: its Data API must not expose our tables (private schema), the worker needs a session-mode or direct connection for LISTEN/NOTIFY, and free projects pause after a week of inactivity (run staging and prod on the Pro plan).
+6. Supabase specifics: its Data API must not expose our tables (private schema), the worker needs a session-mode or direct connection for LISTEN/NOTIFY, and Free projects pause after a week of low activity and have no backups (daily use plus a daily backup job; resume from the dashboard if it pauses).

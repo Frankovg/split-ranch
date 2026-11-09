@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Path, Query
 
 from split_ranch.api.deps import HouseholdActorDep, IfMatchDep, SessionDep
-from split_ranch.schemas.common import MonthStr, Page, parse_month
+from split_ranch.schemas.common import Page, PeriodSeq
 from split_ranch.schemas.expenses import (
     PeriodBalanceRead,
     PeriodRead,
@@ -18,10 +18,16 @@ from split_ranch.schemas.expenses import (
     TransferSentIn,
 )
 from split_ranch.use_cases import periods
+from split_ranch.use_cases.periods import PeriodKey
 
 router = APIRouter(prefix="/households/{household_id}", tags=["periods"])
 
-MonthPath = Annotated[str, Path(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
+# A period number (1, 2, ...) or "current" for the latest period.
+PeriodPath = Annotated[str, Path(pattern=r"^(current|[1-9][0-9]{0,6})$")]
+
+
+def _key(value: str) -> PeriodKey:
+    return "current" if value == "current" else int(value)
 
 
 @router.get("/periods")
@@ -29,45 +35,48 @@ def list_periods(
     actor: HouseholdActorDep,
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 24,
-    cursor: MonthStr | None = None,
+    cursor: Annotated[PeriodSeq | None, Query()] = None,
 ) -> Page[PeriodRead]:
-    items, next_cursor = periods.list_periods(
-        session, actor, limit=limit, before=parse_month(cursor) if cursor else None
-    )
+    items, next_cursor = periods.list_periods(session, actor, limit=limit, before=cursor)
     return Page[PeriodRead](items=items, next_cursor=next_cursor)
 
 
-@router.get("/periods/{month}")
-def get_period(month: MonthPath, actor: HouseholdActorDep, session: SessionDep) -> PeriodRead:
-    return periods.get_period(session, actor, parse_month(month))
+@router.post("/periods", status_code=201)
+def start_period(actor: HouseholdActorDep, session: SessionDep) -> PeriodRead:
+    return periods.start_period(session, actor)
 
 
-@router.get("/periods/{month}/balance")
+@router.get("/periods/{period}")
+def get_period(period: PeriodPath, actor: HouseholdActorDep, session: SessionDep) -> PeriodRead:
+    return periods.get_period(session, actor, _key(period))
+
+
+@router.get("/periods/{period}/balance")
 def get_balance(
-    month: MonthPath, actor: HouseholdActorDep, session: SessionDep
+    period: PeriodPath, actor: HouseholdActorDep, session: SessionDep
 ) -> PeriodBalanceRead:
-    return periods.get_balance(session, actor, parse_month(month))
+    return periods.get_balance(session, actor, _key(period))
 
 
-@router.post("/periods/{month}/close")
+@router.post("/periods/{period}/close")
 def close_period(
-    month: MonthPath, actor: HouseholdActorDep, session: SessionDep, if_match: IfMatchDep
+    period: PeriodPath, actor: HouseholdActorDep, session: SessionDep, if_match: IfMatchDep
 ) -> PeriodRead:
-    return periods.close_period(session, actor, parse_month(month), if_match)
+    return periods.close_period(session, actor, _key(period), if_match)
 
 
-@router.post("/periods/{month}/reopen")
+@router.post("/periods/{period}/reopen")
 def reopen_period(
-    month: MonthPath, data: ReopenIn, actor: HouseholdActorDep, session: SessionDep
+    period: PeriodPath, data: ReopenIn, actor: HouseholdActorDep, session: SessionDep
 ) -> PeriodRead:
-    return periods.reopen_period(session, actor, parse_month(month), data)
+    return periods.reopen_period(session, actor, _key(period), data)
 
 
-@router.get("/periods/{month}/settlement")
+@router.get("/periods/{period}/settlement")
 def get_settlement(
-    month: MonthPath, actor: HouseholdActorDep, session: SessionDep
+    period: PeriodPath, actor: HouseholdActorDep, session: SessionDep
 ) -> SettlementRead:
-    return periods.get_settlement(session, actor, parse_month(month))
+    return periods.get_settlement(session, actor, _key(period))
 
 
 @router.post("/transfers/{transfer_id}/sent")

@@ -67,8 +67,8 @@ Example (`allocate.json`):
 - **Tenant isolation** (see [08](08-security-and-privacy.md)): auto-generated from OpenAPI routes.
 - **Migrations**: upgrade from empty, downgrade last, `alembic check`.
 - **Jobs**: Procrastinate in-memory connector for unit tests; integration with real Postgres for retries/locks.
-- **Auth**: tests sign Supabase-shaped JWTs with a local ES256 key exposed through a fake JWKS (valid, expired, wrong issuer/audience, `anon`/`service_role` role, `HS256`, unknown `kid`); one staging smoke test with a real Google test account through Supabase.
-- **Supabase exposure check** (staging, nightly): the publishable key cannot read any `app` table through the Data API.
+- **Auth**: tests sign Supabase-shaped JWTs with a local ES256 key exposed through a fake JWKS (valid, expired, wrong issuer/audience, `anon`/`service_role` role, `HS256`, unknown `kid`); one manual smoke test with a real Google account through the cloud Supabase project.
+- **Supabase exposure check** (manual, after any change to Data API settings): the publishable key cannot read any `app` table through the Data API.
 
 ## Linters, formatters, typing
 
@@ -84,13 +84,12 @@ Example (`allocate.json`):
 |---|---|---|
 | `ci.yml` | PR, push to main | path-filtered: **domain** (TS + Py + parity vectors), **api** (ruff, mypy, pytest with Postgres service, migrations check, OpenAPI diff), **mobile** (tsc, eslint, jest), gitleaks |
 | `openapi.yml` | API change | regenerate TS client; fail if committed client is stale |
-| `mobile-preview.yml` | PR label `preview` / push to main | `eas build --profile preview` + `eas update --channel staging` |
-| `e2e.yml` | nightly + before release | EAS build → Maestro on emulator (or Maestro Cloud) |
-| `release-api.yml` | tag `api-v*` | Render deploy hook (prod); Alembic migrations against Supabase prod (session-mode URL) as pre-deploy |
-| `release-mobile.yml` | tag `mobile-v*` | `eas build --profile production` + `eas submit` to Play internal track |
-| `nightly.yml` | cron | Sheets sandbox integration, random parity vectors with a new seed, dependency audit |
+| `db-backup.yml` | daily cron + manual | `supabase db dump` (roles, schema, data) → gpg-encrypted artifact, 30-day retention |
+| `mobile-preview.yml` | manual | `eas build --profile preview` (APK, installed directly) |
+| `e2e.yml` | before release | Maestro on a local emulator (Maestro Cloud is paid) |
+| `nightly.yml` | cron | random parity vectors with a new seed, dependency audit |
 
-Staging deploys automatically from `main`; production needs a tag (manual approval in GitHub environments).
+The API deploys automatically from `main` once `ci.yml` passes (Render `autoDeployTrigger: checksPass`). Migrations run in the Render build. There is no staging environment and no tag-based release.
 
 ## Definition of done (any task)
 - Tests for new behaviour (property tests for anything touching money).

@@ -28,9 +28,9 @@ gantt
 | T-0.1 Monorepo scaffold (pnpm workspaces, uv, folders per [11](11-repo-structure.md)) | `pnpm i` and `uv sync` work; `pnpm db:up` starts the local Supabase stack; `pnpm api:dev` connects to it |
 | T-0.2 CI skeleton | ci.yml runs lint/type/test for empty packages; gitleaks; branch protection |
 | T-0.3 **UI stack spike** on Expo SDK 58: NativeWind 4.2 + Tailwind 3 + React Native Reusables (Button, Dialog, Select, Tabs), dark mode, font scaling | Dev build on a real Android device; decision recorded (go / fallback SDK 57 / Uniwind) in [13](13-design-system.md) |
-| T-0.4 **Google sign-in spike** (Universal Sign-In vs free Credential Manager lib) → `supabase.auth.signInWithIdToken` + FastAPI JWKS verification | Real device signs in to the staging Supabase project; a FastAPI endpoint accepts the Supabase token and rejects anon/expired ones; library choice + licence cost recorded |
+| T-0.4 **Google sign-in spike** (Universal Sign-In vs free Credential Manager lib) → `supabase.auth.signInWithIdToken` + FastAPI JWKS verification | Real device signs in to the Supabase project; a FastAPI endpoint accepts the Supabase token and rejects anon/expired ones; library choice + licence cost recorded |
 | T-0.5 FastAPI skeleton: settings, structlog, Sentry, `/healthz` `/readyz`, SQLAlchemy 2 async session, Alembic init, Procrastinate worker hello-job | Tests green; worker processes a job from a DB row |
-| T-0.6 Supabase staging + prod projects (Frankfurt, Pro org; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render staging (`render.yaml`: web, worker) + EAS project (`development`/`preview`) | Staging URL responds and reaches the DB via the pooler; worker receives NOTIFY via session mode; preview APK installs |
+| T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API + in-process worker) + EAS project (`development`/`preview`) + daily backup workflow | URL responds and reaches the DB via the shared pooler; in-process worker receives NOTIFY via session mode; preview APK installs; backup artifact produced |
 
 Risks: version incompatibilities (mitigated by spikes and pinning).
 
@@ -62,7 +62,7 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | Task | AC |
 |---|---|
 | T-3.1 `get_actor` dependency (JWKS cache, claim checks) + `ensure_user` + `GET/PATCH /me` | Unit tests with locally signed ES256 test tokens: valid, expired, wrong `iss`/`aud`, `anon` role, `HS256`; first call creates `app.users` |
-| T-3.2 Supabase config as code (`supabase/config.toml` for local; documented dashboard settings for staging/prod: only Google provider, anonymous sign-ins off, token lifetime) | Fresh local stack reproduces the config; checklist ticked for both cloud projects |
+| T-3.2 Supabase config as code (`supabase/config.toml` for local; documented dashboard settings for the cloud project: only Google provider, anonymous sign-ins off, token lifetime) | Fresh local stack reproduces the config; checklist ticked for the cloud project |
 | T-3.3 App auth flow (sign-in screen, `signInWithGoogle` → Supabase, encrypted MMKV session storage, AppState auto-refresh, Stack.Protected) | Kill app → reopen stays signed in; sign-out → back to sign-in; expired token transparently refreshed |
 | T-3.4 Households + members + roles + default categories | Create household → admin; 12 default categories copied |
 | T-3.5 Invitations (code + App Link, start_period) | Second device joins via WhatsApp link; expired/exhausted handled |
@@ -73,7 +73,7 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 
 | Task | AC |
 |---|---|
-| T-4.1 Periods (lazy creation, closes_at by TZ + grace) | Expense dated 31 Mar 23:30 Madrid → March period |
+| T-4.1 Periods (numbered, started and closed by hand; one open at a time) | New expenses land in the open period whatever their date; none open → `409 no_open_period` |
 | T-4.2 Split rules: household default + category rules (API + admin UI) | 60/40 rule must sum 100 %; live validation |
 | T-4.3 `create_expense` use case + revisions + idempotency | Shares persisted; revision v1; replay with same key returns same response |
 | T-4.4 Update/delete in open period with If-Match | Stale version → 412 with current data; UI shows conflict sheet |
@@ -88,7 +88,7 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | Task | AC |
 |---|---|
 | T-5.1 `close_period` + snapshot + transfers (admin early close) | Snapshot seq 1, pending transfers equal greedy result |
-| T-5.2 Auto-close periodic job | Period closes at `closes_at` ± 15 min; idempotent if run twice |
+| ~~T-5.2 Auto-close periodic job~~ (dropped 2026-11-09: members close periods by hand) → T-5.2 Start next period | Any member starts it after the latest one closed; two at once → one wins |
 | T-5.3 Transfers: sent / confirm / dispute + period → settled | State machine tests; only creditor confirms |
 | T-5.4 Edit after close (reason, new snapshot, cancel pending) | Diff old vs new nets shown; Σ nets 0 |
 | T-5.5 Lock on first sent/confirmed + adjustments (reversal + correction) | Correction example from [03](03-business-rules.md) produces +20/−10/−10 in April |
@@ -100,11 +100,11 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 
 | Task | AC |
 |---|---|
-| T-6.1 Workspace + Shared Drive + service account setup (runbook) | Service account can create a file in the Shared Drive |
-| T-6.2 `ensure_household_spreadsheet` (idempotent via appProperties) | Running twice → one file |
+| T-6.1 Service account + user-owned spreadsheet shared with it as Editor (runbook in `infra/README.md`) | Service account can write a cell in the spreadsheet |
+| T-6.2 `ensure_household_spreadsheet` (verify access, write `Léeme`) | Missing share → clear error state, no crash |
 | T-6.3 Pure renderer for the 4 tabs + content hash | Snapshot tests |
-| T-6.4 `sync_period_tab` with throttled queue, backoff, error states | Simulated 429 → retries and succeeds; unchanged hash → no API calls |
-| T-6.5 Triggers (close, edit after close, adjustments, transfers, membership sharing) + nightly reconciliation | Edit after close updates only that month's tabs |
+| T-6.4 `sync_period_tab` with backoff and error states | Simulated 429 → retries and succeeds; unchanged hash → no API calls |
+| T-6.5 Triggers: period close and edit after close only (already enqueued by `write_snapshot`) | Edit after close updates only that period's tabs; the open period is never written |
 | T-6.6 Sheets status in app settings | Shows last sync / error |
 
 ## P7 — MVP hardening and release (2 w)
@@ -114,8 +114,8 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | T-7.1 Privacy policy, account deletion (in-app + web URL), data export | Play Console data-safety form completed |
 | T-7.2 Sentry release tracking (API + mobile source maps) | Errors show readable stacks |
 | T-7.3 Maestro E2E: sign-in (test account), create household, add expenses, close, settle | Green in CI |
-| T-7.4 Prod environment (Render prod; Supabase prod backups verified with a restore drill into a scratch project; decide on PITR add-on) | Restore tested |
-| T-7.5 Play internal → closed testing with the real household | 1 full month cycle run with real data |
+| T-7.4 Prod environment (free tiers; restore drill of the GitHub Actions backup into the local stack) | Restore tested |
+| T-7.5 APK installed directly on both phones (no Play Store) | 1 full period cycle (start, expenses, close, settle) run with real data |
 | T-7.6 Accessibility & i18n pass (es/en) | Checklist in [13](13-design-system.md) passes |
 
 ## Post-MVP — ordered by value / effort
@@ -145,7 +145,8 @@ P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, remi
 |---|---|---|---|
 | UI library churn (NativeWind v5 RC, SDK 58 new) | Medium | Medium | Spike T-0.3, pin versions, Reusables supports NativeWind and Uniwind |
 | Google Sign-In library/licensing | Medium | Medium | Spike T-0.4, abstraction layer |
-| Sheets quotas/ownership | Medium | Low (non-blocking) | Shared Drive, throttled queue, hashes |
+| Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, closed periods only, hashes |
+| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | In-process worker + stalled-job retry, daily backup job doubles as activity, resume runbook (`infra/README.md`) |
 | Rules complexity confuses users | Medium | High | Show "why this split" (`split_origin`) everywhere; sensible defaults |
 | Edits after close / adjustments misunderstood | Medium | Medium | Diff UI, clear copy, E2E tests |
 | Solo developer bandwidth | High | High | Strict phase gates; Quick splits as early release to validate UI stack |

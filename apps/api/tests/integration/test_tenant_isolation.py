@@ -22,8 +22,8 @@ def test_non_member_gets_404_everywhere(
     frozen_clock.set(datetime(2026, 3, 5, tzinfo=UTC))
     house = make_house(client, make_user, ("Juli", "Franco"))
     expense = add_expense(client, house, "Juli", amount=1000, payer="Juli", date="2026-03-02")
-    ok(client.post(house.url("/periods/2026-03/close"), headers=house.h("Juli")))
-    settlement = ok(client.get(house.url("/periods/2026-03/settlement"), headers=house.h("Juli")))
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
+    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
     real_ids = {
         "household_id": house.id,
         "expense_id": expense["id"],
@@ -31,7 +31,7 @@ def test_non_member_gets_404_everywhere(
         "category_id": house.categories["Supermercado"],
         "transfer_id": settlement["transfers"][0]["id"],
         "invitation_id": str(uuid.uuid4()),
-        "month": "2026-03",
+        "period": "1",
     }
     outsider = make_user("Mallory")
     # The outsider has a household of their own: membership must be checked per path.

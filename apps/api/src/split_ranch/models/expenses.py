@@ -34,20 +34,26 @@ REVISION_ACTIONS = ("create", "update", "delete", "restore", "confirm")
 class Period(Base):
     __tablename__ = "periods"
     __table_args__ = (
-        UniqueConstraint("household_id", "month"),
+        UniqueConstraint("household_id", "seq"),
         UniqueConstraint("id", "household_id"),
         CheckConstraint(in_check("status", PERIOD_STATUSES), name="status"),
-        CheckConstraint("extract(day from month) = 1", name="month_first_day"),
-        Index("ix_periods_status_closes_at", "status", "closes_at"),
+        CheckConstraint("seq >= 1", name="seq_positive"),
+        # Members close a period and start the next one by hand: at most one is open.
+        Index(
+            "uq_periods_one_open",
+            "household_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
     )
 
     id: Mapped[UUID] = uuid_pk()
     household_id: Mapped[UUID] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"))
-    month: Mapped[date] = mapped_column(Date)
+    # 1, 2, 3... per household, in the order members started them.
+    seq: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(16), server_default="open", default="open")
-    closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # NULL = closed by the system (auto-close job).
     closed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reopened_count: Mapped[int] = mapped_column(Integer, server_default="0", default=0)

@@ -5,7 +5,15 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from split_ranch.schemas.common import AmountCents, Day, Id, ReadModel, Reason, StrictModel
+from split_ranch.schemas.common import (
+    AmountCents,
+    Day,
+    Id,
+    PeriodSeq,
+    ReadModel,
+    Reason,
+    StrictModel,
+)
 from split_ranch.schemas.split import ShareRead, SplitSpec
 
 ExpenseSource = Literal["manual", "ai_text", "ai_voice", "recurring"]
@@ -25,7 +33,8 @@ class ExpenseCreate(StrictModel):
     source: ExpenseSource = "manual"
     source_transcript: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=1000)
-    # Required when the expense lands in a closed (unlocked) period.
+    # Default: the open period. A closed (unlocked) one needs a `reason`.
+    period_seq: PeriodSeq | None = None
     reason: Reason | None = None
 
 
@@ -36,6 +45,7 @@ class ExpensePreviewIn(StrictModel):
     expense_date: Day
     split: SplitSpec | None = None
     participants: list[Id] | None = Field(default=None, min_length=1, max_length=50)
+    period_seq: PeriodSeq | None = None
 
 
 class ExpenseUpdate(StrictModel):
@@ -70,7 +80,7 @@ class AdjustmentCreate(StrictModel):
 
 class PeriodRef(ReadModel):
     id: Id
-    month: str
+    seq: int
     status: str
 
 
@@ -163,9 +173,9 @@ class SnapshotRead(ReadModel):
 
 class PeriodRead(ReadModel):
     id: Id
-    month: str
+    seq: int
     status: str
-    closes_at: datetime
+    started_at: datetime
     closed_at: datetime | None
     settled_at: datetime | None
     reopened_count: int

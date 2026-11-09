@@ -1,0 +1,66 @@
+name: DB backup
+
+# Supabase Free projects have no automatic backups, so this dumps the prod database daily
+# (roles, schema, data — including auth.users) and stores it as an encrypted workflow artifact.
+# The daily connection also counts as database activity, which helps keep the Free project
+# from being paused for inactivity.
+#
+# Secrets:
+#   SUPABASE_DB_URL     session pooler URL (IPv4) as the `postgres` role, e.g.
+#                       postgresql://postgres.<ref>:<password>@aws-<n>-eu-central-1.pooler.supabase.com:5432/postgres
+#   BACKUP_PASSPHRASE   symmetric passphrase for gpg; keep a copy outside GitHub (password manager)
+#
+# Restore: download the artifact, `gpg -d backup.tar.gz.gpg | tar xz`, then follow infra/README.md.
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # daily, 03:30 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::SUPABASE_DB_URL and BACKUP_PASSPHRASE secrets are required"
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Dump roles, schema and data
+        run: |
+          mkdir -p backup
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/data.sql --data-only --use-copy
+          ls -la backup
+
+      - name: Encrypt
+        run: |
+          tar czf - backup | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 \
+            -o backup.tar.gz.gpg
+          rm -rf backup
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error

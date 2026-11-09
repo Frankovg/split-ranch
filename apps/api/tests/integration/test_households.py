@@ -20,8 +20,12 @@ def test_create_household_defaults(
         client.post("/v1/households", json={"name": "Casa Ranch"}, headers=juli.headers), 201
     )
     assert house["timezone"] == "Europe/Madrid"
-    assert house["grace_days"] == 3
+    assert "grace_days" not in house and "auto_close" not in house
     assert house["my_role"] == "admin"
+    assert house["members"][0]["joined_period_seq"] == 1
+    # A new household starts with period 1 open.
+    period = ok(client.get(f"/v1/households/{house['id']}/periods/current", headers=juli.headers))
+    assert period["seq"] == 1 and period["status"] == "open"
     cats = ok(client.get(f"/v1/households/{house['id']}/categories", headers=juli.headers))
     assert [c["name"] for c in cats] == [c[0] for c in DEFAULT_CATEGORIES]
     assert "Supermercado" in [c["name"] for c in cats]
@@ -45,24 +49,29 @@ def test_household_update_requires_if_match(
     client: TestClient, make_user: Callable[[str], TestUser]
 ) -> None:
     house = make_house(client, make_user, ("Juli", "Franco"))
-    r = client.patch(house.url(), json={"grace_days": 5}, headers=house.h("Juli"))
+    r = client.patch(house.url(), json={"name": "Piso"}, headers=house.h("Juli"))
     assert r.status_code == 428
     r = client.patch(
-        house.url(), json={"grace_days": 5}, headers=house.h("Juli", **{"If-Match": '"7"'})
+        house.url(), json={"name": "Piso"}, headers=house.h("Juli", **{"If-Match": '"7"'})
     )
     assert r.status_code == 412
     assert r.json()["code"] == "version_conflict"
     assert r.json()["current"]["version"] == 1
     updated = ok(
         client.patch(
-            house.url(), json={"grace_days": 5}, headers=house.h("Juli", **{"If-Match": '"1"'})
+            house.url(), json={"name": "Piso"}, headers=house.h("Juli", **{"If-Match": '"1"'})
         )
     )
-    assert updated["grace_days"] == 5 and updated["version"] == 2
+    assert updated["name"] == "Piso" and updated["version"] == 2
     r = client.patch(
-        house.url(), json={"grace_days": 1}, headers=house.h("Franco", **{"If-Match": '"2"'})
+        house.url(), json={"name": "Casa"}, headers=house.h("Franco", **{"If-Match": '"2"'})
     )
     assert r.status_code == 403
+    # Auto-close settings are gone.
+    r = client.patch(
+        house.url(), json={"grace_days": 5}, headers=house.h("Juli", **{"If-Match": '"2"'})
+    )
+    assert r.status_code == 422
 
 
 def test_invitation_lifecycle(
@@ -83,10 +92,10 @@ def test_invitation_lifecycle(
         "member_count": 1,
         "expires_at": preview["expires_at"],
     }
-    # After day 10, the default start is next month.
+    # By default a new member joins the open period, whatever the date.
     joined = ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=franco.headers))
     franco_member = next(m for m in joined["members"] if m["user_id"] == str(franco.id))
-    assert franco_member["joined_period"] == "2026-04-01"
+    assert franco_member["joined_period_seq"] == 1
     r = client.post(f"/v1/invitations/{inv['code']}/accept", headers=franco.headers)
     assert r.status_code == 409  # exhausted (max_uses=1) or already member
     r = client.post(f"/v1/invitations/{inv['code']}/accept", headers=ana.headers)
@@ -165,15 +174,16 @@ def test_roles_and_leaving(
 
     left = ok(client.post(house.url("/members/me/leave"), headers=house.h("Ana")))
     ana = next(x for x in left["members"] if x["id"] == m["Ana"])
-    assert ana["status"] == "leaving" and ana["left_period"] == "2026-03-01"
-    # Ana still takes part in March (full month) but not in April.
+    assert ana["status"] == "leaving" and ana["left_period_seq"] == 1
+    # Ana still takes part in the current period but not in the next one.
     add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-03-03")
-    april = add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-04-01")
-    assert m["Ana"] not in {s["member_id"] for s in april["shares"]}
-    assert nets(client, house, "2026-03")["Ana"] == -300
-    # After March is settled, Ana is gone.
-    ok(client.post(house.url("/periods/2026-03/close"), headers=house.h("Franco")))
-    settlement = ok(client.get(house.url("/periods/2026-03/settlement"), headers=house.h("Juli")))
+    assert nets(client, house, "1")["Ana"] == -300
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Franco")))
+    ok(client.post(house.url("/periods"), headers=house.h("Juli")), 201)
+    second = add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-04-01")
+    assert m["Ana"] not in {s["member_id"] for s in second["shares"]}
+    # After period 1 is settled, Ana is gone.
+    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
     for t in settlement["transfers"]:
         debtor = next(n for n, mid in m.items() if mid == t["from_member_id"])
         ok(
@@ -185,7 +195,7 @@ def test_roles_and_leaving(
     house_after = ok(client.get(house.url(), headers=house.h("Juli")))
     assert next(x for x in house_after["members"] if x["id"] == m["Ana"])["status"] == "left"
     # Former members keep read access only.
-    assert client.get(house.url("/periods/2026-03"), headers=house.h("Ana")).status_code == 200
+    assert client.get(house.url("/periods/1"), headers=house.h("Ana")).status_code == 200
     r = client.post(house.url("/expenses"), json={}, headers=house.h("Ana"))
     assert r.status_code in (403, 422)
 
@@ -275,7 +285,19 @@ def test_rule_precedence_and_fallback(
     assert [s["amount_cents"] for s in e["shares"]] == [600, 300]
     assert e["split_origin"] == "override" and e["participant_mode"] == "subset"
 
-    # Category single rule pointing to a member who is not in the April period -> fallback.
+    # Changing the category rule re-resolves open-period expenses that follow it.
+    ok(
+        client.put(
+            house.url(f"/categories/{house.categories['Luz']}/split-rule"),
+            json={"split_type": "equal"},
+            headers=house.h("Juli"),
+        )
+    )
+    luz = ok(client.get(house.url("/expenses?q=Luz"), headers=house.h("Juli")))["items"][0]
+    assert luz["split_origin"] == "category"
+    assert [s["amount_cents"] for s in luz["shares"]] == [334, 334, 333]
+
+    # Category single rule pointing to a member who is not in the open period -> fallback.
     dani = make_user("Dani")
     inv = ok(
         client.post(
@@ -284,7 +306,9 @@ def test_rule_precedence_and_fallback(
         201,
     )
     joined = ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=dani.headers))
-    dani_id = next(x["id"] for x in joined["members"] if x["user_id"] == str(dani.id))
+    dani = next(x for x in joined["members"] if x["user_id"] == str(dani.id))
+    assert dani["joined_period_seq"] == 2
+    dani_id = dani["id"]
     ok(
         client.put(
             house.url(f"/categories/{house.categories['Gas']}/split-rule"),
@@ -296,6 +320,8 @@ def test_rule_precedence_and_fallback(
         client, house, "Juli", amount=400, payer="Juli", date="2026-03-03", category="Gas"
     )
     assert march["rule_fallback"] is True and march["split_origin"] == "household_default"
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Franco")))
+    ok(client.post(house.url("/periods"), headers=house.h("Ana")), 201)
     april = add_expense(
         client, house, "Juli", amount=400, payer="Juli", date="2026-04-03", category="Gas"
     )
@@ -309,18 +335,6 @@ def test_rule_precedence_and_fallback(
             "exact_cents": None,
         }
     ]
-
-    # Changing the category rule re-resolves open-period expenses that follow it.
-    ok(
-        client.put(
-            house.url(f"/categories/{house.categories['Luz']}/split-rule"),
-            json={"split_type": "equal"},
-            headers=house.h("Juli"),
-        )
-    )
-    luz = ok(client.get(house.url("/expenses?q=Luz"), headers=house.h("Juli")))["items"][0]
-    assert luz["split_origin"] == "category"
-    assert [s["amount_cents"] for s in luz["shares"]] == [334, 334, 333]
 
     # Preview does not save.
     preview = ok(

@@ -14,6 +14,8 @@ npx expo run:android                      # local dev build (Android SDK + devic
 pnpm --filter @split-ranch/mobile start   # = expo start --dev-client (root: pnpm mobile:dev)
 ```
 
+From the repo root, `pnpm mobile:dev` also keeps `adb reverse tcp:8081` and `tcp:8000` applied on every connected emulator/USB phone (re-applied within ~3 s after an emulator restart), so the app reaches Metro and the API on `localhost`. One-shot: `pnpm adb:reverse`.
+
 `expo start` also generates `.expo/types/router.d.ts` (typed routes). Without it `tsc` still passes, only with looser `href` types.
 
 ## Scripts

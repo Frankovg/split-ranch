@@ -1,6 +1,6 @@
 """Users, households, members, invitations and categories."""
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import Field
@@ -62,8 +62,6 @@ class HouseholdCreate(StrictModel):
 
 class HouseholdUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
-    grace_days: int | None = Field(default=None, ge=0, le=15)
-    auto_close: bool | None = None
     timezone: str | None = Field(default=None, max_length=64)
 
 
@@ -74,8 +72,8 @@ class MemberRead(ReadModel):
     role: str
     status: str
     sort_key: int
-    joined_period: date
-    left_period: date | None
+    joined_period_seq: int
+    left_period_seq: int | None
 
 
 class HouseholdRead(ReadModel):
@@ -83,8 +81,6 @@ class HouseholdRead(ReadModel):
     name: str
     timezone: str
     currency: str
-    grace_days: int
-    auto_close: bool
     version: int
     created_at: datetime
     members: list[MemberRead]

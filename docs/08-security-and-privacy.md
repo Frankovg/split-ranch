@@ -53,7 +53,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 ## GDPR (EU personal data)
 
-**Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API/worker hosting, Frankfurt), Google (Sign-In, Workspace/Sheets), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
+**Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API/worker hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
 
 **Personal data processed:** name, email, avatar URL (Google), household membership, expenses (amounts, descriptions — may reveal lifestyle), optional payment handles (phone for Bizum), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split participant names of **non-users** (stored only if the owner saves/shares the event).
 
@@ -61,7 +61,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).
-- Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in Google Workspace (EU data region if the Workspace edition supports it; otherwise disclosed).
+- Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the household admin's personal Google Drive (no data-region guarantee; disclosed).
 - Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared households (others' financial records stay coherent), deletes the personal profile, push tokens and Quick-split events owned by the user, and finally deletes the Supabase auth user (which removes sessions and identities).
 - Sharing to Google Sheets: explained at household creation; per-user opt-out of being shared.
 
@@ -72,7 +72,8 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 | Household expenses, revisions, snapshots | While the household exists; deleted 30 days after household deletion |
 | Left members' read access | Until household deletion |
 | Sessions / refresh tokens | Managed by Supabase Auth; removed on sign-out or account deletion |
-| Supabase auth/API logs | Per Supabase plan retention (Pro: days, not months) |
+| Supabase auth/API logs | Per Supabase plan retention (Free plan: short, about a day) |
+| DB backups (GitHub Actions artifacts, gpg-encrypted) | 30 days |
 | Idempotency keys | 48 h |
 | Logs | 30 days; Sentry 90 days |
 | Quick events (saved) | Until deleted by owner; shared links expire after 90 days (configurable) |

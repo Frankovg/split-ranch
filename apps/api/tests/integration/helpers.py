@@ -85,8 +85,8 @@ def add_expense(
     return ok(client.post(house.url("/expenses"), json=body, headers=house.h(who)), expect)
 
 
-def nets(client: TestClient, house: House, month: str, who: str | None = None) -> dict[str, int]:
+def nets(client: TestClient, house: House, period: str, who: str | None = None) -> dict[str, int]:
     who = who or next(iter(house.users))
-    body = ok(client.get(house.url(f"/periods/{month}/balance"), headers=house.h(who)))
+    body = ok(client.get(house.url(f"/periods/{period}/balance"), headers=house.h(who)))
     names = {v: k for k, v in house.members.items()}
     return {names[b["member_id"]]: b["net_cents"] for b in body["balances"]}

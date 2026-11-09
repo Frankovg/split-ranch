@@ -1,5 +1,5 @@
 # Supabase CLI local stack (`supabase start`). Only Auth and Postgres are used by Split Ranch.
-# Cloud projects (staging/prod) must mirror the [auth] settings below — see infra/README.md.
+# The cloud project (split-ranch-prod, Free plan) must mirror the [auth] settings below — see infra/README.md.
 project_id = "split-ranch"
 
 [api]

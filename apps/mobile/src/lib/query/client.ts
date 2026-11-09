@@ -21,11 +21,11 @@ export const queryKeys = {
   households: () => ['households'] as const,
   household: (householdId: string) => ['household', householdId] as const,
   categories: (householdId: string) => ['household', householdId, 'categories'] as const,
-  balance: (householdId: string, month: string) =>
-    ['household', householdId, 'balance', month] as const,
+  balance: (householdId: string, period: string) =>
+    ['household', householdId, 'balance', period] as const,
   periods: (householdId: string) => ['household', householdId, 'periods'] as const,
-  settlement: (householdId: string, month: string) =>
-    ['household', householdId, 'settlement', month] as const,
+  settlement: (householdId: string, period: string) =>
+    ['household', householdId, 'settlement', period] as const,
   expenses: (householdId: string, filters: Record<string, unknown> = {}) =>
     ['household', householdId, 'expenses', filters] as const,
 };

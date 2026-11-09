@@ -23,7 +23,8 @@ pnpm db:up / db:down                        # supabase start / stop (Docker)
 pnpm api:dev                                # uvicorn on :8000
 pnpm worker:dev                             # Procrastinate worker
 pnpm backend:dev                            # api + worker via concurrently
-pnpm mobile:dev                             # expo start --dev-client
+pnpm mobile:dev                             # expo start --dev-client + keeps adb reverse (8081, 8000) applied
+pnpm adb:reverse                            # one-shot adb reverse for every connected device
 pnpm domain:test                            # TS domain + parity vectors
 pnpm api:test                               # pytest
 ```

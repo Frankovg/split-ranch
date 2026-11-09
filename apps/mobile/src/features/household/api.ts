@@ -11,6 +11,7 @@ import type {
   Page,
   Period,
   PeriodBalance,
+  PeriodKey,
   Settlement,
   Transfer,
 } from './types';
@@ -44,19 +45,19 @@ export function useCategories(householdId: string | undefined) {
   });
 }
 
-export function useBalance(householdId: string | undefined, month: string) {
+export function useBalance(householdId: string | undefined, period: PeriodKey) {
   return useQuery({
-    queryKey: queryKeys.balance(householdId ?? '', month),
-    queryFn: () => apiFetch<PeriodBalance>(`/households/${householdId}/periods/${month}/balance`),
+    queryKey: queryKeys.balance(householdId ?? '', String(period)),
+    queryFn: () => apiFetch<PeriodBalance>(`/households/${householdId}/periods/${period}/balance`),
     enabled: !!householdId,
   });
 }
 
-export function useExpenses(householdId: string | undefined, month: string) {
+export function useExpenses(householdId: string | undefined, period: PeriodKey) {
   return useQuery({
-    queryKey: queryKeys.expenses(householdId ?? '', { month }),
+    queryKey: queryKeys.expenses(householdId ?? '', { period: String(period) }),
     queryFn: () =>
-      apiFetch<Page<Expense>>(`/households/${householdId}/expenses?period=${month}&limit=100`),
+      apiFetch<Page<Expense>>(`/households/${householdId}/expenses?period=${period}&limit=100`),
     enabled: !!householdId,
   });
 }
@@ -69,10 +70,10 @@ export function usePeriods(householdId: string | undefined) {
   });
 }
 
-export function useSettlement(householdId: string | undefined, month: string) {
+export function useSettlement(householdId: string | undefined, period: PeriodKey) {
   return useQuery({
-    queryKey: queryKeys.settlement(householdId ?? '', month),
-    queryFn: () => apiFetch<Settlement>(`/households/${householdId}/periods/${month}/settlement`),
+    queryKey: queryKeys.settlement(householdId ?? '', String(period)),
+    queryFn: () => apiFetch<Settlement>(`/households/${householdId}/periods/${period}/settlement`),
     enabled: !!householdId,
   });
 }
@@ -83,19 +84,28 @@ function useInvalidateHousehold(householdId: string) {
   return () => qc.invalidateQueries({ queryKey: queryKeys.household(householdId) });
 }
 
-export function useClosePeriod(householdId: string, month: string) {
+export function useClosePeriod(householdId: string, seq: number) {
   const invalidate = useInvalidateHousehold(householdId);
   return useMutation({
-    mutationFn: () => apiFetch<Period>(`/households/${householdId}/periods/${month}/close`, json({})),
+    mutationFn: () => apiFetch<Period>(`/households/${householdId}/periods/${seq}/close`, json({})),
     onSettled: invalidate,
   });
 }
 
-export function useReopenPeriod(householdId: string, month: string) {
+/** Any member starts the next period once the latest one is closed. */
+export function useStartPeriod(householdId: string) {
+  const invalidate = useInvalidateHousehold(householdId);
+  return useMutation({
+    mutationFn: () => apiFetch<Period>(`/households/${householdId}/periods`, json({})),
+    onSettled: invalidate,
+  });
+}
+
+export function useReopenPeriod(householdId: string, seq: number) {
   const invalidate = useInvalidateHousehold(householdId);
   return useMutation({
     mutationFn: (reason: string) =>
-      apiFetch<Period>(`/households/${householdId}/periods/${month}/reopen`, json({ reason })),
+      apiFetch<Period>(`/households/${householdId}/periods/${seq}/reopen`, json({ reason })),
     onSettled: invalidate,
   });
 }

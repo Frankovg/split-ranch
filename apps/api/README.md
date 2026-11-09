@@ -33,7 +33,8 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | Variable | Used by | Notes |
 |---|---|---|
 | `DATABASE_URL` | API | `postgresql+psycopg://…` — Supabase transaction pooler in the cloud (prepared statements are disabled) |
-| `DATABASE_URL_SESSION` | worker, migrations | session pooler / direct connection (LISTEN/NOTIFY). Falls back to `DATABASE_URL` |
+| `DATABASE_URL_SESSION` | worker, migrations | session pooler (LISTEN/NOTIFY; IPv4 on Supabase Free). Falls back to `DATABASE_URL` |
+| `RUN_WORKER_IN_API` | API | `true` runs the Procrastinate worker inside the API process (prod on Render Free, which has no background workers). Default `false` |
 | `SUPABASE_URL` | API | JWKS is fetched from `$SUPABASE_URL/auth/v1/.well-known/jwks.json` (cached 10 min) |
 | `SUPABASE_JWT_ISSUER` | API | expected `iss`; defaults to `$SUPABASE_URL/auth/v1` |
 | `SUPABASE_SECRET_KEY` | worker | account deletion only (not implemented yet) |
@@ -64,8 +65,12 @@ uv run alembic check                 # no pending autogenerate diff
 
 ```sh
 uv run uvicorn split_ranch.main:app --reload --port 8000          # API, routes under /v1
-uv run procrastinate --app=split_ranch.jobs.app.app worker         # worker (periodic auto-close every 15 min)
+uv run procrastinate --app=split_ranch.jobs.app.app worker         # worker (job queue + hourly idempotency purge)
 ```
+
+In production there is a single process. With `RUN_WORKER_IN_API=true`, the FastAPI lifespan starts the
+worker as an asyncio task and stops it gracefully on shutdown. `retry_stalled_jobs` (every 10 min)
+requeues jobs that a killed instance left in `doing`.
 
 `/healthz` and `/readyz` are served both at the root (platform probes) and under `/v1`.
 OpenAPI: `/v1/openapi.json` (Swagger UI at `/v1/docs` outside prod).

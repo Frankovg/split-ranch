@@ -22,7 +22,7 @@ apps/mobile/
 │   ├── (app)/expense/new.tsx         # presented as modal
 │   ├── (app)/expense/[id].tsx
 │   ├── (app)/expense/[id]/history.tsx
-│   ├── (app)/period/[month].tsx      # summary, settlement, transfers
+│   ├── (app)/period/[seq].tsx        # summary, close, settlement, transfers, start next
 │   ├── (app)/household/members.tsx
 │   ├── (app)/household/categories.tsx
 │   ├── (app)/household/rules.tsx

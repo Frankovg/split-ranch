@@ -21,7 +21,7 @@ import {
   useHousehold,
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
-import { currentMonth, todayIso } from './dates';
+import { todayIso } from './dates';
 import type { Household } from './types';
 
 export function NewExpenseScreen() {
@@ -42,11 +42,10 @@ function NewExpenseForm({ household }: { household: Household }) {
   const everyone = members.map((m) => m.id);
   const categories = useCategories(household.id);
   const create = useCreateExpense(household.id);
-  // The expense is dated today, so it lands in the current month: its state decides the rules.
-  const period = useBalance(household.id, currentMonth()).data?.period;
-  const monthLocked = period?.locked === true;
-  const needsReason = period !== undefined && period.status !== 'open' && !monthLocked;
-  const [reason, setReason] = React.useState('');
+  // New expenses go to the open period; when the latest one is closed, someone must start
+  // the next period first.
+  const period = useBalance(household.id, 'current').data?.period;
+  const noOpenPeriod = period !== undefined && period.status !== 'open';
   // Stable per form: a double tap or a retry reuses the same id (idempotent POST).
   const [expenseId] = React.useState(() => Crypto.randomUUID());
 
@@ -59,8 +58,7 @@ function NewExpenseForm({ household }: { household: Household }) {
 
   const amountValid = amountCents !== null && amountCents > 0 && amountCents <= MAX_AMOUNT_CENTS;
   const descriptionValid = description.trim() !== '';
-  const reasonValid = !needsReason || reason.trim().length >= 5;
-  const valid = amountValid && descriptionValid && participants.length > 0 && reasonValid && !monthLocked;
+  const valid = amountValid && descriptionValid && participants.length > 0 && !noOpenPeriod;
   const activeCategories = (categories.data ?? []).filter((c) => !c.archived_at);
 
   const onSave = () => {
@@ -77,7 +75,6 @@ function NewExpenseForm({ household }: { household: Household }) {
         expense_date: todayIso(),
         // Everyone selected = let the household/category rule decide the split.
         participants: allSelected ? undefined : everyone.filter((id) => participants.includes(id)),
-        reason: needsReason ? reason.trim() : undefined,
       },
       {
         onSuccess: () => {
@@ -86,7 +83,7 @@ function NewExpenseForm({ household }: { household: Household }) {
         },
         onError: (error) =>
           toast.error(
-            apiErrorCode(error) === 'period_locked' ? t('expenses.lockedMonth') : t('expenses.saveFailed'),
+            apiErrorCode(error) === 'no_open_period' ? t('expenses.noOpenPeriod') : t('expenses.saveFailed'),
           ),
       },
     );
@@ -176,25 +173,11 @@ function NewExpenseForm({ household }: { household: Household }) {
         </View>
       ) : null}
 
-      {needsReason ? (
-        <View className="gap-1.5">
-          <Label nativeID="expense-reason">{t('expenses.closedReason')}</Label>
-          <Input
-            aria-labelledby="expense-reason"
-            value={reason}
-            onChangeText={setReason}
-            placeholder={t('expenses.closedReasonPlaceholder')}
-            maxLength={280}
-            className={submitted && !reasonValid ? 'border-destructive' : undefined}
-          />
-        </View>
+      {noOpenPeriod ? (
+        <Text className="text-sm text-destructive">{t('expenses.noOpenPeriod')}</Text>
       ) : null}
 
-      {monthLocked ? (
-        <Text className="text-sm text-destructive">{t('expenses.lockedMonth')}</Text>
-      ) : null}
-
-      <Button size="lg" disabled={create.isPending || monthLocked} onPress={onSave}>
+      <Button size="lg" disabled={create.isPending || noOpenPeriod} onPress={onSave}>
         <Text>{t('common.save')}</Text>
       </Button>
     </Screen>

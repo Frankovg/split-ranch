@@ -20,7 +20,6 @@ from split_ranch.domain import DomainError
 from split_ranch.models import Expense, ExpenseRevision, ExpenseShare, Household, Period
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as hrepo
-from split_ranch.schemas.common import month_to_str
 from split_ranch.schemas.expenses import (
     AdjustmentCreate,
     AdjustmentRead,
@@ -37,9 +36,11 @@ from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec
 from split_ranch.use_cases import idempotency
 from split_ranch.use_cases.common import check_version, require_active
 from split_ranch.use_cases.periods import (
+    PeriodKey,
     after_edit_in_closed_period,
-    get_or_create_period,
+    load_period,
     period_state,
+    require_open_period,
 )
 from split_ranch.use_cases.split_resolution import (
     Resolution,
@@ -83,7 +84,7 @@ def _resolve(
     session: Session,
     household_id: UUID,
     *,
-    month: date,
+    seq: int,
     amount_cents: int,
     payer_member_id: UUID,
     category_id: UUID | None,
@@ -92,7 +93,7 @@ def _resolve(
     allowed_members: set[UUID] | None = None,
 ) -> Resolution:
     members = hrepo.list_members(session, household_id)
-    period_ids = [m.id for m in hrepo.period_members(session, household_id, month)]
+    period_ids = [m.id for m in hrepo.period_members(session, household_id, seq)]
     return resolve_expense_split(
         amount_cents=amount_cents,
         payer_member_id=payer_member_id,
@@ -106,12 +107,12 @@ def _resolve(
     )
 
 
-def _check_payer(session: Session, household_id: UUID, payer_id: UUID, month: date) -> None:
+def _check_payer(session: Session, household_id: UUID, payer_id: UUID, seq: int) -> None:
     member = hrepo.get_member(session, household_id, payer_id)
     if member is None:
         raise Unprocessable("Payer is not a member of this household", code="invalid_payer")
-    in_period = member.joined_period <= month and (
-        member.left_period is None or member.left_period >= month
+    in_period = member.joined_period_seq <= seq and (
+        member.left_period_seq is None or member.left_period_seq >= seq
     )
     if member.status == "left" or not in_period:
         raise Unprocessable("Payer does not take part in this period", code="invalid_payer")
@@ -240,7 +241,7 @@ def to_read(
         id=expense.id,
         household_id=expense.household_id,
         version=expense.version,
-        period=PeriodRef(id=period.id, month=month_to_str(period.month), status=period.status),
+        period=PeriodRef(id=period.id, seq=period.seq, status=period.status),
         category_id=expense.category_id,
         payer_member_id=expense.payer_member_id,
         amount_cents=expense.amount_cents,
@@ -307,16 +308,23 @@ def _gate_period(state: str, reason: str | None, *, extra: dict[str, Any] | None
 # ----------------------------------------------------------------- create
 
 
+def _target_period(session: Session, household_id: UUID, seq: int | None) -> Period:
+    """Explicit period number, else the open period (the expense date does not decide)."""
+    if seq is None:
+        return require_open_period(session, household_id)
+    return load_period(session, household_id, seq, for_update=True)
+
+
 def preview_split(
     session: Session, actor: HouseholdActor, data: ExpensePreviewIn
 ) -> SplitPreviewRead:
-    month = clock.month_start(data.expense_date)
-    _check_payer(session, actor.household_id, data.payer_member_id, month)
+    seq = _target_period(session, actor.household_id, data.period_seq).seq
+    _check_payer(session, actor.household_id, data.payer_member_id, seq)
     _check_category(session, actor.household_id, data.category_id)
     res = _resolve(
         session,
         actor.household_id,
-        month=month,
+        seq=seq,
         amount_cents=data.amount_cents,
         payer_member_id=data.payer_member_id,
         category_id=data.category_id,
@@ -376,16 +384,15 @@ def create_expense(
             raise Conflict("An expense with this id already exists", code="id_conflict")
 
     household = _household(session, actor.household_id)
-    month = clock.month_start(data.expense_date)
-    period = get_or_create_period(session, household, month)
+    period = _target_period(session, household.id, data.period_seq)
     state = period_state(session, period)
     _gate_period(state, data.reason)
-    _check_payer(session, household.id, data.payer_member_id, month)
+    _check_payer(session, household.id, data.payer_member_id, period.seq)
     _check_category(session, household.id, data.category_id)
     resolution = _resolve(
         session,
         household.id,
-        month=month,
+        seq=period.seq,
         amount_cents=data.amount_cents,
         payer_member_id=data.payer_member_id,
         category_id=data.category_id,
@@ -454,7 +461,7 @@ def list_expenses(
     *,
     limit: int = DEFAULT_PAGE,
     cursor: str | None = None,
-    month: date | None = None,
+    period: PeriodKey | None = None,
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
     q: str | None = None,
@@ -462,11 +469,11 @@ def list_expenses(
 ) -> tuple[list[ExpenseRead], str | None]:
     limit = max(1, min(limit, MAX_PAGE))
     period_id: UUID | None = None
-    if month is not None:
-        period = erepo.get_period_by_month(session, actor.household_id, month)
-        if period is None:
+    if period is not None:
+        try:
+            period_id = load_period(session, actor.household_id, period).id
+        except NotFound:
             return [], None
-        period_id = period.id
     rows = erepo.list_expenses(
         session,
         actor.household_id,
@@ -503,7 +510,7 @@ def _resolve_for_existing(
     session: Session,
     expense: Expense,
     *,
-    month: date,
+    seq: int,
     amount_cents: int,
     payer_member_id: UUID,
     category_id: UUID | None,
@@ -520,7 +527,7 @@ def _resolve_for_existing(
     res = _resolve(
         session,
         expense.household_id,
-        month=month,
+        seq=seq,
         amount_cents=amount_cents,
         payer_member_id=payer_member_id,
         category_id=category_id,
@@ -545,12 +552,13 @@ def _adjustment_preview(
     if data is not None:
         try:
             fields = data.model_fields_set
+            open_period = erepo.get_open_period(session, expense.household_id)
+            if open_period is None:
+                return preview
             res = _resolve_for_existing(
                 session,
                 expense,
-                month=clock.month_start(
-                    clock.today_in(_household(session, expense.household_id).timezone)
-                ),
+                seq=open_period.seq,
                 amount_cents=data.amount_cents
                 if data.amount_cents is not None
                 else expense.amount_cents,
@@ -591,46 +599,35 @@ def update_expense(
     household = _household(session, actor.household_id)
     fields = data.model_fields_set
 
-    old_period = erepo.get_period(session, household.id, expense.period_id, for_update=True)
-    assert old_period is not None
-    new_date = data.expense_date or expense.expense_date
-    new_month = clock.month_start(new_date)
-    new_period = (
-        old_period
-        if new_month == old_period.month
-        else get_or_create_period(session, household, new_month)
+    # The expense stays in its period: changing the date does not move it.
+    period = erepo.get_period(session, household.id, expense.period_id, for_update=True)
+    assert period is not None
+    state = period_state(session, period)
+    _gate_period(
+        state,
+        data.reason,
+        extra={"adjustment_preview": _adjustment_preview(session, actor, expense, data)}
+        if state == "locked"
+        else None,
     )
-    states = {
-        old_period.id: period_state(session, old_period),
-        new_period.id: period_state(session, new_period),
-    }
-    for state in states.values():
-        _gate_period(
-            state,
-            data.reason,
-            extra={"adjustment_preview": _adjustment_preview(session, actor, expense, data)}
-            if state == "locked"
-            else None,
-        )
 
     before = snapshot_json(session, expense)
     amount = data.amount_cents if data.amount_cents is not None else expense.amount_cents
     payer = data.payer_member_id or expense.payer_member_id
     category_id = data.category_id if "category_id" in fields else expense.category_id
-    if "payer_member_id" in fields or new_period.id != old_period.id:
-        _check_payer(session, household.id, payer, new_month)
+    if "payer_member_id" in fields:
+        _check_payer(session, household.id, payer, period.seq)
     if "category_id" in fields:
         _check_category(session, household.id, category_id)
 
-    needs_resolve = (
-        bool(fields & {"amount_cents", "payer_member_id", "category_id", "split", "participants"})
-        or new_period.id != old_period.id
+    needs_resolve = bool(
+        fields & {"amount_cents", "payer_member_id", "category_id", "split", "participants"}
     )
     if needs_resolve:
         resolution = _resolve_for_existing(
             session,
             expense,
-            month=new_month,
+            seq=period.seq,
             amount_cents=amount,
             payer_member_id=payer,
             category_id=category_id,
@@ -640,8 +637,7 @@ def update_expense(
     expense.amount_cents = amount
     expense.payer_member_id = payer
     expense.category_id = category_id
-    expense.expense_date = new_date
-    expense.period_id = new_period.id
+    expense.expense_date = data.expense_date or expense.expense_date
     if data.description is not None:
         expense.description = data.description.strip()
     if "notes" in fields:
@@ -652,12 +648,10 @@ def update_expense(
     expense.updated_by_user_id = actor.user_id
     session.flush()
     _revision(session, expense, "update", actor.user_id, before, data.reason)
-    if expense.status == "confirmed":
-        for period in {old_period.id: old_period, new_period.id: new_period}.values():
-            if states[period.id] == "closed":
-                after_edit_in_closed_period(session, household, period)
+    if expense.status == "confirmed" and state == "closed":
+        after_edit_in_closed_period(session, household, period)
     session.commit()
-    return to_read(session, actor, expense, period=new_period)
+    return to_read(session, actor, expense, period=period)
 
 
 def delete_expense(
@@ -747,9 +741,7 @@ def create_adjustment(
         )
 
     today = clock.today_in(household.timezone)
-    target = get_or_create_period(session, household, clock.month_start(today))
-    if period_state(session, target) != "open":
-        raise Conflict("The current period is not open", code="period_locked")
+    target = require_open_period(session, household.id)
 
     stored = _stored_shares(session, original)
     personal = original.split_type == "personal"
@@ -809,7 +801,7 @@ def create_adjustment(
         resolution = _resolve(
             session,
             household.id,
-            month=target.month,
+            seq=target.seq,
             amount_cents=amount,
             payer_member_id=payer,
             category_id=category_id,
@@ -867,6 +859,9 @@ def reresolve_open_expenses(
 
     Closed periods are never touched. Returns the number of expenses changed.
     """
+    open_period = erepo.get_open_period(session, household_id)
+    if open_period is None:
+        return 0
     changed = 0
     for expense in erepo.open_period_expenses(session, household_id, split_origin=split_origin):
         if expense.source == "adjustment":
@@ -877,13 +872,12 @@ def reresolve_open_expenses(
             continue
         if split_origin is None and not only_all_members and expense.split_origin == "override":
             continue
-        month = clock.month_start(expense.expense_date)
         before_shares = [(s.member_id, s.amount_cents) for s in _stored_shares(session, expense)]
         try:
             res = _resolve_for_existing(
                 session,
                 expense,
-                month=month,
+                seq=open_period.seq,
                 amount_cents=expense.amount_cents,
                 payer_member_id=expense.payer_member_id,
                 category_id=expense.category_id,

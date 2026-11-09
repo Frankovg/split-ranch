@@ -1,13 +1,12 @@
 """Households, members, invitations, categories and split rules."""
 
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
-    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -29,7 +28,6 @@ class Household(Base):
     __tablename__ = "households"
     __table_args__ = (
         CheckConstraint("currency = 'EUR'", name="currency_eur"),
-        CheckConstraint("grace_days BETWEEN 0 AND 15", name="grace_days_range"),
         CheckConstraint("char_length(name) BETWEEN 1 AND 80", name="name_length"),
     )
 
@@ -39,8 +37,6 @@ class Household(Base):
         String(64), server_default="Europe/Madrid", default="Europe/Madrid"
     )
     currency: Mapped[str] = mapped_column(String(3), server_default="EUR", default="EUR")
-    grace_days: Mapped[int] = mapped_column(Integer, server_default="3", default=3)
-    auto_close: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     version: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
     created_at: Mapped[datetime] = created_at_col()
@@ -57,10 +53,10 @@ class HouseholdMember(Base):
         UniqueConstraint("id", "household_id"),
         CheckConstraint(in_check("role", ("admin", "member")), name="role"),
         CheckConstraint(in_check("status", ("active", "leaving", "left")), name="status"),
-        CheckConstraint("extract(day from joined_period) = 1", name="joined_period_first_day"),
+        CheckConstraint("joined_period_seq >= 1", name="joined_period_seq_positive"),
         CheckConstraint(
-            "left_period IS NULL OR extract(day from left_period) = 1",
-            name="left_period_first_day",
+            "left_period_seq IS NULL OR left_period_seq >= joined_period_seq",
+            name="left_after_joined",
         ),
         Index(
             "ix_household_members_active",
@@ -76,8 +72,10 @@ class HouseholdMember(Base):
     status: Mapped[str] = mapped_column(String(16), server_default="active", default="active")
     display_name_override: Mapped[str | None] = mapped_column(String(80))
     sort_key: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
-    joined_period: Mapped[date] = mapped_column(Date)
-    left_period: Mapped[date | None] = mapped_column(Date)
+    # Period sequence numbers (`Period.seq`): the member takes part in every period from
+    # `joined_period_seq` to `left_period_seq`, both included (NULL = still a member).
+    joined_period_seq: Mapped[int] = mapped_column(Integer)
+    left_period_seq: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
@@ -105,7 +103,7 @@ class Invitation(Base):
     max_uses: Mapped[int] = mapped_column(Integer, server_default="5", default=5)
     uses: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # NULL = decided at accept time ('current' within the first 10 days of the month).
+    # 'current' = the open period, 'next' = the next period started. NULL = 'current'.
     start_period: Mapped[str | None] = mapped_column(String(8))
 
 

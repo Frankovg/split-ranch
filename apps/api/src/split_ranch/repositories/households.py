@@ -1,7 +1,6 @@
 """Household-scoped queries: every function takes `household_id`."""
 
 from collections.abc import Sequence
-from datetime import date
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -70,14 +69,17 @@ def get_member(
     return session.scalars(stmt).first()
 
 
-def period_members(session: Session, household_id: UUID, month: date) -> Sequence[HouseholdMember]:
-    """Members who belong to the household during `month` (full-month membership)."""
+def period_members(session: Session, household_id: UUID, seq: int) -> Sequence[HouseholdMember]:
+    """Members who take part in period `seq` (whole-period membership)."""
     return session.scalars(
         select(HouseholdMember)
         .where(
             HouseholdMember.household_id == household_id,
-            HouseholdMember.joined_period <= month,
-            or_(HouseholdMember.left_period.is_(None), HouseholdMember.left_period >= month),
+            HouseholdMember.joined_period_seq <= seq,
+            or_(
+                HouseholdMember.left_period_seq.is_(None),
+                HouseholdMember.left_period_seq >= seq,
+            ),
         )
         .order_by(HouseholdMember.sort_key, HouseholdMember.id)
     ).all()
