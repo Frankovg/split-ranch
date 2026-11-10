@@ -43,7 +43,7 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `TEST_DATABASE_URL` | tests | optional, see below |
 
 Optional tuning: `LOG_LEVEL`, `LOG_JSON`, `MIN_APP_VERSION`, `PUBLIC_WEB_URL`, `JWT_LEEWAY_SECONDS`,
-`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`, `QUICK_SHARE_DAYS`.
+`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`.
 
 ## Database and migrations
 

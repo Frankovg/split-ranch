@@ -453,7 +453,6 @@ def mark_transfer_sent(
         raise _invalid(transfer, "send")
     transfer.status = "sent"
     transfer.sent_at = clock.now()
-    transfer.method = data.method
     if data.note is not None:
         transfer.note = data.note
     transfer.version += 1

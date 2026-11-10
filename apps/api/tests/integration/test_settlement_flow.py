@@ -171,7 +171,7 @@ def test_adjustment_example(
     ok(
         client.post(
             house.url(f"/transfers/{t['id']}/sent"),
-            json={"method": "bizum"},
+            json={"note": "Paid by bank transfer"},
             headers=house.h("Ana"),
         )
     )

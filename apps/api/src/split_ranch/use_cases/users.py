@@ -111,8 +111,6 @@ def update_profile(session: Session, actor: Actor, data: MeUpdate) -> MeRead:
         user.display_name = data.display_name.strip()
     if data.locale is not None:
         user.locale = data.locale
-    if data.payment_handles is not None:
-        user.payment_handles = data.payment_handles.model_dump(exclude_none=True)
     session.commit()
     return get_me(session, actor)
 

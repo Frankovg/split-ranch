@@ -1,11 +1,9 @@
 """Users and push tokens."""
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from split_ranch.models.base import Base, created_at_col, in_check, updated_at_col, uuid_pk
@@ -29,9 +27,6 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120))
     avatar_url: Mapped[str | None] = mapped_column(Text)
     locale: Mapped[str] = mapped_column(String(16), server_default="es-ES", default="es-ES")
-    payment_handles: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, server_default=text("'{}'::jsonb"), default=dict
-    )
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -153,7 +153,6 @@ class TransferRead(ReadModel):
     to_member_id: Id
     amount_cents: int
     status: str
-    method: str | None
     note: str | None
     sent_at: datetime | None
     confirmed_at: datetime | None
@@ -204,7 +203,6 @@ class ReopenIn(StrictModel):
 
 
 class TransferSentIn(StrictModel):
-    method: Literal["bizum", "paypal", "cash", "other"] | None = None
     note: str | None = Field(default=None, max_length=280)
 
 

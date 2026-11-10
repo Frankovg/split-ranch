@@ -75,10 +75,6 @@ class SettlementTransfer(Base):
         CheckConstraint("amount_cents > 0", name="amount_positive"),
         CheckConstraint("from_member_id <> to_member_id", name="distinct_members"),
         CheckConstraint(in_check("status", TRANSFER_STATUSES), name="status"),
-        CheckConstraint(
-            "method IS NULL OR " + in_check("method", ("bizum", "paypal", "cash", "other")),
-            name="method",
-        ),
     )
 
     id: Mapped[UUID] = uuid_pk()
@@ -89,7 +85,6 @@ class SettlementTransfer(Base):
     to_member_id: Mapped[UUID] = mapped_column()
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(16), server_default="pending", default="pending")
-    method: Mapped[str | None] = mapped_column(String(16))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confirmed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))

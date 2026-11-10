@@ -22,7 +22,7 @@ A second, independent tool — **Quick splits** — solves the dinner/trip case:
 - **Quick splits** (modes 1 and 2), computed locally, shareable as text.
 
 ### Post-MVP (ordered in [10-roadmap.md](10-roadmap.md))
-Recurring expenses, push notifications, payment button, budgets with alerts, comments/reactions/approval, private-expense visibility, multi-household UI, PDF/CSV export and charts, home-screen widget, full offline sync.
+Recurring expenses, push notifications, budgets with alerts, comments/reactions/approval, private-expense visibility, multi-household UI, PDF/CSV export and charts, home-screen widget, full offline sync.
 
 ### Out of scope
 Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), multi-currency (only the `currency` column exists, always `EUR`), iOS (architecture keeps the door open), AI features (architecture only — see [07](07-future-ai.md)).
@@ -58,7 +58,7 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 
 ## Assumptions
 1. Households are small (2–8 members); a few hundred expenses per month at most.
-2. Members are adults with a Google account; Spain is the primary market (EUR, Spanish locale, Bizum culture).
+2. Members are adults with a Google account; Spain is the primary market (EUR, Spanish locale).
 3. The app UI will be Spanish first, with i18n in place from day one (English second).
 4. No paid services (decided 2026-11-09): the app is for the developer's own household, so every provider runs on its free tier.
 5. No regulated payment flows: the app never moves money, it only calculates and records.
@@ -66,7 +66,7 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 ## Critical review of the original brief (summary)
 - **Celery + Redis** is more than needed: Procrastinate gives transactional, idempotent job creation on the database we already run. Redis can be added later for rate limiting/caching.
 - **Service-account-owned spreadsheets** no longer work reliably (zero Drive quota). The household admin owns the spreadsheet and shares it with the service account. See [06](06-google-sheets.md).
-- **Bizum has no public P2P API or deep link with a pre-filled amount.** The "pay" button becomes "copy amount + phone, open your bank app", plus real pre-filled links for providers that support them (e.g. PayPal.me). See [03](03-business-rules.md#payment-button).
+- **No payment-platform integration** (decided 2026-11-10): people pay each other outside the app (Bizum, cash, bank transfer…) and the app only records it — the debtor marks a transfer "sent" and the creditor confirms. See [03](03-business-rules.md#7-payments-outside-the-app).
 - **Editing a closed period after partial payments**: model transfers as ledger entries so a recalculation yields residual transfers; keep the "freeze + adjustment in next period" rule as the product behaviour. See [03](03-business-rules.md#critical-review-of-the-edit-model).
 - **"Whole period" membership** retroactively changes default splits of the open period when someone joins. Invitations offer "starts in the current period / next period". See [12](12-open-questions.md).
 - **Settlement minimisation** is NP-hard in the exact sense; a deterministic greedy algorithm guarantees at most _n − 1_ transfers, which is optimal enough for households. An exact solver for _n ≤ 10_ is optional.

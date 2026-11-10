@@ -28,13 +28,13 @@ Each item has a **default** that the plan already assumes. Change the default by
 
 ## Settlement and payments
 12. **Disputed transfers at long durations** — escalate to admins after N days? **Default:** reminder to both after 7 days, no escalation.
-13. **Cash settlements outside the app** (e.g. paid 50 € in cash mid-month). **Default:** creditor confirms the transfer with method `cash`; ad-hoc "reimbursement" entries are not supported in MVP. Consider a `transfer` expense type later.
-14. **Payment handles visibility.** **Default:** phone/PayPal/Revolut handles visible only to members of the same household (or typed ad hoc in Quick splits).
+13. **Cash settlements outside the app** (e.g. paid 50 € in cash mid-month). **Default:** debtor marks the transfer sent with a note ("en efectivo") and the creditor confirms it; ad-hoc "reimbursement" entries are not supported in MVP. Consider a `transfer` expense type later.
+14. ~~Payment handles visibility.~~ **Decided 2026-11-10:** no payment handles at all; the app never links to payment platforms.
 
 ## Quick splits
-15. **Collaborative editing via link without account.** **Default:** later phase; v1 = single editor, read-only share. Requires conflict handling and abuse controls.
-16. **Keep history of quick events?** **Default:** yes, locally (unlimited) and server-side only for saved events; user can delete.
-17. **Link a participant to a real user** (`user_id`). **Default:** column exists; no UI in MVP.
+15. ~~Collaborative editing via link without account.~~ **Decided 2026-11-10:** no; Quick splits never leave the phone.
+16. **Keep history of quick events?** **Decided:** yes, locally only (unlimited); user can delete.
+17. ~~Link a participant to a real user.~~ Not applicable: no server data. The only link is "Soy yo" (the phone's owner).
 18. **Convert a quick event into household expenses?** **Default:** not planned.
 
 ## Google Sheets
@@ -53,7 +53,7 @@ Each item has a **default** that the plan already assumes. Change the default by
 
 ## Supabase
 29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Decided 2026-11-09:** one Render **Free** web service in Frankfurt, with the worker inside the API process; we accept the ~1 min cold start after 15 min idle. Revisit (Render Starter, or a separate worker) only if more households join.
-30. **Supabase anonymous sign-ins** to let Quick-split users save/share events without a Google account. **Default:** disabled in MVP (saving requires Google); revisit with the share-link feature.
+30. ~~Supabase anonymous sign-ins for Quick splits.~~ Not needed: Quick splits are never saved on the server.
 31. ~~PITR add-on for prod~~ **Decided 2026-11-09:** Supabase Free plan (no backups, no PITR). A weekly encrypted `supabase db dump` runs in GitHub Actions (`.github/workflows/db-backup.yml`), so the worst case is losing up to a week of data (run the workflow by hand before risky changes).
 32. **Use Supabase Realtime** for live balance updates between members. **Default:** no; TanStack Query refetch on focus + push notifications are enough, and Realtime on our private schema would require exposing it.
 33. **Access-token lifetime.** **Default:** Supabase's 1 h; revocation is not instant for that window (see [08](08-security-and-privacy.md)).

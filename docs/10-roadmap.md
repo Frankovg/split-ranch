@@ -55,7 +55,8 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | T-2.3 Mode 2 UI (itemised expenses) | Trip example from [03](03-business-rules.md) reproduced |
 | T-2.4 Share as text (WhatsApp) | Text format as specified; uses `Share` API |
 | T-2.5 Access without login from sign-in screen | Fresh install → Quick splits usable offline in airplane mode |
-| T-2.6 (after P3) Save/sync to account: `PUT /quick-events/{id}` + server recompute | Server rejects tampered shares; list of saved events |
+| ~~T-2.6 Save/sync to account~~ | **Dropped 2026-11-10**: Quick splits stay on the phone only |
+| T-2.7 Manual payment status ("Debe / Ha pagado"; "Debo / Ya lo pagué" for "Soy yo") | Button toggles the status; edits never change it; share text shows ✓ |
 
 ## P3 — Auth, households, categories (2 w)
 
@@ -124,12 +125,12 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 |---|---|---|---|---|
 | 1 | **Push notifications** (new/edited expense, close reminder, transfer sent/pending) | High | S (1 w) | Needed by several features below |
 | 2 | **Recurring expenses** with own split rules | High | M (1.5 w) | Daily job creates expenses on `day_of_month`, `source='recurring'`; skip if already created (unique `(recurring_id, period)`) |
-| 3 | **Payment button** (Bizum copy+open bank, PayPal.me, Revolut) | High | S (1 w) | Also for Quick splits |
+| 3 | ~~Payment button~~ | — | — | **Dropped 2026-11-10**: the app never links to payment platforms |
 | 4 | **Private expenses visibility** (fully hidden from others) | Medium | S (0.5 w) | Split type already exists |
 | 5 | **Multi-household UI** (switcher) | Medium | S (0.5–1 w) | Data model ready |
 | 6 | **Budgets** per category + alerts | Medium | M (1.5 w) | Needs push |
 | 7 | **Charts, month-over-month, CSV/PDF export** | Medium | M (1.5 w) | victory-native; PDF server-side (WeasyPrint) or `expo-print` |
-| 8 | **Quick-split share link + image** | Medium | S (1 w) | Public read-only page |
+| 8 | **Quick-split result as image** | Low | S (0.5 w) | Shared from the phone; no server link |
 | 9 | **Comments/reactions + optional approval flow** | Low-Med | M (1.5 w) | Approval = expense `status='pending_approval'` before entering balance |
 | 10 | **Full offline sync** | Medium | L (3 w) | Outbox, change feed, conflict UI |
 | 11 | **Home-screen widget / quick add** | Low-Med | M (1.5 w) | Android widget via `react-native-android-widget`; App Shortcuts (long-press icon → "Nuevo gasto") is a cheap first step |

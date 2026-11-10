@@ -39,20 +39,18 @@ erDiagram
   periods ||--o{ sheet_tabs : "exported as"
 ```
 
-## ERD — Quick splits (independent)
+## Quick splits — device only
 
-```mermaid
-erDiagram
-  users ||--o{ quick_events : owns
-  quick_events ||--o{ quick_participants : has
-  quick_events ||--o{ quick_expenses : has
-  quick_participants ||--o{ quick_expenses : pays
-  quick_expenses ||--o{ quick_expense_shares : "split into"
-  quick_participants ||--o{ quick_expense_shares : owes
-  users |o--o{ quick_participants : "optional link"
-```
+Quick splits have **no server tables** (decided 2026-11-10; the `quick_*` tables were dropped in migration 0004). Each event lives only on the user's phone, in the Zustand store persisted to MMKV (`apps/mobile/src/stores/quick-splits.ts`, store version 2):
 
-No foreign key goes from `quick_*` to any household table.
+| Field | Notes |
+|---|---|
+| `id`, `title`, `mode` ('total','itemised'), `createdAt`, `updatedAt` | `id` is a random UUID generated on device |
+| `participants[]` | `{id, name}`; order = creation order (canonical for tie-breaks); names unique case-insensitively, editable |
+| `total` | Mode 1: `amountCents`, `excludedIds`, `weights`, `payerId` |
+| `expenses[]` | Mode 2: `{id, description, amountCents, payerId, participantIds}`, all editable |
+| `meId` | The participant who is the phone's owner ("you"), or null |
+| `paidIds` | Participants marked by hand as "has paid" |
 
 ## Tables
 
@@ -60,7 +58,7 @@ No foreign key goes from `quick_*` to any household table.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `users` | `id` (= Supabase `auth.users.id`), `email` (citext, unique), `display_name`, `avatar_url`, `locale`, `payment_handles` jsonb, `created_at`, `deleted_at` | Created/updated by `ensure_user` from the JWT claims (`sub`, `email`, `user_metadata.full_name`, `avatar_url`). Sessions, refresh tokens and provider identities are owned by Supabase Auth — no tables of ours |
+| `users` | `id` (= Supabase `auth.users.id`), `email` (citext, unique), `display_name`, `avatar_url`, `locale`, `created_at`, `deleted_at` | Created/updated by `ensure_user` from the JWT claims (`sub`, `email`, `user_metadata.full_name`, `avatar_url`). Sessions, refresh tokens and provider identities are owned by Supabase Auth — no tables of ours |
 | `push_tokens` | `id`, `user_id`, `expo_token` unique, `platform`, `last_seen_at`, `disabled_at` | Disabled on `DeviceNotRegistered` receipts |
 
 ### Households
@@ -113,18 +111,9 @@ No foreign key goes from `quick_*` to any household table.
 | `idempotency_keys` | `user_id`, `key`, `request_hash`, `response_status`, `response_body` jsonb, `created_at` | `UNIQUE(user_id, key)`; purge after 48 h |
 | `ai_usage` (AI phase) | per-user counters for quotas |
 
-### Quick splits
-
-| Table | Key columns | Notes |
-|---|---|---|
-| `quick_events` | `id` (client-generated UUIDv7), `owner_user_id`, `title`, `mode` ('total','itemised'), `currency`, `share_token` (NULL until shared, 22-char random), `share_expires_at`, `version`, `created_at`, `updated_at`, `deleted_at` | One editor (owner) in v1 |
-| `quick_participants` | `id`, `event_id`, `name` (≤ 40), `user_id` NULL, `sort_key`, `weight` (default 1) | `UNIQUE(event_id, lower(name))` |
-| `quick_expenses` | `id`, `event_id`, `payer_participant_id` NULL (mode 1 without payer), `amount_cents`, `description`, `split_type` ('equal','weights','exact') | |
-| `quick_expense_shares` | `quick_expense_id`, `participant_id`, `weight` / `exact_cents`, `amount_cents` | Same invariant: sum = amount |
-
 ## Integrity guarantees in the database
 - `amount_cents > 0` on expenses; `>= 0` on shares.
-- Sum-of-shares trigger (deferred, per transaction) on `expense_shares` and `quick_expense_shares`.
+- Sum-of-shares trigger (deferred, per transaction) on `expense_shares`.
 - An expense's `period_id` must belong to its `household_id` (composite FK `(period_id, household_id)` → `periods(id, household_id)`); same pattern for `payer_member_id` and `category_id`. This makes cross-tenant references impossible even with an application bug.
 - The API and worker connect with a dedicated role `split_api` (not `postgres`/`service_role`) that only has privileges on the `app` schema. As defence in depth, RLS is **enabled with no policies** on every `app` table, so even if the schema were exposed by mistake, the `anon`/`authenticated` roles would read nothing; `split_api` has `BYPASSRLS`.
 - `expense_revisions`, `settlement_snapshots`: append-only, enforced by revoking `UPDATE/DELETE` from `split_api` (except `superseded_at`, set via a `SECURITY DEFINER` function, or simply allow update of that one column via a trigger check).

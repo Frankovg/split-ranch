@@ -63,8 +63,8 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Period | Status timeline, totals by category, balances, transfers with Pay / I've paid / Received actions, snapshot diff if recalculated |
 | Members & invitations | Share invite link (WhatsApp), roles, leave |
 | Categories & rules | Default rule editor (equal / weights / percentages with live 100% check), per-category rules |
-| Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips, result card, Share, Pay |
-| Settings | Profile, payment handles, theme (system/light/dark), language, notifications, delete account |
+| Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips (tap to rename, mark "Soy yo" or remove), result card with a manual "Debe / Ha pagado" button per debtor, Share |
+| Settings | Profile, theme (system/light/dark), language, notifications, delete account |
 
 ## State and data
 
@@ -109,7 +109,7 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 - Persisted query cache: everything seen is available offline (read).
 - Creating an expense offline: mutation is queued (TanStack Query paused mutations persisted to MMKV), shown optimistically with a "pending sync" badge. Client generates the UUIDv7 and an `Idempotency-Key`, so replays are safe.
 - Edits/deletes offline are **disabled** in MVP (button shows "Necesitas conexión").
-- Quick splits are fully offline by design.
+- Quick splits are fully offline by design and never leave the phone (no sync).
 
 **Post-MVP (full offline), strategy:**
 - Outbox of mutations (create/update/delete) with `base_version`.

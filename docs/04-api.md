@@ -6,7 +6,7 @@ Base URL `https://api.<domain>/v1`. JSON, UTF-8, `snake_case`. OpenAPI 3.1 gener
 
 | Topic | Rule |
 |---|---|
-| Auth | `Authorization: Bearer <Supabase access token>` on everything except `/healthz`, `/readyz`, `/config`, `GET /quick-events/shared/{token}`. Sign-in, refresh and sign-out happen between the app and Supabase Auth; the API has no `/auth/*` routes |
+| Auth | `Authorization: Bearer <Supabase access token>` on everything except `/healthz`, `/readyz`, `/config`. Sign-in, refresh and sign-out happen between the app and Supabase Auth; the API has no `/auth/*` routes |
 | Tenancy | Household-scoped routes live under `/households/{household_id}/…`. The server loads the caller's membership for that household from the DB; non-members get **404** (not 403) to avoid leaking existence |
 | Identity | `user_id`, `created_by`, `actor` never accepted in bodies; derived from the JWT |
 | IDs | UUIDv7. Clients may send `id` on create (offline-generated); the server rejects collisions with a different payload |
@@ -34,7 +34,7 @@ Token verification (FastAPI dependency `get_actor`):
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/me` | — | user + memberships `[ {household_id, member_id, role, status} ]`; creates `app.users` on first call |
-| PATCH | `/me` | `{display_name?, locale?, payment_handles?}` | user |
+| PATCH | `/me` | `{display_name?, locale?}` | user |
 | DELETE | `/me` | `{confirm: "DELETE"}` | 202 (job: anonymise memberships, delete own data, then delete the Supabase auth user with the Admin API using the secret key, which only the worker holds) |
 | POST | `/me/push-tokens` | `{expo_token, platform}` | 204 (upsert) |
 | DELETE | `/me/push-tokens/{token}` | — | 204 |
@@ -148,24 +148,15 @@ Response (excerpt):
 | POST | `/households/{hid}/periods/{period}/close` | member | Idempotent; optional `If-Match` on period version |
 | POST | `/households/{hid}/periods/{period}/reopen` | admin | `{reason}`; latest period only (`409 period_not_latest`); `409 period_locked` if any transfer sent/confirmed |
 | GET | `/households/{hid}/periods/{period}/settlement` | member | current snapshot + transfers + previous snapshots summary |
-| POST | `/households/{hid}/transfers/{tid}/sent` | debtor | `{method?: "bizum"|"paypal"|"cash"|"other", note?}` |
+| POST | `/households/{hid}/transfers/{tid}/sent` | debtor | `{note?}` |
 | POST | `/households/{hid}/transfers/{tid}/confirm` | creditor (or admin with note if creditor left) | |
 | POST | `/households/{hid}/transfers/{tid}/dispute` | creditor | `{note}` |
 
 ## Quick splits
 
-| Method | Path | Notes |
-|---|---|---|
-| PUT | `/quick-events/{id}` | upsert the whole event (participants, expenses, shares) — client is the single editor; If-Match after first save |
-| GET | `/quick-events?cursor=` | my saved events |
-| GET | `/quick-events/{id}` | owner only |
-| DELETE | `/quick-events/{id}` | soft delete |
-| POST | `/quick-events/{id}/share` | → `{share_token, url, expires_at}` |
-| GET | `/quick-events/shared/{token}` | **public, read-only**, rate-limited; returns names, amounts, result |
-
-The server **recomputes** shares and transfers with the Python domain on save and rejects mismatches with the client (`422 split_mismatch`), which doubles as a production parity check (logged to Sentry).
+No endpoints: Quick splits live only on the user's phone (decided 2026-11-10; the former `/quick-events` routes were removed).
 
 ## Misc
 - `GET /healthz`, `GET /readyz`.
-- `GET /config` (public): min app version, payment-apps list, feature flags.
+- `GET /config` (public): min app version, feature flags.
 - Webhooks: none in MVP.

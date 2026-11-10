@@ -12,7 +12,7 @@ import structlog
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import Engine
 
-from split_ranch.api.routers import expenses, households, me, periods, quick_events, system
+from split_ranch.api.routers import expenses, households, me, periods, system
 from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.errors import install_error_handlers
 from split_ranch.core.logging import configure_logging
@@ -24,6 +24,7 @@ log = structlog.get_logger(__name__)
 API_PREFIX = "/v1"
 
 
+# TODO: Ver esto de Sentry
 def _init_sentry(settings: Settings) -> None:
     if not settings.sentry_dsn:
         return
@@ -39,7 +40,7 @@ def _init_sentry(settings: Settings) -> None:
 
 WORKER_SHUTDOWN_TIMEOUT_SECONDS = 20
 
-
+# TODO: Ver este deprecado
 @asynccontextmanager
 async def _in_process_worker() -> AsyncIterator[None]:
     """Run the Procrastinate worker as a task of the API's event loop.
@@ -84,7 +85,7 @@ def create_app(
             yield
 
     app = FastAPI(
-        title="Split Ranch API",
+        title="Split Ranch",
         version="0.1.0",
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,
@@ -132,7 +133,6 @@ def create_app(
         households.router,
         expenses.router,
         periods.router,
-        quick_events.router,
     ):
         app.include_router(router, prefix=API_PREFIX)
     return app

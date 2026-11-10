@@ -1,7 +1,7 @@
 """Users, households, members, invitations and categories."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -28,23 +28,15 @@ class UserRead(ReadModel):
     display_name: str | None
     avatar_url: str | None
     locale: str
-    payment_handles: dict[str, Any]
 
 
 class MeRead(UserRead):
     memberships: list[MembershipRead]
 
 
-class PaymentHandles(StrictModel):
-    bizum_phone: str | None = Field(default=None, max_length=20, pattern=r"^\+?[0-9 ]{6,20}$")
-    paypal_me: str | None = Field(default=None, max_length=40, pattern=r"^[A-Za-z0-9._-]+$")
-    revolut: str | None = Field(default=None, max_length=40, pattern=r"^[A-Za-z0-9._-]+$")
-
-
 class MeUpdate(StrictModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
-    payment_handles: PaymentHandles | None = None
 
 
 class PushTokenIn(StrictModel):

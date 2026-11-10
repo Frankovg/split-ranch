@@ -4,15 +4,18 @@ import {
   addParticipant,
   canRemoveParticipant,
   createQuickEvent,
+  migrateEventV1,
   removeParticipant,
+  setMe,
   setMode,
   setTotalAmount,
   setTotalPayer,
   setWeight,
   toggleExcluded,
+  togglePaid,
+  updateParticipant,
   upsertExpense,
 } from './model';
-import { clipboardAmount, normaliseHandle, paypalMeUrl, revolutUrl } from './payment-links';
 import { buildShareText } from './share-text';
 import type { QuickEvent } from './types';
 
@@ -142,16 +145,46 @@ describe('participants', () => {
   });
 });
 
-describe('payment links', () => {
-  it('builds PayPal.me with amount and Revolut profile links', () => {
-    expect(paypalMeUrl('@carlos', 2188)).toBe('https://paypal.me/carlos/21.88EUR');
-    expect(paypalMeUrl('https://paypal.me/carlos/', 5)).toBe('https://paypal.me/carlos/0.05EUR');
-    expect(revolutUrl('revolut.me/carlos')).toBe('https://revolut.me/carlos');
-    expect(normaliseHandle('bad handle')).toBeNull();
-    expect(paypalMeUrl('carlos', 0)).toBeNull();
+describe('me and paid status', () => {
+  it('marks one participant as me and toggles paid by hand', () => {
+    let e = withPeople('x', ['Ana', 'Bea']);
+    e = setMe(e, 'bea', NOW);
+    expect(e.meId).toBe('bea');
+    expect(setMe(e, 'ghost', NOW)).toBe(e);
+    e = togglePaid(togglePaid(e, 'ana', NOW), 'bea', NOW);
+    expect(e.paidIds).toEqual(['ana', 'bea']);
+    e = togglePaid(e, 'ana', NOW);
+    expect(e.paidIds).toEqual(['bea']);
   });
 
-  it('copies the amount in es-ES format', () => {
-    expect(clipboardAmount(2188)).toBe('21,88');
+  it('keeps the paid status when amounts or names change', () => {
+    let e = setTotalPayer(setTotalAmount(withPeople('x', ['Ana', 'Bea']), 1000, NOW), 'ana', NOW);
+    e = togglePaid(e, 'bea', NOW);
+    e = updateParticipant(setTotalAmount(e, 2000, NOW), 'bea', { name: 'Beatriz' }, NOW);
+    expect(e.paidIds).toEqual(['bea']);
+    expect(e.participants[1]?.name).toBe('Beatriz');
+  });
+
+  it('removing a participant clears me and paid', () => {
+    let e = togglePaid(setMe(withPeople('x', ['Ana', 'Bea']), 'bea', NOW), 'bea', NOW);
+    e = removeParticipant(e, 'bea', NOW);
+    expect(e.meId).toBeNull();
+    expect(e.paidIds).toEqual([]);
+  });
+
+  it('ticks paid debtors in the share text', () => {
+    let e = setTotalPayer(setTotalAmount(withPeople('Cena', ['Ana', 'Bea', 'Carlos']), 3000, NOW), 'ana', NOW);
+    e = togglePaid(e, 'bea', NOW);
+    const text = buildShareText(e.title, ok(e), undefined, 'es-ES', e.paidIds);
+    expect(text.split('\n')[2]).toMatch(/^Pagos: Bea → Ana 10,00\s€ ✓; Carlos → Ana 10,00\s€$/);
+  });
+
+  it('migrates v1 events: adds me/paid and drops payment handles', () => {
+    const v1 = { ...withPeople('x', ['Ana']), meId: undefined, paidIds: undefined } as Record<string, unknown>;
+    (v1.participants as Record<string, unknown>[])[0]!.paypalMe = 'ana';
+    const e = migrateEventV1(v1);
+    expect(e.meId).toBeNull();
+    expect(e.paidIds).toEqual([]);
+    expect(e.participants[0]).toEqual({ id: 'ana', name: 'Ana' });
   });
 });

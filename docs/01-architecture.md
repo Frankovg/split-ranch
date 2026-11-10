@@ -76,7 +76,6 @@ Rules:
 | Expenses | `create_expense`, `update_expense`, `delete_expense`, `confirm_draft_expense`, `discard_draft_expense`, `list_expenses`, `get_expense_history` |
 | Periods | `get_balance`, `close_period`, `start_period`, `reopen_period` |
 | Settlement | `get_settlement`, `mark_transfer_sent`, `confirm_transfer`, `dispute_transfer` |
-| Quick splits | `save_quick_event`, `share_quick_event`, `get_shared_quick_event` (calculation itself is client-side) |
 | Sheets | `ensure_household_spreadsheet`, `sync_period_tab` |
 
 ## Main flows
@@ -142,7 +141,7 @@ sequenceDiagram
 
 ### Quick splits (offline)
 
-Entirely on device: the screen state is fed to `@split-ranch/domain` (`allocate` + `settle`). Nothing reaches the API unless the user taps **Save** or **Share link**.
+Entirely on device: the screen state is fed to `@split-ranch/domain` (`allocate` + `settle`). Nothing ever reaches the API: events are stored only in the phone (MMKV) and shared as plain text.
 
 ## Cross-cutting decisions
 
