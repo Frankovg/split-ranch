@@ -192,6 +192,8 @@ def settings() -> Settings:
         ensure_user_cache_seconds=0,
         log_json=False,
         log_level="WARNING",
+        # apps/api/.env may hold a real DSN; tests must never report to Sentry.
+        sentry_dsn=None,
     )
 
 
