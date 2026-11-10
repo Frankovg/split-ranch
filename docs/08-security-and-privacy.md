@@ -73,7 +73,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 | Left members' read access | Until household deletion |
 | Sessions / refresh tokens | Managed by Supabase Auth; removed on sign-out or account deletion |
 | Supabase auth/API logs | Per Supabase plan retention (Free plan: short, about a day) |
-| DB backups (GitHub Actions artifacts, gpg-encrypted) | 30 days |
+| DB backups (GitHub Actions artifacts, gpg-encrypted) | 60 days |
 | Idempotency keys | 48 h |
 | Logs | 30 days; Sentry 90 days |
 | Quick events (saved) | Until deleted by owner; shared links expire after 90 days (configurable) |

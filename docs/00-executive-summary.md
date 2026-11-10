@@ -45,7 +45,7 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 | Sheets | Google Sheets API with a service account **editing a spreadsheet owned by the household admin**, who shares it with the service account; only closed periods are exported | Service accounts have no Drive storage of their own, but they can edit a file a person owns; free, no Workspace |
 | Push | Expo Push Service (FCM v1 credentials via EAS) | Simple, free, iOS-ready |
 | Hosting | **Free tiers only (€0/month)**: **Supabase Free** (Postgres + Auth, Frankfurt) + one **Render Free** web service in Frankfurt running FastAPI with the worker in-process (Supabase cannot run a Python service) | One household of two people; no staging environment. Trade-offs (cold starts, project pausing, no managed backups) are covered in `infra/README.md` |
-| CI/CD | GitHub Actions + EAS Build/Update; Render auto-deploy from `main` when CI passes, with Alembic migrations in the build; daily encrypted DB dump in GitHub Actions | Low ops, no cost |
+| CI/CD | GitHub Actions + EAS Build/Update; Render auto-deploy from `main` when CI passes, with Alembic migrations in the build; weekly encrypted DB dump in GitHub Actions | Low ops, no cost |
 | Observability | Sentry (mobile + API, EU data region), structured JSON logs (structlog) | Fast feedback with little setup |
 
 ## Decisions taken with the product owner (2026-11-07)
@@ -76,4 +76,4 @@ Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), m
 2. Google Sign-In library landscape (legacy API deprecated; the maintained Credential Manager option of `react-native-google-signin` is paid) → spike and thin abstraction. Supabase does not remove this: it consumes the ID token the native library returns.3. Google Sheets quotas (60 writes/min per user; a service account counts as one user) → batching, one `batchUpdate` per tab, queue throttling.
 4. Edits after close producing confusing results → strict state machine, snapshots and clear UI diffs.
 5. Scope creep across many post-MVP features → strict phase gates.
-6. Supabase specifics: its Data API must not expose our tables (private schema), the worker needs a session-mode or direct connection for LISTEN/NOTIFY, and Free projects pause after a week of low activity and have no backups (daily use plus a daily backup job; resume from the dashboard if it pauses).
+6. Supabase specifics: its Data API must not expose our tables (private schema), the worker needs a session-mode or direct connection for LISTEN/NOTIFY, and Free projects pause after a week of low activity and have no backups (regular use plus a weekly backup job; resume from the dashboard if it pauses).

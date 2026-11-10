@@ -39,16 +39,16 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 ## 5. Sentry (free Developer plan, EU region, optional)
 - [ ] Projects `split-ranch-api` and `split-ranch-mobile`; DSNs into Render and EAS env. If unset, Sentry stays off.
 
-## 6. GitHub Actions: daily backup
+## 6. GitHub Actions: weekly backup
 - [ ] Repository secrets: `SUPABASE_DB_URL` (session pooler URL as the `postgres` role) and `BACKUP_PASSPHRASE` (long random string; also keep it in your password manager, since without it the backups cannot be read).
-- [ ] Run `.github/workflows/db-backup.yml` once by hand (`workflow_dispatch`) and check that the artifact appears. After that it runs daily and keeps 30 days of encrypted dumps. The dumps contain emails and every expense, so they are always encrypted, even in a private repo.
+- [ ] Run `.github/workflows/db-backup.yml` once by hand (`workflow_dispatch`) and check that the artifact appears. After that it runs every Monday and keeps 60 days of encrypted dumps (the worst case is losing up to a week of data). The dumps contain emails and every expense, so they are always encrypted, even in a private repo.
 
 ## Free-tier limits
 
 | Service | Limit | What it means here |
 |---|---|---|
 | Supabase | 500 MB DB, 50k MAU, 5 GB egress, **2 free projects** | Years of a household's expenses fit in a few MB |
-| Supabase | **Pauses after ~7 days of low activity** | Daily use plus the daily backup job keep it active. If it pauses anyway, resume it in the dashboard (data kept, restorable up to 1 year) |
+| Supabase | **Pauses after ~7 days of low activity** | Regular use of the app keeps it active; the weekly backup is a safety net, not a guarantee. If it pauses anyway, resume it in the dashboard (data kept, restorable up to 1 year) |
 | Supabase | No backups, no PITR | Covered by §6 |
 | Render | Spins down after 15 min idle; **~1 min cold start** | The first request after a quiet spell is slow. Queued jobs (Sheets sync) run once the instance is awake |
 | Render | 750 instance hours/month per workspace | One service is at most ~744 h, so it fits even if it never sleeps |

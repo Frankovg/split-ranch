@@ -54,6 +54,6 @@ Each item has a **default** that the plan already assumes. Change the default by
 ## Supabase
 29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Decided 2026-11-09:** one Render **Free** web service in Frankfurt, with the worker inside the API process; we accept the ~1 min cold start after 15 min idle. Revisit (Render Starter, or a separate worker) only if more households join.
 30. **Supabase anonymous sign-ins** to let Quick-split users save/share events without a Google account. **Default:** disabled in MVP (saving requires Google); revisit with the share-link feature.
-31. ~~PITR add-on for prod~~ **Decided 2026-11-09:** Supabase Free plan (no backups, no PITR). A daily encrypted `supabase db dump` runs in GitHub Actions (`.github/workflows/db-backup.yml`), so the worst case is losing the last day of data.
+31. ~~PITR add-on for prod~~ **Decided 2026-11-09:** Supabase Free plan (no backups, no PITR). A weekly encrypted `supabase db dump` runs in GitHub Actions (`.github/workflows/db-backup.yml`), so the worst case is losing up to a week of data (run the workflow by hand before risky changes).
 32. **Use Supabase Realtime** for live balance updates between members. **Default:** no; TanStack Query refetch on focus + push notifications are enough, and Realtime on our private schema would require exposing it.
 33. **Access-token lifetime.** **Default:** Supabase's 1 h; revocation is not instant for that window (see [08](08-security-and-privacy.md)).
