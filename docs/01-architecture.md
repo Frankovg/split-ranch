@@ -76,7 +76,6 @@ Rules:
 | Expenses | `create_expense`, `update_expense`, `delete_expense`, `confirm_draft_expense`, `discard_draft_expense`, `list_expenses`, `get_expense_history` |
 | Periods | `get_balance`, `close_period`, `start_period`, `reopen_period` |
 | Settlement | `get_settlement`, `mark_transfer_sent`, `confirm_transfer`, `dispute_transfer` |
-| Quick splits | `save_quick_event`, `share_quick_event`, `get_shared_quick_event` (calculation itself is client-side) |
 | Sheets | `ensure_household_spreadsheet`, `sync_period_tab` |
 
 ## Main flows
@@ -142,7 +141,7 @@ sequenceDiagram
 
 ### Quick splits (offline)
 
-Entirely on device: the screen state is fed to `@split-ranch/domain` (`allocate` + `settle`). Nothing reaches the API unless the user taps **Save** or **Share link**.
+Entirely on device: the screen state is fed to `@split-ranch/domain` (`allocate` + `settle`). Nothing ever reaches the API: events are stored only in the phone (MMKV) and shared as plain text.
 
 ## Cross-cutting decisions
 
@@ -165,7 +164,7 @@ Entirely on device: the screen state is fed to `@split-ranch/domain` (`allocate`
 | Env | API/worker | DB | Mobile |
 |---|---|---|---|
 | `dev` | local uvicorn + worker | **Supabase CLI** local stack (`supabase start`: Postgres + Auth in Docker) | Expo dev build, EAS channel `development` |
-| `prod` | Render **Free** web service (Frankfurt), API + in-process worker, auto-deploy from `main` when CI passes | Supabase project `split-ranch-prod` (Frankfurt, **Free plan**; daily encrypted dump via GitHub Actions) | EAS `preview`/`production` APK installed directly (no Play Store) |
+| `prod` | Render **Free** web service (Frankfurt), API + in-process worker, auto-deploy from `main` when CI passes | Supabase project `split-ranch-prod` (Frankfurt, **Free plan**; weekly encrypted dump via GitHub Actions) | EAS `preview`/`production` APK installed directly (no Play Store) |
 
 - **Why Supabase**: managed Postgres + Auth in the EU from one provider; Google/Apple providers by configuration; JWKS-based JWT verification; no token code to maintain. The Free plan's limits (500 MB, 50k MAU) are far above what one household needs. Its two drawbacks are covered: Free projects **pause after ~7 days of low activity** (daily use plus the daily backup job keep it active, and a paused project can be resumed from the dashboard), and Free has **no backups** (`.github/workflows/db-backup.yml`). Upgrade to Pro only if more households join.
 - **Why Render for the Python process**: a free web service in Frankfurt (same city as the database → low latency), `render.yaml` as code. Free trade-offs: the instance **spins down after 15 min idle** (~1 min cold start on the next request); there are no free background workers, so the worker runs in-process; and there is no pre-deploy command, so migrations run in the build. Jobs only run while the instance is awake. That is fine because they are triggered by API requests (a period close), and the job runs right after the request that enqueued it. Jobs interrupted by a spin-down are requeued by `retry_stalled_jobs`. **Alternative**: Fly.io (no free tier for new accounts).

@@ -24,6 +24,8 @@ interface QuickSplitsState {
   setTotalPayer: (id: string, payerId: string | null) => void;
   upsertExpense: (id: string, expense: Omit<QuickExpense, 'id'> & { id?: string }) => void;
   removeExpense: (id: string, expenseId: string) => void;
+  setMe: (id: string, participantId: string | null) => void;
+  togglePaid: (id: string, participantId: string) => void;
 }
 
 const now = () => new Date().toISOString();
@@ -72,13 +74,26 @@ export const useQuickSplitsStore = create<QuickSplitsState>()(
             model.upsertExpense(e, { ...expense, id: expense.id ?? Crypto.randomUUID() }, now()),
           ),
         removeExpense: (id, expenseId) => void update(id, (e) => model.removeExpense(e, expenseId, now())),
+        setMe: (id, participantId) => void update(id, (e) => model.setMe(e, participantId, now())),
+        togglePaid: (id, participantId) =>
+          void update(id, (e) => model.togglePaid(e, participantId, now())),
       };
     },
     {
       name: 'quick-splits',
       storage: createJSONStorage(() => zustandStorage),
-      version: 1,
+      version: 2,
       partialize: (s) => ({ events: s.events }),
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as { events?: Record<string, unknown> };
+        if (version < 2) {
+          const events = Object.fromEntries(
+            Object.entries(state.events ?? {}).map(([k, v]) => [k, model.migrateEventV1(v)]),
+          );
+          return { events } as Pick<QuickSplitsState, 'events'>;
+        }
+        return state as Pick<QuickSplitsState, 'events'>;
+      },
     },
   ),
 );

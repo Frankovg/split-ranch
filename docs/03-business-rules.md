@@ -41,7 +41,7 @@ allocate(total: int, ratios: list[int]) -> list[int]
 
 Properties: `sum(result) == total`; each result is `floor` or `ceil` of the exact share; zero ratios get 0; output depends only on `(total, ratios, order of inputs)`.
 
-The **order of inputs** is always the canonical member order: `household_members.sort_key ASC, id ASC` (Quick splits: `quick_participants.sort_key ASC, id ASC`). The domain functions receive already-ordered lists, so the tie-break is "earlier member wins".
+The **order of inputs** is always the canonical member order: `household_members.sort_key ASC, id ASC` (Quick splits: participant creation order). The domain functions receive already-ordered lists, so the tie-break is "earlier member wins".
 
 Python (illustrative):
 
@@ -254,7 +254,7 @@ See [12](12-open-questions.md) for the trade-offs of retroactive re-resolution.
 
 ## 6. Quick splits
 
-Independent of households: no periods, no close, no adjustments, no Sheets. Same domain functions (`allocate`, `settle`). Computed on device, offline, without login; persisted only on **Save**/**Share**.
+Independent of households: no periods, no close, no adjustments, no Sheets. Same domain functions (`allocate`, `settle`). Computed on device, offline, without login. **Stored only on the user's phone**: never saved, synced or shared through the server (decided 2026-11-10). Everything stays editable at any time: event name, participant names, the total, weights, exclusions, payer, and every itemised expense.
 
 ### Mode 1 — split a total
 Input: total, participants (names), optional weights/exclusions, optional payer.
@@ -300,23 +300,27 @@ Mode 1 is literally mode 2 with a single expense; the UI just hides the list.
   Pagos: Ana → Carlos 21,88 €; Bea → Carlos 21,88 €; Dani → Carlos 21,87 €
   Hecho con Split Ranch
   ```
+  People marked "has paid" get a ✓ after their payment (or after their share when there is no payer).
 - Image: render the result card with `react-native-view-shot` and share via `expo-sharing` (post-MVP polish).
-- Link (requires login + save): read-only web page `https://split.ranch/q/{share_token}` (post-MVP; v1 = text only).
+- No share links: the server never holds Quick-split data.
 
-## 7. Payment button
+### Payment status (manual)
+Quick splits are **not linked to any payment method** (no Bizum, PayPal.me or Revolut links). Instead, everyone who owes money has a status the user switches **by hand** with a button:
 
-Research summary (Nov 2026):
-- **Bizum has no public P2P API and no documented deep link/intent that pre-fills amount or recipient.** It lives inside each bank's app; public Bizum APIs are merchant e-commerce flows via payment gateways (Redsys, Adyen, Worldpay…), which require a merchant contract and don't fit P2P.
-- **PayPal.me** links accept an amount: `https://paypal.me/<user>/<amount>EUR`.
-- **Revolut.me** links open the profile; no documented amount parameter (amount is set in the app).
+| Who | Status labels |
+|---|---|
+| Another participant | **Debe** ↔ **Ha pagado** |
+| The phone's owner (participant marked "Soy yo") | **Debo** ↔ **Ya lo pagué** |
 
-Design:
-1. Each member can store optional payment handles in their profile: phone for Bizum (shown only to household members), PayPal.me username, Revolut username.
-2. On a transfer the debtor taps **Pay**:
-   - **Bizum**: copies the amount (`21,88`) to the clipboard, shows the recipient's phone with a copy button, and opens the user's chosen bank app via an Android launch intent for its package (`Linking`/`expo-intent-launcher`, with the package names declared in `<queries>` for Android 11+ package visibility). The user picks their bank once (curated list: CaixaBank, BBVA, Santander, Sabadell, ING, imagin, Unicaja, Kutxabank, Abanca, Openbank…, editable remotely via a JSON config).
-   - **PayPal**: opens `paypal.me/<user>/<amount>EUR` (amount pre-filled).
-   - **Revolut**: opens `revolut.me/<user>` and copies the amount.
-3. Returning to the app shows "Did you pay?" → marks the transfer `sent`.
-4. Quick splits reuse the same component, with handles typed ad hoc.
+- "Owes money" = negative net when there is a payer; with no payer, every person with a share > 0.
+- The status is a plain flag (`paidIds`): editing amounts or names never changes it; only the button does. Removing a participant clears their flag.
+- One participant per event can be marked "Soy yo" in the participant dialog; it shows as "Ana (tú)".
+
+## 7. Payments outside the app
+
+**Decided 2026-11-10:** the app does not link to any payment platform. There is no Pay button, no Bizum/PayPal.me/Revolut links or deep links, no bank-app list, and no payment handles (phone, usernames) in profiles. People pay each other however they like, outside the app.
+
+- Household: the debtor marks a transfer **sent** (optional note, e.g. "en efectivo"); the creditor **confirms** or **disputes** it. When every transfer is confirmed the period is settled.
+- Quick splits: a manual "Debe / Ha pagado" status per person (§6).
 
 Never claim a payment happened automatically: confirmation is always the creditor's.

@@ -84,7 +84,7 @@ Example (`allocate.json`):
 |---|---|---|
 | `ci.yml` | PR, push to main | path-filtered: **domain** (TS + Py + parity vectors), **api** (ruff, mypy, pytest with Postgres service, migrations check, OpenAPI diff), **mobile** (tsc, eslint, jest), gitleaks |
 | `openapi.yml` | API change | regenerate TS client; fail if committed client is stale |
-| `db-backup.yml` | daily cron + manual | `supabase db dump` (roles, schema, data) → gpg-encrypted artifact, 30-day retention |
+| `db-backup.yml` | weekly cron (Mondays) + manual | `supabase db dump` (roles, schema, data) → gpg-encrypted artifact, 60-day retention |
 | `mobile-preview.yml` | manual | `eas build --profile preview` (APK, installed directly) |
 | `e2e.yml` | before release | Maestro on a local emulator (Maestro Cloud is paid) |
 | `nightly.yml` | cron | random parity vectors with a new seed, dependency audit |

@@ -5,9 +5,6 @@ export type QuickMode = 'total' | 'itemised';
 export interface QuickParticipant {
   id: string;
   name: string;
-  /** Optional ad-hoc payment handles (docs/03 §7). */
-  paypalMe?: string;
-  revolut?: string;
 }
 
 export interface QuickTotal {
@@ -38,4 +35,11 @@ export interface QuickEvent {
   participants: QuickParticipant[];
   total: QuickTotal;
   expenses: QuickExpense[];
+  /** The participant who is the phone's owner ("you"), if they marked one. */
+  meId: string | null;
+  /**
+   * Participants marked by hand as "has paid" their part. Only the user changes it (a
+   * button per person); edits to amounts never change it automatically.
+   */
+  paidIds: string[];
 }

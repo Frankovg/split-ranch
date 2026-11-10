@@ -16,6 +16,7 @@ import {
 import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useQuickSplitsStore } from '@/stores/quick-splits';
 import { canRemoveParticipant, isDuplicateName, normaliseName } from '../model';
@@ -42,19 +43,16 @@ function ParticipantDialog({
   const { t } = useTranslation();
   const update = useQuickSplitsStore((s) => s.updateParticipant);
   const remove = useQuickSplitsStore((s) => s.removeParticipant);
+  const setMe = useQuickSplitsStore((s) => s.setMe);
   const [name, setName] = React.useState(participant.name);
-  const [paypalMe, setPaypalMe] = React.useState(participant.paypalMe ?? '');
-  const [revolut, setRevolut] = React.useState(participant.revolut ?? '');
+  const [isMe, setIsMe] = React.useState(event.meId === participant.id);
   const duplicate = isDuplicateName(event, name, participant.id);
   const valid = normaliseName(name) !== '' && !duplicate;
 
   const onSave = () => {
     if (!valid) return;
-    update(event.id, participant.id, {
-      name,
-      paypalMe: paypalMe.trim() || undefined,
-      revolut: revolut.trim() || undefined,
-    });
+    update(event.id, participant.id, { name });
+    if (isMe !== (event.meId === participant.id)) setMe(event.id, isMe ? participant.id : null);
     onClose();
   };
 
@@ -78,26 +76,11 @@ function ParticipantDialog({
           <Input value={name} onChangeText={setName} aria-labelledby="participant-name" aria-invalid={duplicate} />
           {duplicate ? <Text className="text-sm text-destructive">{t('quick.duplicateName')}</Text> : null}
         </View>
-        <Text className="font-semibold">{t('quick.handles')}</Text>
-        <View className="gap-1.5">
-          <Label nativeID="participant-paypal">{t('quick.paypalHandle')}</Label>
-          <Input
-            value={paypalMe}
-            onChangeText={setPaypalMe}
-            autoCapitalize="none"
-            autoCorrect={false}
-            aria-labelledby="participant-paypal"
-          />
-        </View>
-        <View className="gap-1.5">
-          <Label nativeID="participant-revolut">{t('quick.revolutHandle')}</Label>
-          <Input
-            value={revolut}
-            onChangeText={setRevolut}
-            autoCapitalize="none"
-            autoCorrect={false}
-            aria-labelledby="participant-revolut"
-          />
+        <View className="min-h-12 flex-row items-center gap-3">
+          <Switch checked={isMe} onCheckedChange={setIsMe} accessibilityLabel={t('quick.thisIsMe')} />
+          <Text className="flex-1" onPress={() => setIsMe((v) => !v)}>
+            {t('quick.thisIsMe')}
+          </Text>
         </View>
         <DialogFooter className="flex-row flex-wrap justify-between gap-2">
           <Button variant="ghost" onPress={onRemove}>
@@ -145,7 +128,7 @@ export function ParticipantsSection({ event }: { event: QuickEvent }) {
                   <Text className="text-xs">{initials(p.name)}</Text>
                 </AvatarFallback>
               </Avatar>
-              <Text>{p.name}</Text>
+              <Text>{p.id === event.meId ? t('quick.nameYou', { name: p.name }) : p.name}</Text>
             </Button>
           ))}
         </View>

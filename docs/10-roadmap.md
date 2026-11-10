@@ -30,7 +30,7 @@ gantt
 | T-0.3 **UI stack spike** on Expo SDK 58: NativeWind 4.2 + Tailwind 3 + React Native Reusables (Button, Dialog, Select, Tabs), dark mode, font scaling | Dev build on a real Android device; decision recorded (go / fallback SDK 57 / Uniwind) in [13](13-design-system.md) |
 | T-0.4 **Google sign-in spike** (Universal Sign-In vs free Credential Manager lib) → `supabase.auth.signInWithIdToken` + FastAPI JWKS verification | Real device signs in to the Supabase project; a FastAPI endpoint accepts the Supabase token and rejects anon/expired ones; library choice + licence cost recorded |
 | T-0.5 FastAPI skeleton: settings, structlog, Sentry, `/healthz` `/readyz`, SQLAlchemy 2 async session, Alembic init, Procrastinate worker hello-job | Tests green; worker processes a job from a DB row |
-| T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API + in-process worker) + EAS project (`development`/`preview`) + daily backup workflow | URL responds and reaches the DB via the shared pooler; in-process worker receives NOTIFY via session mode; preview APK installs; backup artifact produced |
+| T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API + in-process worker) + EAS project (`development`/`preview`) + weekly backup workflow | URL responds and reaches the DB via the shared pooler; in-process worker receives NOTIFY via session mode; preview APK installs; backup artifact produced |
 
 Risks: version incompatibilities (mitigated by spikes and pinning).
 
@@ -55,7 +55,8 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | T-2.3 Mode 2 UI (itemised expenses) | Trip example from [03](03-business-rules.md) reproduced |
 | T-2.4 Share as text (WhatsApp) | Text format as specified; uses `Share` API |
 | T-2.5 Access without login from sign-in screen | Fresh install → Quick splits usable offline in airplane mode |
-| T-2.6 (after P3) Save/sync to account: `PUT /quick-events/{id}` + server recompute | Server rejects tampered shares; list of saved events |
+| ~~T-2.6 Save/sync to account~~ | **Dropped 2026-11-10**: Quick splits stay on the phone only |
+| T-2.7 Manual payment status ("Debe / Ha pagado"; "Debo / Ya lo pagué" for "Soy yo") | Button toggles the status; edits never change it; share text shows ✓ |
 
 ## P3 — Auth, households, categories (2 w)
 
@@ -124,12 +125,12 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 |---|---|---|---|---|
 | 1 | **Push notifications** (new/edited expense, close reminder, transfer sent/pending) | High | S (1 w) | Needed by several features below |
 | 2 | **Recurring expenses** with own split rules | High | M (1.5 w) | Daily job creates expenses on `day_of_month`, `source='recurring'`; skip if already created (unique `(recurring_id, period)`) |
-| 3 | **Payment button** (Bizum copy+open bank, PayPal.me, Revolut) | High | S (1 w) | Also for Quick splits |
+| 3 | ~~Payment button~~ | — | — | **Dropped 2026-11-10**: the app never links to payment platforms |
 | 4 | **Private expenses visibility** (fully hidden from others) | Medium | S (0.5 w) | Split type already exists |
 | 5 | **Multi-household UI** (switcher) | Medium | S (0.5–1 w) | Data model ready |
 | 6 | **Budgets** per category + alerts | Medium | M (1.5 w) | Needs push |
 | 7 | **Charts, month-over-month, CSV/PDF export** | Medium | M (1.5 w) | victory-native; PDF server-side (WeasyPrint) or `expo-print` |
-| 8 | **Quick-split share link + image** | Medium | S (1 w) | Public read-only page |
+| 8 | **Quick-split result as image** | Low | S (0.5 w) | Shared from the phone; no server link |
 | 9 | **Comments/reactions + optional approval flow** | Low-Med | M (1.5 w) | Approval = expense `status='pending_approval'` before entering balance |
 | 10 | **Full offline sync** | Medium | L (3 w) | Outbox, change feed, conflict UI |
 | 11 | **Home-screen widget / quick add** | Low-Med | M (1.5 w) | Android widget via `react-native-android-widget`; App Shortcuts (long-press icon → "Nuevo gasto") is a cheap first step |
@@ -146,7 +147,7 @@ P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, remi
 | UI library churn (NativeWind v5 RC, SDK 58 new) | Medium | Medium | Spike T-0.3, pin versions, Reusables supports NativeWind and Uniwind |
 | Google Sign-In library/licensing | Medium | Medium | Spike T-0.4, abstraction layer |
 | Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, closed periods only, hashes |
-| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | In-process worker + stalled-job retry, daily backup job doubles as activity, resume runbook (`infra/README.md`) |
+| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | In-process worker + stalled-job retry, weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
 | Rules complexity confuses users | Medium | High | Show "why this split" (`split_origin`) everywhere; sensible defaults |
 | Edits after close / adjustments misunderstood | Medium | Medium | Diff UI, clear copy, E2E tests |
 | Solo developer bandwidth | High | High | Strict phase gates; Quick splits as early release to validate UI stack |

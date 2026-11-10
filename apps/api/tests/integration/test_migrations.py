@@ -20,6 +20,16 @@ def _config(url: str) -> Config:
 def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
     cfg = _config(database_url)
     command.check(cfg)  # raises if models and migrations diverge
+    command.downgrade(cfg, "0003")
+    with engine.connect() as conn:
+        # 0004 down: the (empty) Quick split tables and the payment columns are back.
+        assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar()
+        assert conn.execute(
+            text(
+                "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'app' "
+                "AND table_name = 'users' AND column_name = 'payment_handles'"
+            )
+        ).scalar()
     command.downgrade(cfg, "0002")
     with engine.connect() as conn:
         # 0003 down: periods are calendar months again.
@@ -37,5 +47,6 @@ def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
         assert conn.execute(text("SELECT to_regclass('app.expenses')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0003"
+        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0004"
         assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar()
+        assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar() is None

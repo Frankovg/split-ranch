@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.logging import configure_logging
+from split_ranch.core.observability import init_sentry
 from split_ranch.core.settings import get_settings, libpq_url
 from split_ranch.use_cases import idempotency
 
@@ -41,6 +42,9 @@ def _connector() -> procrastinate.PsycopgConnector:
 
 
 configure_logging(get_settings().log_level, get_settings().log_json)
+# The standalone worker never runs create_app; failed jobs reach Sentry through
+# Procrastinate's ERROR log records (default LoggingIntegration).
+init_sentry(get_settings())
 
 app = procrastinate.App(connector=_connector(), import_paths=["split_ranch.jobs.app"])
 

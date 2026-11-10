@@ -23,22 +23,26 @@ export const DEFAULT_SHARE_LABELS: ShareTextLabels = {
  *   Pagos: Ana → Carlos 21,88 €; Bea → Carlos 21,88 €; Dani → Carlos 21,87 €
  *   Hecho con Split Ranch
  * The "Pagos" line is omitted when nobody paid (split without payer).
+ * People in `paidIds` (marked "has paid" by hand) get a ✓ after their payment, or after
+ * their share when there is no payer.
  */
 export function buildShareText(
   title: string,
   result: QuickResultOk,
   labels: ShareTextLabels = DEFAULT_SHARE_LABELS,
   locale = 'es-ES',
+  paidIds: readonly string[] = [],
 ): string {
+  const tick = (id: string) => (paidIds.includes(id) ? ' ✓' : '');
   const amount = (cents: number) => plainSpaces(formatAmount(cents, locale));
   const lines = [`🧾 ${title.trim()} — ${displayMoney(result.totalCents, locale)}`];
-  lines.push(`${labels.each}: ${result.perPerson.map((p) => `${p.name} ${amount(p.amountCents)}`).join(' · ')}`);
+  lines.push(`${labels.each}: ${result.perPerson.map((p) => `${p.name} ${amount(p.amountCents)}${result.balances ? '' : tick(p.id)}`).join(' · ')}`);
   if (result.balances) {
     const payments =
       result.transfers.length === 0
         ? labels.noPayments
         : result.transfers
-            .map((t) => `${t.fromName} → ${t.toName} ${displayMoney(t.amountCents, locale)}`)
+            .map((t) => `${t.fromName} → ${t.toName} ${displayMoney(t.amountCents, locale)}${tick(t.fromId)}`)
             .join('; ');
     lines.push(`${labels.payments}: ${payments}`);
   }

@@ -23,7 +23,7 @@ From the repo root, `pnpm mobile:dev` also keeps `adb reverse tcp:8081` and `tcp
 | Script | Does |
 |---|---|
 | `pnpm --filter @split-ranch/mobile typecheck` | `tsc --noEmit` (strict + `noUncheckedIndexedAccess`) |
-| `pnpm --filter @split-ranch/mobile test` | Vitest for the pure TS modules (quick-split logic, share text, payment links, tokens sync, API client retry) |
+| `pnpm --filter @split-ranch/mobile test` | Vitest for the pure TS modules (quick-split logic, share text, tokens sync, API client retry) |
 | `pnpm --filter @split-ranch/mobile export:android` | `expo export --platform android` (proves the JS bundle builds) |
 | `pnpm --filter @split-ranch/mobile doctor` | `expo-doctor` |
 
@@ -41,7 +41,7 @@ All are public (`EXPO_PUBLIC_*` is inlined into the bundle — never secrets) an
 ## Layout
 
 - `app/` — routes only (thin). Root `Stack` with `Stack.Protected`: `(app)` (tabs Inicio · Gastos · Cuentas rápidas · Ajustes) when signed in, `(auth)` (sign-in + signed-out Quick splits list at `/quick-splits`) when signed out, `quick/[id]` always, `dev/gallery` only in `__DEV__`.
-- `src/features/quick-splits/` — `model.ts` (pure updates), `compute.ts` (store → `resolveShares` → `computeBalances` → `settle` from `@split-ranch/domain`), `share-text.ts` (WhatsApp text), `payment-links.ts`, screens and components.
+- `src/features/quick-splits/` — `model.ts` (pure updates), `compute.ts` (store → `resolveShares` → `computeBalances` → `settle` from `@split-ranch/domain`), `share-text.ts` (WhatsApp text), screens and components.
 - `src/components/ui/` — React Native Reusables components added with the CLI (owned code; each file has a `// Source:` header listing local changes, mainly 48 dp touch targets).
 - `src/components/` — `MoneyText`, `MoneyInput`, `EmptyState`, `FormField`, `Screen`, `BackendPlaceholder`.
 - `src/lib/` — `money` (re-exports the domain + display helpers), `supabase.ts`, `api/`, `query/`, `storage.ts` (MMKV; session in an AES-256 encrypted MMKV whose key lives in SecureStore).
@@ -51,7 +51,7 @@ All are public (`EXPO_PUBLIC_*` is inlined into the bundle — never secrets) an
 
 ## What is real vs placeholder
 
-- **Real:** Quick splits (offline, signed out, both modes, result card, share text, payment helper), theme switch, language switch, design-system base and dev gallery, auth wiring (needs env + Google Cloud/Supabase setup to actually sign in), API fetch wrapper.
+- **Real:** Quick splits (offline, signed out, both modes, result card, share text, manual "has paid" status), theme switch, language switch, design-system base and dev gallery, auth wiring (needs env + Google Cloud/Supabase setup to actually sign in), API fetch wrapper.
 - **Placeholder:** Inicio and Gastos show an empty state saying they need the backend (no fake data). Not built yet: expense form/detail, periods, members, categories, onboarding, `join/[code]`, push, persisted query cache, OpenAPI-generated client, Sentry.
 - **Google sign-in:** uses the free `GoogleSignin` API of `@react-native-google-signin/google-signin`, which still wraps the legacy Google Sign-In SDK and cannot embed a nonce; the nonce is generated but only sent to Supabase when the provider applies it. See the TODO for the Credential Manager spike (T-0.4) in `src/features/auth/google.ts`.
-- **Bizum:** copy amount only (opening the bank app is post-MVP).
+- **Payments:** no links to payment platforms; people pay outside the app.

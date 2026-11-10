@@ -17,6 +17,8 @@ export function createQuickEvent(id: string, title: string, now: string): QuickE
     participants: [],
     total: { amountCents: null, excludedIds: [], weights: {}, payerId: null },
     expenses: [],
+    meId: null,
+    paidIds: [],
   };
 }
 
@@ -75,7 +77,25 @@ export function removeParticipant(event: QuickEvent, id: string, now: string): Q
       ...e,
       participantIds: e.participantIds.filter((x) => x !== id),
     })),
+    meId: event.meId === id ? null : event.meId,
+    paidIds: event.paidIds.filter((x) => x !== id),
   });
+}
+
+/** Mark which participant is the phone's owner; null clears it. Unknown ids are ignored. */
+export function setMe(event: QuickEvent, id: string | null, now: string): QuickEvent {
+  if (id !== null && !event.participants.some((p) => p.id === id)) return event;
+  if (event.meId === id) return event;
+  return touch(event, now, { meId: id });
+}
+
+/** Manual "has paid" / "owes" switch for one participant. */
+export function togglePaid(event: QuickEvent, id: string, now: string): QuickEvent {
+  if (!event.participants.some((p) => p.id === id)) return event;
+  const paidIds = event.paidIds.includes(id)
+    ? event.paidIds.filter((x) => x !== id)
+    : [...event.paidIds, id];
+  return touch(event, now, { paidIds });
 }
 
 export function setTitle(event: QuickEvent, title: string, now: string): QuickEvent {
@@ -121,4 +141,18 @@ export function upsertExpense(event: QuickEvent, expense: QuickExpense, now: str
 
 export function removeExpense(event: QuickEvent, expenseId: string, now: string): QuickEvent {
   return touch(event, now, { expenses: event.expenses.filter((e) => e.id !== expenseId) });
+}
+
+/**
+ * Persisted-store migration v1 -> v2: adds `meId` / `paidIds` and drops the old payment
+ * handles (`paypalMe`, `revolut`) that participants used to carry.
+ */
+export function migrateEventV1(raw: unknown): QuickEvent {
+  const e = raw as QuickEvent & { participants: (QuickParticipant & Record<string, unknown>)[] };
+  return {
+    ...e,
+    participants: e.participants.map((p) => ({ id: p.id, name: p.name })),
+    meId: e.meId ?? null,
+    paidIds: e.paidIds ?? [],
+  };
 }

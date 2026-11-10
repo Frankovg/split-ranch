@@ -12,7 +12,6 @@ from split_ranch.models.households import (
 )
 from split_ranch.models.identity import PushToken, User
 from split_ranch.models.misc import AuditLog, HouseholdSpreadsheet, IdempotencyKey, SheetTab
-from split_ranch.models.quick import QuickEvent, QuickExpense, QuickExpenseShare, QuickParticipant
 from split_ranch.models.settlement import SettlementSnapshot, SettlementTransfer
 
 __all__ = [
@@ -30,10 +29,6 @@ __all__ = [
     "Invitation",
     "Period",
     "PushToken",
-    "QuickEvent",
-    "QuickExpense",
-    "QuickExpenseShare",
-    "QuickParticipant",
     "SettlementSnapshot",
     "SettlementTransfer",
     "SheetTab",

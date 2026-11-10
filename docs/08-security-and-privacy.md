@@ -36,7 +36,7 @@ Permission matrix (MVP):
 
 ## Transport and platform
 - HTTPS only (HSTS); Android `usesCleartextTraffic=false`.
-- CORS closed (mobile only) except the public quick-event page.
+- CORS closed (mobile only).
 - Rate limiting on auth and public share endpoints.
 - Dependency scanning: Dependabot/Renovate + `pip-audit` + `pnpm audit` in CI.
 - No secrets in the app bundle beyond public client IDs.
@@ -55,14 +55,14 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 **Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API/worker hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
 
-**Personal data processed:** name, email, avatar URL (Google), household membership, expenses (amounts, descriptions — may reveal lifestyle), optional payment handles (phone for Bizum), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split participant names of **non-users** (stored only if the owner saves/shares the event).
+**Personal data processed:** name, email, avatar URL (Google), household membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
 
 **Lawful bases:** contract (providing the service to members); legitimate interest (security logs, fraud/abuse prevention); consent (push notifications, optional analytics). Non-user names in Quick splits: legitimate interest of the user, minimised (first names only, encouraged), never used for anything else.
 
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).
 - Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the household admin's personal Google Drive (no data-region guarantee; disclosed).
-- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared households (others' financial records stay coherent), deletes the personal profile, push tokens and Quick-split events owned by the user, and finally deletes the Supabase auth user (which removes sessions and identities).
+- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared households (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and finally deletes the Supabase auth user (which removes sessions and identities).
 - Sharing to Google Sheets: explained at household creation; per-user opt-out of being shared.
 
 **Retention (defaults):**
@@ -73,10 +73,9 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 | Left members' read access | Until household deletion |
 | Sessions / refresh tokens | Managed by Supabase Auth; removed on sign-out or account deletion |
 | Supabase auth/API logs | Per Supabase plan retention (Free plan: short, about a day) |
-| DB backups (GitHub Actions artifacts, gpg-encrypted) | 30 days |
+| DB backups (GitHub Actions artifacts, gpg-encrypted) | 60 days |
 | Idempotency keys | 48 h |
 | Logs | 30 days; Sentry 90 days |
-| Quick events (saved) | Until deleted by owner; shared links expire after 90 days (configurable) |
 | AI transcripts (future) | With the expense; raw audio not stored |
 
 **Privacy policy** (Phase 7 deliverable): plain-language Spanish + English, linked in the store listing, sign-in screen and settings. Include a Records of Processing Activities (RoPA) entry and a lightweight DPIA note (financial-ish data, small scale → DPIA likely not mandatory, but document the assessment).

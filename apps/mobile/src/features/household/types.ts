@@ -116,7 +116,6 @@ export interface Transfer {
   to_member_id: string;
   amount_cents: number;
   status: TransferStatus;
-  method: string | null;
   note: string | null;
   sent_at: string | null;
   confirmed_at: string | null;

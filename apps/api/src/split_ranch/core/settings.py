@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, computed_field
+from pydantic import AliasChoices, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,12 +35,15 @@ class Settings(BaseSettings):
     ensure_user_cache_seconds: int = 300
 
     sentry_dsn: str | None = None
+    # Render sets RENDER_GIT_COMMIT on every deploy; SENTRY_RELEASE overrides it.
+    sentry_release: str | None = Field(
+        default=None, validation_alias=AliasChoices("SENTRY_RELEASE", "RENDER_GIT_COMMIT")
+    )
     log_level: str = "INFO"
     log_json: bool = True
 
     min_app_version: str = "0.1.0"
     public_web_url: str = "https://split.ranch"
-    quick_share_days: int = Field(default=90, ge=1, le=3650)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

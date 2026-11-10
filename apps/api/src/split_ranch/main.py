@@ -5,17 +5,19 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import Engine
 
-from split_ranch.api.routers import expenses, households, me, periods, quick_events, system
+from split_ranch.api.routers import expenses, households, me, periods, system
 from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.errors import install_error_handlers
 from split_ranch.core.logging import configure_logging
+from split_ranch.core.observability import init_sentry
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings, get_settings
 
@@ -24,24 +26,11 @@ log = structlog.get_logger(__name__)
 API_PREFIX = "/v1"
 
 
-def _init_sentry(settings: Settings) -> None:
-    if not settings.sentry_dsn:
-        return
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.app_env,
-        send_default_pii=False,
-        traces_sample_rate=0.0,
-    )
-
-
 WORKER_SHUTDOWN_TIMEOUT_SECONDS = 20
 
 
 @asynccontextmanager
-async def _in_process_worker() -> AsyncIterator[None]:
+async def _in_process_worker() -> AsyncGenerator[None, None]:
     """Run the Procrastinate worker as a task of the API's event loop.
 
     Imported lazily: the jobs module builds its connector from the settings at import time.
@@ -72,11 +61,11 @@ def create_app(
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_json)
-    _init_sentry(settings)
+    init_sentry(settings)
     run_worker = settings.run_worker_in_api
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         if not run_worker:
             yield
             return
@@ -84,7 +73,7 @@ def create_app(
             yield
 
     app = FastAPI(
-        title="Split Ranch API",
+        title="Split Ranch",
         version="0.1.0",
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,
@@ -111,6 +100,8 @@ def create_app(
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
+        # Lets a Sentry event be matched with the request's log lines.
+        sentry_sdk.set_tag("request_id", request_id)
         start = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
@@ -132,7 +123,6 @@ def create_app(
         households.router,
         expenses.router,
         periods.router,
-        quick_events.router,
     ):
         app.include_router(router, prefix=API_PREFIX)
     return app

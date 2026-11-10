@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
+import sentry_sdk
 import structlog
 from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from split_ranch.core.actor import Actor, HouseholdActor
 from split_ranch.core.db import get_session
 from split_ranch.core.errors import NotFound, Unauthenticated, Unprocessable
 from split_ranch.core.logging import hash_user_id
+from split_ranch.core.observability import set_sentry_user
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings
 from split_ranch.repositories import households as hrepo
@@ -41,6 +43,7 @@ def get_actor(
     claims = verifier.verify(authorization[7:].strip())
     actor = ensure_user(session, claims, cache_seconds=settings.ensure_user_cache_seconds)
     structlog.contextvars.bind_contextvars(user=hash_user_id(actor.user_id))
+    set_sentry_user(actor.user_id)
     return actor
 
 
@@ -53,6 +56,7 @@ def get_household_actor(household_id: UUID, actor: ActorDep, session: SessionDep
     if member is None:
         raise NotFound("Household not found")
     structlog.contextvars.bind_contextvars(household_id=str(household_id))
+    sentry_sdk.set_tag("household_id", str(household_id))
     return HouseholdActor(
         user_id=actor.user_id,
         household_id=household_id,

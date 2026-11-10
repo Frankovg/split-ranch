@@ -1,6 +1,7 @@
-import { ArrowRight, Share2 } from 'lucide-react-native';
+import { ArrowRight, Check, Share2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Share, View } from 'react-native';
+import type { TFunction } from 'i18next';
 import { MoneyText } from '@/components/MoneyText';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,9 +14,34 @@ import { displayMoney } from '@/lib/money';
 import type { QuickResult } from '../compute';
 import { buildShareText } from '../share-text';
 import type { QuickEvent } from '../types';
-import { PaymentHelper } from './PaymentHelper';
+import { useQuickSplitsStore } from '@/stores/quick-splits';
 
 type ResultCardProps = { event: QuickEvent; result: QuickResult };
+
+/**
+ * Manual "owes" / "has paid" switch for someone who owes money. Only the user changes it;
+ * for the phone's owner ("you") it reads "I owe" / "I already paid".
+ */
+function PaidToggle({ event, id, name, t }: { event: QuickEvent; id: string; name: string; t: TFunction }) {
+  const togglePaid = useQuickSplitsStore((s) => s.togglePaid);
+  const paid = event.paidIds.includes(id);
+  const me = event.meId === id;
+  const label = me
+    ? t(paid ? 'quick.status.mePaid' : 'quick.status.meOwes')
+    : t(paid ? 'quick.status.paid' : 'quick.status.owes');
+  return (
+    <Button
+      size="sm"
+      variant={paid ? 'secondary' : 'outline'}
+      onPress={() => togglePaid(event.id, id)}
+      role="switch"
+      accessibilityState={{ checked: paid }}
+      accessibilityLabel={t('quick.status.toggle', { name, status: label })}>
+      {paid ? <Icon as={Check} size={16} className="text-positive" /> : null}
+      <Text className={paid ? 'text-positive' : 'text-negative'}>{label}</Text>
+    </Button>
+  );
+}
 
 export function ResultCard({ event, result }: ResultCardProps) {
   const { t } = useTranslation();
@@ -45,6 +71,7 @@ export function ResultCard({ event, result }: ResultCardProps) {
         footer: t('share.footer'),
       },
       currentMoneyLocale(),
+      event.paidIds,
     );
     try {
       await Share.share({ message });
@@ -53,7 +80,8 @@ export function ResultCard({ event, result }: ResultCardProps) {
     }
   };
 
-  const handles = new Map(event.participants.map((p) => [p.id, p]));
+  const displayName = (id: string, name: string) =>
+    id === event.meId ? t('quick.nameYou', { name }) : name;
 
   return (
     <Card>
@@ -72,8 +100,14 @@ export function ResultCard({ event, result }: ResultCardProps) {
           <Text className="font-semibold">{t('quick.each')}</Text>
           {result.perPerson.map((p) => (
             <View key={p.id} className="min-h-10 flex-row flex-wrap items-center justify-between gap-2">
-              <Text className="flex-shrink">{p.name}</Text>
-              <MoneyText cents={p.amountCents} accessibilityPrefix={p.name} />
+              <Text className="flex-shrink">{displayName(p.id, p.name)}</Text>
+              <View className="flex-row items-center gap-2">
+                {/* Without a payer nobody is owed yet: everyone owes their own share. */}
+                {!result.balances && p.amountCents > 0 ? (
+                  <PaidToggle event={event} id={p.id} name={p.name} t={t} />
+                ) : null}
+                <MoneyText cents={p.amountCents} accessibilityPrefix={p.name} />
+              </View>
             </View>
           ))}
         </View>
@@ -86,16 +120,19 @@ export function ResultCard({ event, result }: ResultCardProps) {
               {result.balances.map((b) => (
                 <View key={b.id} className="min-h-10 flex-row flex-wrap items-center justify-between gap-2">
                   <View className="flex-shrink">
-                    <Text>{b.name}</Text>
+                    <Text>{displayName(b.id, b.name)}</Text>
                     <Text className="text-sm text-muted-foreground">
                       {t('quick.paid', { amount: displayMoney(b.paidCents, currentMoneyLocale()) })}
                     </Text>
                   </View>
-                  <MoneyText
-                    cents={b.netCents}
-                    tone={b.netCents > 0 ? 'positive' : b.netCents < 0 ? 'negative' : 'muted'}
-                    accessibilityPrefix={b.name}
-                  />
+                  <View className="flex-row items-center gap-2">
+                    {b.netCents < 0 ? <PaidToggle event={event} id={b.id} name={b.name} t={t} /> : null}
+                    <MoneyText
+                      cents={b.netCents}
+                      tone={b.netCents > 0 ? 'positive' : b.netCents < 0 ? 'negative' : 'muted'}
+                      accessibilityPrefix={b.name}
+                    />
+                  </View>
                 </View>
               ))}
             </View>
@@ -107,7 +144,7 @@ export function ResultCard({ event, result }: ResultCardProps) {
                 <Text className="text-muted-foreground">{t('quick.noTransfers')}</Text>
               ) : (
                 result.transfers.map((tr) => {
-                  const creditor = handles.get(tr.toId);
+                  const paid = event.paidIds.includes(tr.fromId);
                   return (
                     <View
                       key={`${tr.fromId}-${tr.toId}`}
@@ -116,16 +153,15 @@ export function ResultCard({ event, result }: ResultCardProps) {
                         className="flex-1 flex-row flex-wrap items-center gap-1"
                         accessible
                         accessibilityLabel={`${tr.fromName} → ${tr.toName}`}>
-                        <Text className="font-medium">{tr.fromName}</Text>
+                        <Text className="font-medium">{displayName(tr.fromId, tr.fromName)}</Text>
                         <Icon as={ArrowRight} size={16} className="text-muted-foreground" />
-                        <Text className="font-medium">{tr.toName}</Text>
+                        <Text className="font-medium">{displayName(tr.toId, tr.toName)}</Text>
                       </View>
-                      <MoneyText cents={tr.amountCents} accessibilityPrefix={`${tr.fromName} → ${tr.toName}`} />
-                      <PaymentHelper
-                        amountCents={tr.amountCents}
-                        creditorName={tr.toName}
-                        paypalMe={creditor?.paypalMe}
-                        revolut={creditor?.revolut}
+                      {paid ? <Icon as={Check} size={16} className="text-positive" /> : null}
+                      <MoneyText
+                        cents={tr.amountCents}
+                        tone={paid ? 'muted' : 'default'}
+                        accessibilityPrefix={`${tr.fromName} → ${tr.toName}`}
                       />
                     </View>
                   );
