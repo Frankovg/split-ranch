@@ -26,7 +26,6 @@ export default function RootLayout() {
   const status = useSessionStore((s) => s.status);
   const { t } = useTranslation();
 
-  //TODO: quitar react. usar directo, ponerlo en claude.md
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hide();
   }, [status]);
