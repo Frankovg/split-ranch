@@ -1,11 +1,11 @@
 // Source: react-native-reusables dialog (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: close button has an i18n accessibilityLabel and hitSlop 16 (>= 48dp target).
+import { type ComponentProps, Fragment, type ReactNode } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { useTranslation } from 'react-i18next';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
 import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
-import * as React from 'react';
 import { Platform, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
 import { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
@@ -18,15 +18,15 @@ const DialogPortal = DialogPrimitive.Portal;
 
 const DialogClose = DialogPrimitive.Close;
 
-const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : React.Fragment;
+const FullWindowOverlay = Platform.OS === 'ios' ? RNFullWindowOverlay : Fragment;
 
 function DialogOverlay({
   className,
   children,
   onPress,
   ...props
-}: Omit<React.ComponentProps<typeof DialogPrimitive.Overlay>, 'asChild'> & {
-  children?: React.ReactNode;
+}: Omit<ComponentProps<typeof DialogPrimitive.Overlay>, 'asChild'> & {
+  children?: ReactNode;
 }) {
   const { onOpenChange } = DialogPrimitive.useRootContext();
 
@@ -53,7 +53,7 @@ function DialogOverlay({
         <NativeOnlyAnimatedView
           entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)}
           exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
-          as="Pressable">
+          as='Pressable'>
           <NativeOnlyAnimatedView
             entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
             exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}>
@@ -69,7 +69,7 @@ function DialogContent({
   portalHost,
   children,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
   portalHost?: string;
 }) {
   const { t } = useTranslation();
@@ -121,7 +121,7 @@ function DialogFooter({ className, ...props }: ViewProps) {
   );
 }
 
-function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+function DialogTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
       className={cn('text-foreground text-lg font-semibold leading-none', className)}
@@ -133,7 +133,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
 function DialogDescription({
   className,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+}: ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
       className={cn('text-muted-foreground text-sm', className)}

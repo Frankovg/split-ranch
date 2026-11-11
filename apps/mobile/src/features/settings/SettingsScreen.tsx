@@ -43,30 +43,30 @@ export function SettingsScreen() {
         <CardHeader>
           <CardTitle>{t('settings.appearance')}</CardTitle>
         </CardHeader>
-        <CardContent className="gap-4">
-          <View className="gap-2">
+        <CardContent className='gap-4'>
+          <View className='gap-2'>
             <Label>{t('settings.theme')}</Label>
             <ToggleGroup
-              type="single"
-              variant="outline"
+              type='single'
+              variant='outline'
               value={theme}
               onValueChange={(v) => v && setTheme(v as ThemePreference)}>
               {THEMES.map((v) => (
-                <ToggleGroupItem key={v} value={v} isFirst={v === 'system'} isLast={v === 'dark'} className="flex-1">
+                <ToggleGroupItem key={v} value={v} isFirst={v === 'system'} isLast={v === 'dark'} className='flex-1'>
                   <Text>{themeLabel[v]}</Text>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
           </View>
-          <View className="gap-2">
+          <View className='gap-2'>
             <Label>{t('settings.language')}</Label>
             <ToggleGroup
-              type="single"
-              variant="outline"
+              type='single'
+              variant='outline'
               value={language}
               onValueChange={(v) => v && setLanguage(v as LanguagePreference)}>
               {LANGUAGES.map((v) => (
-                <ToggleGroupItem key={v} value={v} isFirst={v === 'system'} isLast={v === 'en'} className="flex-1">
+                <ToggleGroupItem key={v} value={v} isFirst={v === 'system'} isLast={v === 'en'} className='flex-1'>
                   <Text>{languageLabel[v]}</Text>
                 </ToggleGroupItem>
               ))}
@@ -79,11 +79,11 @@ export function SettingsScreen() {
         <CardHeader>
           <CardTitle>{t('settings.account')}</CardTitle>
         </CardHeader>
-        <CardContent className="gap-3">
+        <CardContent className='gap-3'>
           {session?.user.email ? (
-            <Text className="text-muted-foreground">{t('auth.signedInAs', { email: session.user.email })}</Text>
+            <Text className='text-muted-foreground'>{t('auth.signedInAs', { email: session.user.email })}</Text>
           ) : null}
-          <Button variant="outline" onPress={() => void signOut()}>
+          <Button variant='outline' onPress={() => void signOut()}>
             <Icon as={LogOut} size={18} />
             <Text>{t('auth.signOut')}</Text>
           </Button>
@@ -96,7 +96,7 @@ export function SettingsScreen() {
             <CardTitle>{t('settings.developer')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button variant="secondary" onPress={() => router.push('/dev/gallery')}>
+            <Button variant='secondary' onPress={() => router.push('/dev/gallery')}>
               <Icon as={Palette} size={18} />
               <Text>{t('settings.gallery')}</Text>
             </Button>
@@ -104,7 +104,7 @@ export function SettingsScreen() {
         </Card>
       ) : null}
 
-      <Text className="text-center text-sm text-muted-foreground">
+      <Text className='text-center text-sm text-muted-foreground'>
         {t('settings.version', { version: Constants.expoConfig?.version ?? '?' })}
       </Text>
     </Screen>

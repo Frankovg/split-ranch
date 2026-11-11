@@ -1,4 +1,5 @@
 // Source: react-native-reusables textarea (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps, type RefAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { Platform, TextInput } from 'react-native';
 
@@ -8,7 +9,7 @@ function Textarea({
   numberOfLines = Platform.select({ web: 2, native: 8 }), // On web, numberOfLines also determines initial height. On native, it determines the maximum height.
   placeholderClassName,
   ...props
-}: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
+}: ComponentProps<typeof TextInput> & RefAttributes<TextInput>) {
   return (
     <TextInput
       className={cn(
@@ -22,7 +23,7 @@ function Textarea({
       placeholderClassName={cn('text-muted-foreground', placeholderClassName)}
       multiline={multiline}
       numberOfLines={numberOfLines}
-      textAlignVertical="top"
+      textAlignVertical='top'
       {...props}
     />
   );

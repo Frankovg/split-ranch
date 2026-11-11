@@ -1,4 +1,5 @@
 // Source: react-native-reusables button (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink.
+import { type ComponentProps, type RefAttributes } from 'react';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
@@ -89,14 +90,14 @@ const buttonTextVariants = cva(
   }
 );
 
-type ButtonProps = React.ComponentProps<typeof Pressable> & React.RefAttributes<typeof Pressable> & VariantProps<typeof buttonVariants>;
+type ButtonProps = ComponentProps<typeof Pressable> & RefAttributes<typeof Pressable> & VariantProps<typeof buttonVariants>;
 
 function Button({ className, variant, size, ...props }: ButtonProps) {
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
         className={cn(props.disabled && 'opacity-50', buttonVariants({ variant, size }), className)}
-        role="button"
+        role='button'
         {...props}
       />
     </TextClassContext.Provider>

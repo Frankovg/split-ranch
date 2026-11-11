@@ -31,13 +31,13 @@ function PaidToggle({ event, id, name, t }: { event: QuickEvent; id: string; nam
     : t(paid ? 'quick.status.paid' : 'quick.status.owes');
   return (
     <Button
-      size="sm"
+      size='sm'
       variant={paid ? 'secondary' : 'outline'}
       onPress={() => togglePaid(event.id, id)}
-      role="switch"
+      role='switch'
       accessibilityState={{ checked: paid }}
       accessibilityLabel={t('quick.status.toggle', { name, status: label })}>
-      {paid ? <Icon as={Check} size={16} className="text-positive" /> : null}
+      {paid ? <Icon as={Check} size={16} className='text-positive' /> : null}
       <Text className={paid ? 'text-positive' : 'text-negative'}>{label}</Text>
     </Button>
   );
@@ -53,7 +53,7 @@ export function ResultCard({ event, result }: ResultCardProps) {
           <CardTitle>{t('quick.result')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Text className="text-muted-foreground">{t(`quick.incomplete.${result.reason}`)}</Text>
+          <Text className='text-muted-foreground'>{t(`quick.incomplete.${result.reason}`)}</Text>
         </CardContent>
       </Card>
     );
@@ -85,23 +85,23 @@ export function ResultCard({ event, result }: ResultCardProps) {
 
   return (
     <Card>
-      <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+      <CardHeader className='flex-row flex-wrap items-center justify-between gap-2'>
         <CardTitle>{t('quick.result')}</CardTitle>
-        <MoneyText cents={result.totalCents} size="xl" accessibilityPrefix={t('quick.total')} />
+        <MoneyText cents={result.totalCents} size='xl' accessibilityPrefix={t('quick.total')} />
       </CardHeader>
-      <CardContent className="gap-4">
+      <CardContent className='gap-4'>
         {result.skippedExpenseIds.length > 0 ? (
-          <Badge variant="outline" className="self-start border-warning">
-            <Text className="text-warning">{t('quick.skipped', { count: result.skippedExpenseIds.length })}</Text>
+          <Badge variant='outline' className='self-start border-warning'>
+            <Text className='text-warning'>{t('quick.skipped', { count: result.skippedExpenseIds.length })}</Text>
           </Badge>
         ) : null}
 
-        <View className="gap-2">
-          <Text className="font-semibold">{t('quick.each')}</Text>
+        <View className='gap-2'>
+          <Text className='font-semibold'>{t('quick.each')}</Text>
           {result.perPerson.map((p) => (
-            <View key={p.id} className="min-h-10 flex-row flex-wrap items-center justify-between gap-2">
-              <Text className="flex-shrink">{displayName(p.id, p.name)}</Text>
-              <View className="flex-row items-center gap-2">
+            <View key={p.id} className='min-h-10 flex-row flex-wrap items-center justify-between gap-2'>
+              <Text className='flex-shrink'>{displayName(p.id, p.name)}</Text>
+              <View className='flex-row items-center gap-2'>
                 {/* Without a payer nobody is owed yet: everyone owes their own share. */}
                 {!result.balances && p.amountCents > 0 ? (
                   <PaidToggle event={event} id={p.id} name={p.name} t={t} />
@@ -115,17 +115,17 @@ export function ResultCard({ event, result }: ResultCardProps) {
         {result.balances ? (
           <>
             <Separator />
-            <View className="gap-2">
-              <Text className="font-semibold">{t('quick.balances')}</Text>
+            <View className='gap-2'>
+              <Text className='font-semibold'>{t('quick.balances')}</Text>
               {result.balances.map((b) => (
-                <View key={b.id} className="min-h-10 flex-row flex-wrap items-center justify-between gap-2">
-                  <View className="flex-shrink">
+                <View key={b.id} className='min-h-10 flex-row flex-wrap items-center justify-between gap-2'>
+                  <View className='flex-shrink'>
                     <Text>{displayName(b.id, b.name)}</Text>
-                    <Text className="text-sm text-muted-foreground">
+                    <Text className='text-sm text-muted-foreground'>
                       {t('quick.paid', { amount: displayMoney(b.paidCents, currentMoneyLocale()) })}
                     </Text>
                   </View>
-                  <View className="flex-row items-center gap-2">
+                  <View className='flex-row items-center gap-2'>
                     {b.netCents < 0 ? <PaidToggle event={event} id={b.id} name={b.name} t={t} /> : null}
                     <MoneyText
                       cents={b.netCents}
@@ -138,26 +138,26 @@ export function ResultCard({ event, result }: ResultCardProps) {
             </View>
 
             <Separator />
-            <View className="gap-2">
-              <Text className="font-semibold">{t('quick.transfers')}</Text>
+            <View className='gap-2'>
+              <Text className='font-semibold'>{t('quick.transfers')}</Text>
               {result.transfers.length === 0 ? (
-                <Text className="text-muted-foreground">{t('quick.noTransfers')}</Text>
+                <Text className='text-muted-foreground'>{t('quick.noTransfers')}</Text>
               ) : (
                 result.transfers.map((tr) => {
                   const paid = event.paidIds.includes(tr.fromId);
                   return (
                     <View
                       key={`${tr.fromId}-${tr.toId}`}
-                      className="flex-row flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2">
+                      className='flex-row flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2'>
                       <View
-                        className="flex-1 flex-row flex-wrap items-center gap-1"
+                        className='flex-1 flex-row flex-wrap items-center gap-1'
                         accessible
                         accessibilityLabel={`${tr.fromName} → ${tr.toName}`}>
-                        <Text className="font-medium">{displayName(tr.fromId, tr.fromName)}</Text>
-                        <Icon as={ArrowRight} size={16} className="text-muted-foreground" />
-                        <Text className="font-medium">{displayName(tr.toId, tr.toName)}</Text>
+                        <Text className='font-medium'>{displayName(tr.fromId, tr.fromName)}</Text>
+                        <Icon as={ArrowRight} size={16} className='text-muted-foreground' />
+                        <Text className='font-medium'>{displayName(tr.toId, tr.toName)}</Text>
                       </View>
-                      {paid ? <Icon as={Check} size={16} className="text-positive" /> : null}
+                      {paid ? <Icon as={Check} size={16} className='text-positive' /> : null}
                       <MoneyText
                         cents={tr.amountCents}
                         tone={paid ? 'muted' : 'default'}

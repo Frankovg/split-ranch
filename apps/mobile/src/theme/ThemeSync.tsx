@@ -1,6 +1,6 @@
+import { useEffect } from 'react';
 import * as SystemUI from 'expo-system-ui';
 import { colorScheme as nwColorScheme, useColorScheme } from 'nativewind';
-import * as React from 'react';
 import { usePreferencesStore } from '@/stores/preferences';
 import { tokenColor, type ColorScheme } from './tokens';
 
@@ -18,11 +18,11 @@ export function ThemeSync() {
   const pref = usePreferencesStore((s) => s.theme);
   const scheme = useAppColorScheme();
 
-  React.useEffect(() => {
+  useEffect(() => {
     nwColorScheme.set(pref);
   }, [pref]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     void SystemUI.setBackgroundColorAsync(tokenColor(scheme, 'background'));
   }, [scheme]);
 

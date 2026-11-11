@@ -8,8 +8,8 @@ export default function AuthLayout() {
   const { t } = useTranslation();
   return (
     <Stack>
-      <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-      <Stack.Screen name="quick-splits" options={{ title: t('quick.title') }} />
+      <Stack.Screen name='sign-in' options={{ headerShown: false }} />
+      <Stack.Screen name='quick-splits' options={{ title: t('quick.title') }} />
     </Stack>
   );
 }

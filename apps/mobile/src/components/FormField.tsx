@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { type ReactElement, useId } from 'react';
 import {
   Controller,
   type Control,
@@ -23,7 +23,7 @@ type FormFieldProps<TValues extends FieldValues, TName extends FieldPath<TValues
     fieldState: ControllerFieldState;
     /** Pass to the input as `nativeID` so the label is associated with it. */
     inputId: string;
-  }) => React.ReactElement;
+  }) => ReactElement;
 };
 
 /**
@@ -38,7 +38,7 @@ export function FormField<TValues extends FieldValues, TName extends FieldPath<T
   className,
   render,
 }: FormFieldProps<TValues, TName>) {
-  const inputId = React.useId();
+  const inputId = useId();
   return (
     <Controller
       control={control}
@@ -50,10 +50,10 @@ export function FormField<TValues extends FieldValues, TName extends FieldPath<T
           </Label>
           {render({ field, fieldState, inputId })}
           {description && !fieldState.error ? (
-            <Text className="text-sm text-muted-foreground">{description}</Text>
+            <Text className='text-sm text-muted-foreground'>{description}</Text>
           ) : null}
           {fieldState.error?.message ? (
-            <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
+            <Text className='text-sm text-destructive' accessibilityLiveRegion='polite'>
               {fieldState.error.message}
             </Text>
           ) : null}

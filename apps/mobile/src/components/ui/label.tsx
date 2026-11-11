@@ -1,4 +1,5 @@
 // Source: react-native-reusables label (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 import * as LabelPrimitive from '@rn-primitives/label';
 import { Platform } from 'react-native';
@@ -11,7 +12,7 @@ function Label({
   onPressOut,
   disabled,
   ...props
-}: React.ComponentProps<typeof LabelPrimitive.Text>) {
+}: ComponentProps<typeof LabelPrimitive.Text>) {
   return (
     <LabelPrimitive.Root
       className={cn(

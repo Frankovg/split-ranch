@@ -1,6 +1,6 @@
+import { useMemo } from 'react';
 import { router } from 'expo-router';
 import { Calculator, ChevronRight, Plus } from 'lucide-react-native';
-import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { EmptyState } from '@/components/EmptyState';
@@ -14,20 +14,20 @@ import { computeQuickResult } from './compute';
 import type { QuickEvent } from './types';
 
 function EventRow({ event }: { event: QuickEvent }) {
-  const result = React.useMemo(() => computeQuickResult(event), [event]);
+  const result = useMemo(() => computeQuickResult(event), [event]);
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/quick/[id]', params: { id: event.id } })}
-      role="button"
-      className="min-h-14 flex-row items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 active:bg-accent">
-      <View className="flex-1 gap-0.5">
-        <Text className="font-semibold">{event.title}</Text>
-        <Text className="text-sm text-muted-foreground">
+      role='button'
+      className='min-h-14 flex-row items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 active:bg-accent'>
+      <View className='flex-1 gap-0.5'>
+        <Text className='font-semibold'>{event.title}</Text>
+        <Text className='text-sm text-muted-foreground'>
           {event.participants.map((p) => p.name).join(', ')}
         </Text>
       </View>
       {result.status === 'ok' ? <MoneyText cents={result.totalCents} /> : null}
-      <Icon as={ChevronRight} size={20} className="text-muted-foreground" />
+      <Icon as={ChevronRight} size={20} className='text-muted-foreground' />
     </Pressable>
   );
 }
@@ -37,7 +37,7 @@ export function QuickListScreen() {
   const { t } = useTranslation();
   const eventsById = useQuickSplitsStore((s) => s.events);
   const createEvent = useQuickSplitsStore((s) => s.createEvent);
-  const events = React.useMemo(() => sortEvents(eventsById), [eventsById]);
+  const events = useMemo(() => sortEvents(eventsById), [eventsById]);
 
   const onNew = () => {
     const id = createEvent(t('quick.defaultTitle'));
@@ -63,12 +63,12 @@ export function QuickListScreen() {
         <Icon as={Plus} size={18} />
         <Text>{t('quick.new')}</Text>
       </Button>
-      <View className="gap-2">
+      <View className='gap-2'>
         {events.map((e) => (
           <EventRow key={e.id} event={e} />
         ))}
       </View>
-      <Text className="text-center text-sm text-muted-foreground">{t('quick.offlineNote')}</Text>
+      <Text className='text-center text-sm text-muted-foreground'>{t('quick.offlineNote')}</Text>
     </Screen>
   );
 }

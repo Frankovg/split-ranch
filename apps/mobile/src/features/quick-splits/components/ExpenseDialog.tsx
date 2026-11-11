@@ -78,14 +78,14 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90%]">
+      <DialogContent className='max-h-[90%]'>
         <DialogHeader>
           <DialogTitle>{expense ? t('quick.editExpense') : t('quick.addExpense')}</DialogTitle>
         </DialogHeader>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="gap-4">
+        <ScrollView keyboardShouldPersistTaps='handled' contentContainerClassName='gap-4'>
           <FormField
             control={control}
-            name="description"
+            name='description'
             label={t('quick.expenseDescription')}
             render={({ field, inputId }) => (
               <Input
@@ -100,7 +100,7 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
           />
           <FormField
             control={control}
-            name="amountCents"
+            name='amountCents'
             label={t('quick.expenseAmount')}
             render={({ field, fieldState, inputId }) => (
               <MoneyInput
@@ -115,17 +115,17 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
           />
           <FormField
             control={control}
-            name="payerId"
+            name='payerId'
             label={t('quick.expensePaidBy')}
             render={({ field }) => (
               <ToggleGroup
-                type="single"
-                variant="outline"
+                type='single'
+                variant='outline'
                 value={field.value}
                 onValueChange={(v) => v && field.onChange(v)}
-                className="flex-wrap justify-start gap-2">
+                className='flex-wrap justify-start gap-2'>
                 {event.participants.map((p) => (
-                  <ToggleGroupItem key={p.id} value={p.id} className="rounded-md border-l">
+                  <ToggleGroupItem key={p.id} value={p.id} className='rounded-md border-l'>
                     <Text>{p.name}</Text>
                   </ToggleGroupItem>
                 ))}
@@ -134,17 +134,17 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
           />
           <FormField
             control={control}
-            name="participantIds"
+            name='participantIds'
             label={t('quick.expenseFor')}
             render={({ field }) => (
               <ToggleGroup
-                type="multiple"
-                variant="outline"
+                type='multiple'
+                variant='outline'
                 value={field.value}
                 onValueChange={field.onChange}
-                className="flex-wrap justify-start gap-2">
+                className='flex-wrap justify-start gap-2'>
                 {event.participants.map((p) => (
-                  <ToggleGroupItem key={p.id} value={p.id} className="rounded-md border-l">
+                  <ToggleGroupItem key={p.id} value={p.id} className='rounded-md border-l'>
                     <Text>{p.name}</Text>
                   </ToggleGroupItem>
                 ))}
@@ -152,20 +152,20 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
             )}
           />
         </ScrollView>
-        <DialogFooter className="flex-row flex-wrap justify-between gap-2">
+        <DialogFooter className='flex-row flex-wrap justify-between gap-2'>
           {expense ? (
             <Button
-              variant="ghost"
-              size="icon"
+              variant='ghost'
+              size='icon'
               onPress={() => {
                 removeExpense(event.id, expense.id);
                 onClose();
               }}
               accessibilityLabel={t('quick.deleteExpense')}>
-              <Icon as={Trash2} size={20} className="text-destructive" />
+              <Icon as={Trash2} size={20} className='text-destructive' />
             </Button>
           ) : null}
-          <Button onPress={() => void onSubmit()} className="flex-1">
+          <Button onPress={() => void onSubmit()} className='flex-1'>
             <Text>{t('common.save')}</Text>
           </Button>
         </DialogFooter>

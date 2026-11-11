@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { Input } from '@/components/ui/input';
@@ -43,11 +43,11 @@ export function MoneyInput({
   className,
 }: MoneyInputProps) {
   const { t } = useTranslation();
-  const [text, setText] = React.useState(() => toText(valueCents));
-  const [touched, setTouched] = React.useState(false);
+  const [text, setText] = useState(() => toText(valueCents));
+  const [touched, setTouched] = useState(false);
 
   // Sync when the value is changed from outside (e.g. form reset).
-  React.useEffect(() => {
+  useEffect(() => {
     setText((current) => (parseMoney(current) === valueCents ? current : toText(valueCents)));
   }, [valueCents]);
 
@@ -56,8 +56,8 @@ export function MoneyInput({
   const message = error ?? parseError;
 
   return (
-    <View className="gap-1">
-      <View className="flex-row items-center">
+    <View className='gap-1'>
+      <View className='flex-row items-center'>
         <Input
           nativeID={nativeID}
           value={text}
@@ -70,8 +70,8 @@ export function MoneyInput({
             if (parsed !== null) setText(toText(parsed));
             onBlur?.();
           }}
-          keyboardType="decimal-pad"
-          inputMode="decimal"
+          keyboardType='decimal-pad'
+          inputMode='decimal'
           placeholder={t('money.placeholder')}
           accessibilityLabel={accessibilityLabel}
           aria-invalid={invalid || message !== undefined}
@@ -84,12 +84,12 @@ export function MoneyInput({
         />
         <Text
           className={cn('absolute right-3 text-muted-foreground', size === 'lg' && 'text-2xl')}
-          importantForAccessibility="no">
+          importantForAccessibility='no'>
           €
         </Text>
       </View>
       {message ? (
-        <Text className="text-sm text-destructive" accessibilityLiveRegion="polite">
+        <Text className='text-sm text-destructive' accessibilityLiveRegion='polite'>
           {message}
         </Text>
       ) : null}
