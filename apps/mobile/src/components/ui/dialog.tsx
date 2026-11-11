@@ -6,7 +6,7 @@ import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-vie
 import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
-import { Platform, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
+import { Platform, View, type GestureResponderEvent, type ViewProps } from 'react-native';
 import { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
