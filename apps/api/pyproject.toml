@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "split-ranch-api"
 version = "0.1.0"
-description = "Split Ranch backend: FastAPI API + Procrastinate worker"
+description = "Split Ranch backend: FastAPI API"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
@@ -17,7 +17,6 @@ dependencies = [
     "sqlalchemy>=2.0.36,<2.1",
     "alembic>=1.13,<2",
     "psycopg[binary,pool]>=3.2,<4",
-    "procrastinate>=3.10,<3.11",  # schema SQL is frozen in migrations/sql
     "structlog>=24.1",
     "PyJWT[crypto]>=2.9,<3",
     "sentry-sdk[fastapi]>=2.10,<3",
@@ -69,7 +68,7 @@ plugins = ["pydantic.mypy"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["procrastinate.*", "pgserver.*"]
+module = ["pgserver.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

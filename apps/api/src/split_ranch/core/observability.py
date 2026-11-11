@@ -1,4 +1,4 @@
-"""Sentry error reporting, shared by the API and the standalone worker."""
+"""Sentry error reporting for the API."""
 
 from __future__ import annotations
 
@@ -11,10 +11,7 @@ from split_ranch.core.settings import Settings
 
 
 def init_sentry(settings: Settings) -> bool:
-    """Initialise Sentry when a DSN is configured; returns whether it was enabled.
-
-    Calling it twice (API with the in-process worker) just rebinds the same client config.
-    """
+    """Initialise Sentry when a DSN is configured; returns whether it was enabled."""
     if not settings.sentry_dsn:
         return False
     sentry_sdk.init(

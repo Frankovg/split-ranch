@@ -6,7 +6,7 @@
 - FastAPI verifies every request token locally against the JWKS (asymmetric algorithm only, `iss`, `aud=authenticated`, `exp`, `role=authenticated`). Key rotation in Supabase is picked up automatically through `kid`.
 - Mobile: session persisted by `supabase-js` in encrypted MMKV, key in `expo-secure-store` (Android Keystore-backed).
 - Logout → `supabase.auth.signOut()`; "sign out everywhere" → `signOut({ scope: 'global' })`. Note: an already-issued access token remains valid until it expires (≤ 1 h). Acceptable for this app; if instant revocation is ever needed, the API can check a `sessions_revoked_after` timestamp per user.
-- **Keys**: the publishable (anon) key is public by design and grants nothing on our data (private `app` schema + RLS with no policies). The secret/service-role key is used only by the worker for account deletion and never leaves the server.
+- **Keys**: the publishable (anon) key is public by design and grants nothing on our data (private `app` schema + RLS with no policies). The secret/service-role key is reserved for account deletion on the server and never leaves the server.
 
 ## Authorisation (multi-tenant)
 1. Every household route resolves `Membership(user_id from JWT, household_id from path)`; missing → `404`.
@@ -44,7 +44,7 @@ Permission matrix (MVP):
 ## Secrets management
 | Secret | Where |
 |---|---|
-| Supabase DB URLs (transaction + session pooler, `split_api` role), Supabase secret key (worker only), Google service-account JSON, Sentry DSN (server) | Render environment groups per env |
+| Supabase DB URLs (transaction + session pooler, `split_api` role), Supabase secret key (server only), Sentry DSN (server) | Render environment groups per env |
 | Supabase Google provider client secret | Supabase dashboard (per project) |
 | EAS build-time values (Sentry auth token, Google client IDs, Supabase URL + publishable key — public, but per environment) | EAS environment variables |
 | FCM v1 service account | EAS credentials |
@@ -53,7 +53,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 ## GDPR (EU personal data)
 
-**Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API/worker hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
+**Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
 
 **Personal data processed:** name, email, avatar URL (Google), household membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
 
@@ -69,12 +69,11 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 | Data | Retention |
 |---|---|
-| Household expenses, revisions, snapshots | While the household exists; deleted 30 days after household deletion |
+| Household expenses, history, transfers | While the household exists; deleted 30 days after household deletion |
 | Left members' read access | Until household deletion |
 | Sessions / refresh tokens | Managed by Supabase Auth; removed on sign-out or account deletion |
 | Supabase auth/API logs | Per Supabase plan retention (Free plan: short, about a day) |
 | DB backups (GitHub Actions artifacts, gpg-encrypted) | 60 days |
-| Idempotency keys | 48 h |
 | Logs | 30 days; Sentry 90 days |
 | AI transcripts (future) | With the expense; raw audio not stored |
 

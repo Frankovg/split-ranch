@@ -1,7 +1,11 @@
-"""Settlement snapshots and transfers."""
+"""Settlement transfers of a period.
+
+Closing a period computes the minimal transfers from the balances. When the period changes
+afterwards (edit after close, reopen), its pending transfers become `cancelled` and new
+ones are computed, so the period's live transfers are the ones not cancelled.
+"""
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
@@ -12,43 +16,12 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Integer,
     String,
-    UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from split_ranch.models.base import Base, created_at_col, in_check, updated_at_col, uuid_pk
 
 TRANSFER_STATUSES = ("pending", "sent", "confirmed", "disputed", "cancelled")
-SNAPSHOT_TRIGGERS = ("close", "edit_after_close", "reopen_close")
-
-
-class SettlementSnapshot(Base):
-    """Immutable; the latest non-superseded snapshot of a period is the current one."""
-
-    __tablename__ = "settlement_snapshots"
-    __table_args__ = (
-        UniqueConstraint("period_id", "seq"),
-        UniqueConstraint("id", "household_id"),
-        ForeignKeyConstraint(
-            ["period_id", "household_id"],
-            ["periods.id", "periods.household_id"],
-            ondelete="CASCADE",
-        ),
-        CheckConstraint(in_check("trigger", SNAPSHOT_TRIGGERS), name="trigger"),
-        CheckConstraint("seq >= 1", name="seq_positive"),
-    )
-
-    id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column()
-    period_id: Mapped[UUID] = mapped_column()
-    seq: Mapped[int] = mapped_column(Integer)
-    trigger: Mapped[str] = mapped_column(String(24))
-    balances: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
-    transfers: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
-    input_hash: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = created_at_col()
-    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SettlementTransfer(Base):
@@ -57,11 +30,6 @@ class SettlementTransfer(Base):
         ForeignKeyConstraint(
             ["period_id", "household_id"],
             ["periods.id", "periods.household_id"],
-            ondelete="CASCADE",
-        ),
-        ForeignKeyConstraint(
-            ["snapshot_id", "household_id"],
-            ["settlement_snapshots.id", "settlement_snapshots.household_id"],
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
@@ -80,7 +48,6 @@ class SettlementTransfer(Base):
     id: Mapped[UUID] = uuid_pk()
     household_id: Mapped[UUID] = mapped_column(index=True)
     period_id: Mapped[UUID] = mapped_column(index=True)
-    snapshot_id: Mapped[UUID] = mapped_column()
     from_member_id: Mapped[UUID] = mapped_column()
     to_member_id: Mapped[UUID] = mapped_column()
     amount_cents: Mapped[int] = mapped_column(BigInteger)

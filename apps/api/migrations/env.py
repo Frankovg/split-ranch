@@ -15,10 +15,10 @@ target_metadata = Base.metadata
 
 
 def include_name(name: str | None, type_: str, parent_names: Any) -> bool:
-    """Never look at Supabase-owned schemas or Procrastinate's tables."""
+    """Never look at Supabase-owned schemas: autogenerate only compares `app`."""
     if type_ == "schema":
         return name == SCHEMA
-    return not (type_ == "table" and name is not None and name.startswith("procrastinate_"))
+    return True
 
 
 def _configure(connection: Connection | None = None, url: str | None = None) -> None:

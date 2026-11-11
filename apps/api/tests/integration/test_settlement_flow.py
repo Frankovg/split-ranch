@@ -7,8 +7,6 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from tests.conftest import FrozenClock, TestUser
 from tests.integration.helpers import House, add_expense, make_house, nets, ok
@@ -115,8 +113,7 @@ def test_household_example(client: TestClient, march_house: House) -> None:
         for t in settlement["transfers"]
     ]
     assert transfers == [("Ana", "Juli", 36333), ("Franco", "Juli", 29333)]
-    assert settlement["snapshot"]["seq"] == 1
-    assert settlement["snapshot"]["trigger"] == "close"
+    assert all(t["status"] == "pending" for t in settlement["transfers"])
     # Closing again is idempotent.
     assert (
         ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))["status"]
@@ -209,7 +206,7 @@ def test_adjustment_example(
     assert _shares(adj["correction"], house) == {"Juli": 4334, "Franco": 4333, "Ana": 4333}
     assert adj["reversal"]["period"]["seq"] == 2
     assert nets(client, house, "2") == {"Juli": -1000, "Franco": 2000, "Ana": -1000}
-    # March snapshot never changes.
+    # The locked March balance never changes.
     assert nets(client, house, "1") == {"Juli": 65666, "Franco": -29333, "Ana": -36333}
 
 
@@ -301,6 +298,12 @@ def test_edit_after_close_and_reopen(client: TestClient, march_house: House) -> 
     house = march_house
     e = _march_expenses(client, house)
     ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
+
+    def live_ids() -> set[str]:
+        s = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
+        return {t["id"] for t in s["transfers"]}
+
+    at_close = live_ids()
     e4 = ok(client.get(house.url(f"/expenses/{e['E4']['id']}"), headers=house.h("Ana")))
     assert e4["edit_requires_reason"] is True
     hdr = house.h("Ana", **{"If-Match": f'"{e4["version"]}"'})
@@ -318,16 +321,16 @@ def test_edit_after_close_and_reopen(client: TestClient, march_house: House) -> 
     )
     assert _shares(updated, house) == {"Juli": 4500, "Ana": 4500}
     settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
-    assert settlement["snapshot"]["seq"] == 2
-    assert settlement["snapshot"]["trigger"] == "edit_after_close"
-    assert settlement["previous_snapshots"][0]["superseded_at"] is not None
     assert all(t["status"] == "pending" for t in settlement["transfers"])
+    # The old pending transfers were cancelled and replaced by recomputed ones.
+    after_edit = live_ids()
+    assert after_edit and not after_edit & at_close
     # Nets after edit: Juli 65666-1500, Ana -36333+3000-1500... computed by the server.
     n = nets(client, house, "1")
     assert sum(n.values()) == 0
     assert n["Ana"] == -36333 + 1500
 
-    # Reopen (unlocked) and close again -> seq 3 with trigger reopen_close.
+    # Reopen (unlocked) cancels the pending transfers; closing again proposes new ones.
     reopened = ok(
         client.post(
             house.url("/periods/1/reopen"),
@@ -336,16 +339,14 @@ def test_edit_after_close_and_reopen(client: TestClient, march_house: House) -> 
         )
     )
     assert reopened["status"] == "open" and reopened["reopened_count"] == 1
+    assert live_ids() == set()
     ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
-    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
-    assert settlement["snapshot"]["seq"] == 3
-    assert settlement["snapshot"]["trigger"] == "reopen_close"
-    cancelled = [t for s in settlement["previous_snapshots"] for t in s["transfers"]]
-    assert cancelled  # history keeps the old proposals
+    after_reopen = live_ids()
+    assert after_reopen and not after_reopen & (at_close | after_edit)
 
 
 def test_period_never_closes_by_itself(
-    client: TestClient, march_house: House, frozen_clock: FrozenClock, db_session: Session
+    client: TestClient, march_house: House, frozen_clock: FrozenClock
 ) -> None:
     house = march_house
     _march_expenses(client, house)
@@ -356,14 +357,9 @@ def test_period_never_closes_by_itself(
     period = ok(client.get(house.url("/periods/1"), headers=house.h("Juli")))
     assert period["status"] == "open"
     assert period["started_at"].startswith("2026-03-05T10:00:00")
-
-    ok(client.post(house.url("/periods/1/close"), headers=house.h("Franco")))
-    jobs = (
-        db_session.execute(text("SELECT task_name FROM app.procrastinate_jobs ORDER BY id"))
-        .scalars()
-        .all()
+    assert ok(client.post(house.url("/periods/1/close"), headers=house.h("Franco")))["status"] == (
+        "closed"
     )
-    assert "sync_period_tab" in jobs and "notify_period_closed" in jobs
 
 
 def test_empty_period_closes_to_settled(

@@ -1,5 +1,7 @@
 # 06 — Google Sheets export
 
+> **Status: not built.** Nothing in the code or the database exists for it yet. When it is built, it adds only what it needs (see [Storage](#storage)).
+
 The database is the source of truth. The spreadsheet is a **read-only mirror** for humans.
 
 ## Ownership: the service-account problem
@@ -19,7 +21,7 @@ Service accounts have **no Drive storage quota** of their own: creating spreadsh
 - A `spreadsheets.batchUpdate` with many sub-requests counts as **one** request.
 - `429` → exponential backoff; quotas refill every minute.
 
-Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting). We only sync closed periods, so a household makes a handful of requests per month. A **dedicated queue `sheets`** (concurrency 1) plus backoff on 429 is enough. The token bucket is only needed if many households ever share one service account.
+Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting). We only sync closed periods, so a household makes a handful of requests per month. Backoff on 429 is enough; rate limiting is only needed if many households ever share one service account.
 
 ## Spreadsheet layout
 
@@ -28,10 +30,10 @@ One spreadsheet per household: `Split Ranch — <Household name>`.
 | Tab | Content |
 |---|---|
 | `Léeme` | Explanation, "this file is generated, edits will be overwritten", last sync time, link to the app |
-| `2026-03 Resumen` | Status (abierto/cerrado/liquidado), totals, total per member paid/owed/net, snapshot seq, closed_at |
+| `2026-03 Resumen` | Status (abierto/cerrado/liquidado), totals, total per member paid/owed/net, closed_at |
 | `2026-03 Detalle` | One row per expense: date, description, category, payer, amount, split type, origin, one column per member with their share, source, last edited, flags (adjustment / edited after close) |
 | `2026-03 Por categoría` | Category × member matrix + totals; budget vs actual when budgets exist |
-| `2026-03 Liquidación` | Transfers: from, to, amount, status, sent_at, confirmed_at; previous snapshots summarised |
+| `2026-03 Liquidación` | Live transfers: from, to, amount, status, sent_at, confirmed_at |
 
 The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per period** (prefixed by the period number, e.g. `P3`; periods are started by hand, not calendar months) is the recommended layout. A single tab with four stacked blocks is the fallback if the household prefers fewer tabs (it only changes the renderer).
 
@@ -39,32 +41,35 @@ Personal expenses are excluded. Amounts are written as numbers with currency for
 
 ## Triggers
 
-**Only closed periods are exported.** The open period is never written: it changes on every expense, and the app is where people look at it. Every sync is triggered by a new settlement snapshot, which only exists for a closed period (`write_snapshot` in `use_cases/periods.py`).
+**Only closed periods are exported.** The open period is never written: it changes on every expense, and the app is where people look at it.
 
-| Event | Job |
+| Event | Sync |
 |---|---|
-| Period closed (manual) | `sync_period_tab(period_id)` for all four tabs (first run also runs `ensure_household_spreadsheet`: verify access, write `Léeme`) |
-| Edit in an already closed period (unlocked) | `sync_period_tab` for that period, since the edit writes a new snapshot |
+| Period closed | The period's four tabs (the first sync also checks access and writes `Léeme`) |
+| Edit in an already closed period (unlocked) | That period's tabs, since its transfers were recomputed |
 
-Not synced: transfer status changes (`Liquidación` shows the transfers as of the last snapshot; the app shows their live status), member joins/leaves (sharing is managed by hand in Drive), the open period, and nightly reconciliation (nothing runs on a schedule while the free API instance sleeps).
+Not synced: transfer status changes (the app shows their live status), member joins/leaves (sharing is managed by hand in Drive), the open period, and nightly reconciliation (nothing runs on a schedule while the free API instance sleeps).
 
-All jobs are enqueued **inside the business transaction** (Procrastinate), so a close and its sync request commit or roll back together. On the free hosting the worker runs inside the API process (`RUN_WORKER_IN_API`). A job enqueued by the close request therefore runs a few seconds later, while that same instance is still awake.
+**How it runs:** without a job queue. The sync starts after the close (or edit) has committed, as a FastAPI background task of that same request, so the instance is awake and the user does not wait for Google. If it fails, the stored hash stays old and the sync can be retried from the app.
+
+## Storage
+
+- The spreadsheet id: a column on `households` (the backend never creates files, so duplicates cannot happen).
+- A content hash per period (a column on `periods`, or a small table if per-tab state turns out to be needed).
 
 ## Idempotency
 
-- `household_spreadsheets` stores the configured `spreadsheet_id`; the backend never creates files, so duplicates cannot happen.
-- Each tab is located by **title** and its `sheetId` saved in `sheet_tabs`; missing tab → `addSheet`; existing → `updateCells`/`values.batchUpdate` replacing the full range + clearing trailing rows. Never `append`.
-- The renderer is a pure function `render_period(period_data) -> TabContent`; `content_hash = sha256(TabContent)`. If the hash equals `sheet_tabs.content_hash`, the job does nothing.
-- Procrastinate `queueing_lock = f"sheets:{period_id}"` collapses duplicate pending jobs for the same period.
+- Each tab is located by **title**; missing tab → `addSheet`; existing → `updateCells`/`values.batchUpdate` replacing the full range + clearing trailing rows. Never `append`.
+- The renderer is a pure function `render_period(period_data) -> TabContent`; `content_hash = sha256(TabContent)`. If the hash equals the stored one, nothing is sent.
 
 ## Retries and failures
-- Retry on 429/5xx/timeouts: exponential backoff with jitter (2 s, 4 s, 8 s … max 10 min), up to 8 attempts; honour `Retry-After`.
-- Non-retryable (403 permission removed, 404 file deleted): mark `sheet_tabs.status = 'error'` and send a Sentry alert. The admin re-shares the file, or creates a new one and updates the ID; the next close (or a manual retry) syncs again.
-- Sheets failures never block the business flow: the app shows "Sheets: actualizado hace 3 min / pendiente / error".
+- Retry on 429/5xx/timeouts: exponential backoff with jitter, a few attempts within the background task; honour `Retry-After`.
+- Non-retryable (403 permission removed, 404 file deleted): record the error and send a Sentry alert. The admin re-shares the file, or creates a new one and updates the ID; the next close (or a manual retry) syncs again.
+- Sheets failures never block the business flow: the app shows "Sheets: actualizado / pendiente / error".
 
 ## Sharing
 - Managed by the file's owner in Google Drive, not by the backend: the service account is **Editor**, and other members are **Viewer**.
-- Sheets is disabled when no spreadsheet ID is configured (jobs log and return).
+- Sheets is disabled when no spreadsheet ID is configured.
 
 ## Read-only enforcement
 - Members other than the owner have Viewer permission. The owner can still edit by hand; the `Léeme` tab warns that generated tabs are overwritten on the next sync.

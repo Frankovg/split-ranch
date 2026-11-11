@@ -298,6 +298,33 @@ def resolve_expense_split(
     )
 
 
+def spec_member_ids(spec: SplitSpec) -> list[UUID]:
+    """Members a split names explicitly (empty for "everyone" and personal splits)."""
+    if isinstance(spec, PersonalSplit):
+        return []
+    if isinstance(spec, EqualSplit):
+        return [s.member_id for s in spec.shares or []]
+    return [s.member_id for s in spec.shares]
+
+
+def rule_from_spec(spec: SplitSpec) -> RuleData:
+    """A stored household/category rule (SplitSpec JSON) as resolution input."""
+    if isinstance(spec, PersonalSplit):
+        return RuleData("personal")
+    if isinstance(spec, WeightsSplit):
+        return RuleData("weights", [RuleRow(s.member_id, weight=s.weight) for s in spec.shares])
+    if isinstance(spec, PercentagesSplit):
+        return RuleData(
+            "percentages",
+            [RuleRow(s.member_id, basis_points=s.basis_points) for s in spec.shares],
+        )
+    if isinstance(spec, ExactSplit):
+        return RuleData(
+            "exact", [RuleRow(s.member_id, amount_cents=s.amount_cents) for s in spec.shares]
+        )
+    return RuleData(spec.split_type, [RuleRow(m) for m in spec_member_ids(spec)])
+
+
 def spec_from_stored(split_type: str, shares: Sequence[ResolvedShare]) -> SplitSpec:
     """Rebuild an explicit override from stored share inputs (used by adjustments/edits)."""
     if split_type == "personal":

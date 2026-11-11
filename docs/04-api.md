@@ -10,18 +10,18 @@ Base URL `https://api.<domain>/v1`. JSON, UTF-8, `snake_case`. OpenAPI 3.1 gener
 | Tenancy | Household-scoped routes live under `/households/{household_id}/…`. The server loads the caller's membership for that household from the DB; non-members get **404** (not 403) to avoid leaking existence |
 | Identity | `user_id`, `created_by`, `actor` never accepted in bodies; derived from the JWT |
 | IDs | UUIDv7. Clients may send `id` on create (offline-generated); the server rejects collisions with a different payload |
-| Money | `{"amount_cents": 1250, "currency": "EUR"}` |
+| Money | `{"amount_cents": 1250}` — integer euro cents (EUR only, no currency field) |
 | Dates | `expense_date: "2026-03-14"`; timestamps ISO-8601 UTC |
 | Pagination | Keyset/cursor: `?limit=50&cursor=<opaque>` → `{"items": [...], "next_cursor": "..." | null}`. Default 50, max 200 |
-| Filtering | `?period=3&category_id=…&payer_member_id=…&q=text&status=draft` (`period` is a period number or `current`) |
-| Optimistic locking | Responses carry `ETag: "<version>"`; `PATCH`/`DELETE` require `If-Match: "<version>"` → `412` if stale (body includes the current resource) |
-| Idempotency | `POST` endpoints that create things accept `Idempotency-Key` (UUID). Same key + same body → stored response replayed; same key + different body → `422 idempotency_key_reuse`. Keys kept 48 h |
+| Filtering | `?period=3&category_id=…&payer_member_id=…&q=text` (`period` is a period number or `current`) |
+| Optimistic locking | Expense responses carry `ETag: "<version>"`; expense `PATCH`/`DELETE` require `If-Match: "<version>"` → `412` if stale (body includes the current resource) |
+| Idempotency | Creating an expense is idempotent through its client-generated `id`: the same id and payload again returns the stored expense (`200`); the same id with a different payload is `409 id_conflict`. No `Idempotency-Key` header |
 | Errors | RFC 9457 `application/problem+json`: `{type, title, status, detail, code, errors?: [{loc, msg, type}]}` |
 | Versioning | URL major version (`/v1`). Additive changes only within v1. Min supported app version returned in `X-Min-App-Version`; app forces update when below |
 | Rate limits | Per user (e.g. 120 req/min) and per IP on public endpoints; `429` + `Retry-After`. Auth endpoint rate limits are Supabase's |
 
 ### Error codes (`code`)
-`unauthenticated`, `token_expired`, `forbidden_role`, `not_found`, `validation_error`, `split_mismatch`, `invalid_ratios`, `period_locked`, `reason_required`, `period_state_changed`, `version_conflict` (412), `idempotency_key_reuse`, `invitation_expired`, `invitation_exhausted`, `already_member`, `member_has_open_debts`, `rate_limited`.
+`unauthenticated`, `token_expired`, `forbidden_role`, `not_found`, `validation_error`, `split_mismatch`, `invalid_ratios`, `period_locked`, `reason_required`, `period_state_changed`, `version_conflict` (412), `id_conflict`, `invitation_expired`, `already_member`, `member_has_open_debts`, `rate_limited`.
 
 ## Auth and current user
 
@@ -35,9 +35,9 @@ Token verification (FastAPI dependency `get_actor`):
 |---|---|---|---|
 | GET | `/me` | — | user + memberships `[ {household_id, member_id, role, status} ]`; creates `app.users` on first call |
 | PATCH | `/me` | `{display_name?, locale?}` | user |
-| DELETE | `/me` | `{confirm: "DELETE"}` | 202 (job: anonymise memberships, delete own data, then delete the Supabase auth user with the Admin API using the secret key, which only the worker holds) |
-| POST | `/me/push-tokens` | `{expo_token, platform}` | 204 (upsert) |
-| DELETE | `/me/push-tokens/{token}` | — | 204 |
+| DELETE | `/me` | `{confirm: "DELETE"}` | *Not built yet.* Anonymise memberships, delete own data, then delete the Supabase auth user with the Admin API using the secret key (server only) |
+
+Push-token endpoints come back with push notifications (not built).
 
 No household in the token (multi-household; membership checked per request). We do not add custom claims to Supabase tokens: authorisation data stays in our tables.
 
@@ -47,13 +47,13 @@ Error codes added: `unauthenticated` (missing/invalid token), `token_expired` (t
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| POST | `/households` | any user | `{name, timezone?}` → creator becomes admin; default categories and rule created |
+| POST | `/households` | any user | `{name, timezone?}` → creator becomes admin; default categories copied, default rule = equal |
 | GET | `/households/{hid}` | member | settings, members |
-| PATCH | `/households/{hid}` | admin | `{name?, timezone?}` + If-Match |
-| POST | `/households/{hid}/invitations` | admin | `{expires_in_days=7, max_uses=5, start_period}` → `{code, url}` |
-| DELETE | `/households/{hid}/invitations/{id}` | admin | revoke |
-| GET | `/invitations/{code}` | authenticated | preview `{household_name, inviter, member_count}` |
-| POST | `/invitations/{code}/accept` | authenticated | idempotent; `409 already_member` |
+| PATCH | `/households/{hid}` | admin | `{name?, timezone?}` |
+| POST | `/households/{hid}/invitations` | admin | → `{code, url, expires_at}`: the household's single join code, reused while valid (7 days), a new one otherwise |
+| DELETE | `/households/{hid}/invitations` | admin | revoke the current code (the next POST creates a new one) |
+| GET | `/invitations/{code}` | authenticated | preview `{household_name, member_count, expires_at}`; `410 invitation_expired` |
+| POST | `/invitations/{code}/accept` | authenticated | joins the open period (the next one if none is open); `409 already_member` |
 | PATCH | `/households/{hid}/members/{mid}` | admin | `{role}`; cannot demote the last admin |
 | POST | `/households/{hid}/members/me/leave` | member | → `leaving` |
 | DELETE | `/households/{hid}/members/{mid}` | admin | same as leave, on someone else |
@@ -80,20 +80,21 @@ Split rule payload (shared by rules, expense overrides and AI tools):
 }
 ```
 
-Pydantic models use a **discriminated union on `split_type`** (`EqualSplit`, `WeightsSplit`, `PercentagesSplit`, `ExactSplit`, `SingleSplit`, `PersonalSplit`) with `model_config = ConfigDict(extra="forbid", strict=True)`.
+Pydantic models use a **discriminated union on `split_type`** (`EqualSplit`, `WeightsSplit`, `PercentagesSplit`, `ExactSplit`, `SingleSplit`, `PersonalSplit`) with `model_config = ConfigDict(extra="forbid", strict=True)`. The same JSON is what the database stores ([02](02-data-model.md#split-rules-as-json)).
+
+`GET /split-rules` → `{"default": <split>, "categories": [{"category_id": "…", "split": <split>}]}`. `PUT …/default` returns the split; `PUT …/split-rule` returns `{category_id, split}`.
 
 ## Expenses
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/households/{hid}/expenses` | filters + cursor; drafts only visible to their creator |
-| POST | `/households/{hid}/expenses` | create (status `confirmed` by default; `draft` allowed). Goes to the open period; optional `period_seq` targets a closed (unlocked) one with `reason`. `409 no_open_period` when none is open |
+| GET | `/households/{hid}/expenses` | filters + cursor |
+| POST | `/households/{hid}/expenses` | create. Goes to the open period; optional `period_seq` targets a closed (unlocked) one with `reason`. `409 no_open_period` when none is open. Idempotent by `id` |
 | GET | `/households/{hid}/expenses/{eid}` | includes shares, `split_origin`, `rule_fallback`, `can_edit`, `edit_requires_reason`, `edit_mode` (`in_place` / `adjustment`) |
 | PATCH | `/households/{hid}/expenses/{eid}` | If-Match; `reason` required when period not open; returns `409 period_locked` with `{adjustment_preview}` if the period is locked |
 | DELETE | `/households/{hid}/expenses/{eid}` | If-Match; soft delete; reason rules as PATCH |
 | POST | `/households/{hid}/expenses/{eid}/adjustments` | correction for locked periods: body = corrected fields or `{delete: true}`, `reason` |
-| POST | `/households/{hid}/expenses/{eid}/confirm` | draft → confirmed (If-Match) |
-| GET | `/households/{hid}/expenses/{eid}/revisions` | history |
+| GET | `/households/{hid}/expenses/{eid}/revisions` | history (the expense's rows in `history`) |
 | POST | `/households/{hid}/expenses/preview` | resolves shares without saving (used by AI and for server-side check of the client preview) |
 
 Create payload:
@@ -102,19 +103,18 @@ Create payload:
 {
   "id": "0193a7c2-…",
   "amount_cents": 10000,
-  "currency": "EUR",
   "description": "Supermercado",
   "category_id": "…",
   "payer_member_id": "…",
   "expense_date": "2026-03-14",
   "split": null,
   "participants": null,
-  "status": "confirmed",
   "source": "manual",
-  "source_transcript": null,
   "notes": null
 }
 ```
+
+Drafts (`status`) and `source_transcript` were removed in migration 0005; they come back with the AI phase ([07](07-future-ai.md)).
 
 `split = null` → resolved by precedence; `participants` = optional subset (makes it an override). `source` values other than `manual` are only accepted from server-side callers (AI module, recurring job); a public client sending `ai_*` gets `422`.
 
@@ -124,7 +124,7 @@ Response (excerpt):
 {
   "id": "0193a7c2-…",
   "version": 1,
-  "period": {"id": "…", "month": "2026-03", "status": "open"},
+  "period": {"id": "…", "seq": 3, "status": "open"},
   "split_type": "equal",
   "split_origin": "household_default",
   "shares": [
@@ -144,10 +144,10 @@ Response (excerpt):
 | GET | `/households/{hid}/periods?cursor=` | member | newest first, with totals; `cursor` = period number |
 | POST | `/households/{hid}/periods` | member | Start the next period → `201`; `409 period_open` while one is open |
 | GET | `/households/{hid}/periods/{period}` | member | status, `seq`, `started_at`, `closed_at`, totals per category |
-| GET | `/households/{hid}/periods/{period}/balance` | member | live nets per member (computed) + current snapshot if closed + `drift` flag |
+| GET | `/households/{hid}/periods/{period}/balance` | member | `{period, balances}`: nets per member, always computed from the live expenses |
 | POST | `/households/{hid}/periods/{period}/close` | member | Idempotent; optional `If-Match` on period version |
 | POST | `/households/{hid}/periods/{period}/reopen` | admin | `{reason}`; latest period only (`409 period_not_latest`); `409 period_locked` if any transfer sent/confirmed |
-| GET | `/households/{hid}/periods/{period}/settlement` | member | current snapshot + transfers + previous snapshots summary |
+| GET | `/households/{hid}/periods/{period}/settlement` | member | `{period, transfers}`: the live (non-cancelled) transfers |
 | POST | `/households/{hid}/transfers/{tid}/sent` | debtor | `{note?}` |
 | POST | `/households/{hid}/transfers/{tid}/confirm` | creditor (or admin with note if creditor left) | |
 | POST | `/households/{hid}/transfers/{tid}/dispute` | creditor | `{note}` |

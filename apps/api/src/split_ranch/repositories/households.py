@@ -3,17 +3,10 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from split_ranch.models import (
-    Category,
-    Household,
-    HouseholdMember,
-    SplitRule,
-    SplitRuleShare,
-    User,
-)
+from split_ranch.models import Category, Household, HouseholdMember, User
 
 
 def get_household(
@@ -116,34 +109,10 @@ def category_name_taken(
     return session.scalars(stmt).first() is not None
 
 
-def get_rule(
-    session: Session,
-    household_id: UUID,
-    scope: str,
-    category_id: UUID | None = None,
-    *,
-    for_update: bool = False,
-) -> SplitRule | None:
-    conds = [SplitRule.household_id == household_id, SplitRule.scope == scope]
-    if category_id is not None:
-        conds.append(SplitRule.category_id == category_id)
-    stmt = select(SplitRule).where(and_(*conds))
+def get_household_by_invite_code(
+    session: Session, code: str, *, for_update: bool = False
+) -> Household | None:
+    stmt = select(Household).where(Household.invite_code == code, Household.deleted_at.is_(None))
     if for_update:
         stmt = stmt.with_for_update()
     return session.scalars(stmt).first()
-
-
-def list_rules(session: Session, household_id: UUID) -> Sequence[SplitRule]:
-    return session.scalars(
-        select(SplitRule)
-        .where(SplitRule.household_id == household_id)
-        .order_by(SplitRule.scope, SplitRule.created_at)
-    ).all()
-
-
-def rule_shares(session: Session, household_id: UUID, rule_id: UUID) -> Sequence[SplitRuleShare]:
-    return session.scalars(
-        select(SplitRuleShare)
-        .where(SplitRuleShare.household_id == household_id, SplitRuleShare.split_rule_id == rule_id)
-        .order_by(SplitRuleShare.sort_key)
-    ).all()

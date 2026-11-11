@@ -20,6 +20,12 @@ def _config(url: str) -> Config:
 def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
     cfg = _config(database_url)
     command.check(cfg)  # raises if models and migrations diverge
+    command.downgrade(cfg, "0004")
+    with engine.connect() as conn:
+        # 0005 down: the old tables and the job queue are back, the merged ones are gone.
+        for table in ("split_rules", "expense_revisions", "invitations", "procrastinate_jobs"):
+            assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
+        assert conn.execute(text("SELECT to_regclass('app.history')")).scalar() is None
     command.downgrade(cfg, "0003")
     with engine.connect() as conn:
         # 0004 down: the (empty) Quick split tables and the payment columns are back.
@@ -47,6 +53,7 @@ def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
         assert conn.execute(text("SELECT to_regclass('app.expenses')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0004"
-        assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar()
+        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0005"
+        assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar() is None
         assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar() is None
+        assert conn.execute(text("SELECT to_regclass('app.history')")).scalar()

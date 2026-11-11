@@ -180,12 +180,12 @@ stateDiagram-v2
   sent --> disputed: creditor taps "Not received" (+note)
   disputed --> sent: debtor re-sends
   disputed --> confirmed: creditor confirms
-  pending --> cancelled: snapshot superseded (only before any transfer is sent/confirmed)
+  pending --> cancelled: settlement recomputed or period reopened (only before any transfer is sent/confirmed)
 ```
 
 - Push to the creditor on `sent`; reminder to the debtor every 3 days while `pending` (post-MVP push).
 - If the creditor has left the household, an admin may confirm with a mandatory note.
-- When every transfer of the current snapshot is `confirmed` (or there were none), the period becomes `settled`.
+- When every live (non-cancelled) transfer of the period is `confirmed` (or there were none), the period becomes `settled`.
 
 ## 4. Period lifecycle
 
@@ -200,7 +200,7 @@ stateDiagram-v2
 
 - **No automatic close** (decided 2026-11-09; the earlier month-end auto-close with grace days was removed). Periods are not calendar months: they are numbered per household (1, 2, 3…) and last until a member closes them.
 - A new household starts with period 1 open. **At most one period is open** at a time (enforced by a partial unique index).
-- **Any active member** can close the open period. Closing computes the settlement snapshot (seq 1), creates `pending` transfers and enqueues the Sheets sync and pushes.
+- **Any active member** can close the open period. Closing computes the balances and creates the minimal `pending` transfers.
 - **Any active member** starts the next period (`POST /periods`) once the latest one is closed; settling the previous period can go on in parallel. Until then, new expenses are refused with `409 no_open_period`.
 - New expenses go to the open period whatever their `expense_date`; the date is informational and editing it never moves an expense to another period.
 - A period with no expenses closes directly to `settled`.
@@ -211,7 +211,7 @@ stateDiagram-v2
 | Period state | Who can edit | Requirements | Effect |
 |---|---|---|---|
 | `open` | author or admin | `If-Match` version | Revision; live balance updates |
-| `closed`, **no transfer sent/confirmed** | author or admin | `If-Match` + **reason** (5–280 chars) | Revision; new snapshot (seq+1, `trigger='edit_after_close'`); previous pending transfers → `cancelled`; new transfers; push to members whose net changed; Sheets tab resync |
+| `closed`, **no transfer sent/confirmed** | author or admin | `If-Match` + **reason** (5–280 chars) | History row; previous pending transfers → `cancelled`; new transfers computed; push to members whose net changed; Sheets tab resync |
 | `closed` with any transfer `sent`/`confirmed` ("locked"), or `settled` | author or admin | reason | **No in-place edit.** An **adjustment** is created in the current open period (see below) |
 
 New expense in a closed, unlocked period (API: explicit `period_seq`): allowed with reason, same effect as an edit after close. For a locked/settled period, create it in the open period with a note instead.
@@ -237,7 +237,7 @@ The UI groups both rows as one "Correction of March: Supermercado (+30.00)".
 4. **Concurrency**: two admins editing the same expense → `412` with the current version; closing while someone edits → `close_period` takes `SELECT … FOR UPDATE` on the period row; an edit that loses the race receives `409 period_state_changed` and retries with the closed-period rules (reason required).
 5. **Close while offline edits are queued**: the server applies the rule of the period's state *at write time*; the app shows the "reason required" sheet when the replayed mutation fails with `409 reason_required`, and asks someone to start a new period on `409 no_open_period`.
 6. **Rule changes** never touch closed periods (see [02](02-data-model.md)).
-7. **Snapshot drift**: each snapshot stores `input_hash`; the period screen shows "recalculated after close" with a diff (per member, old vs new net) when seq > 1.
+7. **Recalculated settlements**: balances are always recomputed from the expenses; superseded proposals stay as `cancelled` transfers and the change (with its reason) is in `history`.
 
 ## 5. Membership changes
 
@@ -245,7 +245,7 @@ Product decision: **whole-period membership.** A member participates in the defa
 
 | Event | Rule |
 |---|---|
-| Join (invitation accepted) | Invitation carries `start_period`: `current` (default) or `next`. `current` joins the open period; when no period is open, both mean the next period started. With `current`, open-period expenses whose rule is "all period members" (`participant_mode='all'`) are **re-resolved** to include the new member (revision reason `member_joined`, members notified). Expenses with an explicit subset or exact amounts are untouched |
+| Join (invitation accepted) | The member joins the open period; when no period is open, the next one started. When joining the open period, its expenses whose rule is "all period members" (`participant_mode='all'`) are **re-resolved** to include the new member (revision reason `member_joined`, members notified). Expenses with an explicit subset or exact amounts are untouched |
 | Leave / removed | Status `leaving`, `left_period_seq` = the latest period. The member stays in that period, can still log expenses and must settle it. After the period is `settled`, status becomes `left`; they lose access to new periods but keep read access to periods they took part in |
 | Leaving with debts in older periods | Allowed; transfers remain and keep notifying |
 | Account deletion (GDPR) | Member row anonymised ("Former member"), shares and transfers preserved for other members' records |

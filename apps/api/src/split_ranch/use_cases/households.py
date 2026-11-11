@@ -1,4 +1,4 @@
-"""Households, invitations and membership."""
+"""Households, invitation code and membership."""
 
 from __future__ import annotations
 
@@ -13,28 +13,19 @@ from sqlalchemy.orm import Session
 from split_ranch.core import clock
 from split_ranch.core.actor import Actor, HouseholdActor
 from split_ranch.core.errors import AppError, Conflict, NotFound, Unprocessable
-from split_ranch.models import (
-    Category,
-    Household,
-    HouseholdMember,
-    Invitation,
-    SplitRule,
-    User,
-)
+from split_ranch.models import DEFAULT_SPLIT_RULE, Category, Household, HouseholdMember
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as repo
 from split_ranch.schemas.households import (
     HouseholdCreate,
     HouseholdRead,
     HouseholdUpdate,
-    InvitationAccept,
-    InvitationCreate,
     InvitationPreview,
     InvitationRead,
     MemberRead,
     MemberRoleUpdate,
 )
-from split_ranch.use_cases.common import audit, check_version, require_active, require_admin
+from split_ranch.use_cases.common import audit, require_active, require_admin
 from split_ranch.use_cases.periods import create_first_period
 
 # Default categories copied into every new household (Spanish first; UI translates by icon).
@@ -54,6 +45,7 @@ DEFAULT_CATEGORIES: tuple[tuple[str, str, str], ...] = (
 )
 
 INVITE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"  # base32
+INVITE_VALID_FOR = timedelta(days=7)
 
 
 def _validate_timezone(tz: str) -> None:
@@ -71,14 +63,12 @@ def _household_read(
         id=household.id,
         name=household.name,
         timezone=household.timezone,
-        currency=household.currency,
-        version=household.version,
         created_at=household.created_at,
         members=[
             MemberRead(
                 id=m.id,
                 user_id=m.user_id,
-                display_name=m.display_name_override or u.display_name,
+                display_name=u.display_name,
                 role=m.role,
                 status=m.status,
                 sort_key=m.sort_key,
@@ -102,7 +92,12 @@ def _load(session: Session, actor: HouseholdActor) -> tuple[Household, Household
 
 def create_household(session: Session, actor: Actor, data: HouseholdCreate) -> HouseholdRead:
     _validate_timezone(data.timezone)
-    household = Household(name=data.name.strip(), timezone=data.timezone, created_by=actor.user_id)
+    household = Household(
+        name=data.name.strip(),
+        timezone=data.timezone,
+        created_by=actor.user_id,
+        split_rule=dict(DEFAULT_SPLIT_RULE),
+    )
     session.add(household)
     session.flush()
     first = create_first_period(session, household)
@@ -126,14 +121,6 @@ def create_household(session: Session, actor: Actor, data: HouseholdCreate) -> H
                 sort_key=i,
             )
         )
-    session.add(
-        SplitRule(
-            household_id=household.id,
-            scope="household_default",
-            split_type="equal",
-            updated_by=actor.user_id,
-        )
-    )
     audit(
         session,
         household_id=household.id,
@@ -153,16 +140,13 @@ def get_household(session: Session, actor: HouseholdActor) -> HouseholdRead:
 
 
 def update_household(
-    session: Session, actor: HouseholdActor, data: HouseholdUpdate, if_match: int | None
+    session: Session, actor: HouseholdActor, data: HouseholdUpdate
 ) -> HouseholdRead:
     require_admin(actor)
     household = repo.get_household(session, actor.household_id, for_update=True)
     member = repo.get_member(session, actor.household_id, actor.member_id)
     if household is None or member is None:
         raise NotFound("Household not found")
-    check_version(
-        if_match, household.version, current_body=_household_read(session, household, member)
-    )
     changes = data.model_dump(exclude_unset=True)
     if "timezone" in changes and changes["timezone"] is not None:
         _validate_timezone(changes["timezone"])
@@ -175,7 +159,6 @@ def update_household(
             diff[key] = {"before": old, "after": value}
             setattr(household, key, value)
     if diff:
-        household.version += 1
         audit(
             session,
             household_id=household.id,
@@ -192,90 +175,79 @@ def update_household(
 # ------------------------------------------------------------ invitations
 
 
-def _invitation_read(inv: Invitation, base_url: str) -> InvitationRead:
+def _invite_valid(household: Household) -> bool:
+    return (
+        household.invite_code is not None
+        and household.invite_expires_at is not None
+        and household.invite_expires_at > clock.now()
+    )
+
+
+def _invitation_read(household: Household, base_url: str) -> InvitationRead:
+    assert household.invite_code is not None and household.invite_expires_at is not None
     return InvitationRead(
-        id=inv.id,
-        code=inv.code,
-        url=f"{base_url.rstrip('/')}/join/{inv.code}",
-        expires_at=inv.expires_at,
-        max_uses=inv.max_uses,
-        uses=inv.uses,
-        start_period=inv.start_period,
+        code=household.invite_code,
+        url=f"{base_url.rstrip('/')}/join/{household.invite_code}",
+        expires_at=household.invite_expires_at,
     )
 
 
-def create_invitation(
-    session: Session, actor: HouseholdActor, data: InvitationCreate, *, base_url: str
+def get_or_create_invitation(
+    session: Session, actor: HouseholdActor, *, base_url: str
 ) -> InvitationRead:
+    """The household's join code: the current one while valid, else a fresh one (7 days)."""
     require_admin(actor)
-    code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
-    inv = Invitation(
-        household_id=actor.household_id,
-        code=code,
-        created_by=actor.user_id,
-        expires_at=clock.now() + timedelta(days=data.expires_in_days),
-        max_uses=data.max_uses,
-        start_period=data.start_period,
+    household = repo.get_household(session, actor.household_id, for_update=True)
+    if household is None:
+        raise NotFound("Household not found")
+    if not _invite_valid(household):
+        household.invite_code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+        household.invite_expires_at = clock.now() + INVITE_VALID_FOR
+        session.commit()
+    return _invitation_read(household, base_url)
+
+
+def revoke_invitation(session: Session, actor: HouseholdActor) -> None:
+    """Invalidate the current code; the next invitation gets a new one."""
+    require_admin(actor)
+    household = repo.get_household(session, actor.household_id, for_update=True)
+    if household is None:
+        raise NotFound("Household not found")
+    household.invite_code = None
+    household.invite_expires_at = None
+    session.commit()
+
+
+def _household_for_code(session: Session, code: str, *, for_update: bool = False) -> Household:
+    household = repo.get_household_by_invite_code(
+        session, code.strip().upper(), for_update=for_update
     )
-    session.add(inv)
-    session.commit()
-    return _invitation_read(inv, base_url)
-
-
-def revoke_invitation(session: Session, actor: HouseholdActor, invitation_id: UUID) -> None:
-    require_admin(actor)
-    inv = session.scalars(
-        select(Invitation).where(
-            Invitation.household_id == actor.household_id, Invitation.id == invitation_id
-        )
-    ).first()
-    if inv is None:
+    if household is None:
         raise NotFound("Invitation not found")
-    if inv.revoked_at is None:
-        inv.revoked_at = clock.now()
-    session.commit()
-
-
-def _usable_invitation(session: Session, code: str, *, for_update: bool = False) -> Invitation:
-    stmt = select(Invitation).where(Invitation.code == code.strip().upper())
-    if for_update:
-        stmt = stmt.with_for_update()
-    inv = session.scalars(stmt).first()
-    if inv is None or repo.get_household(session, inv.household_id) is None:
-        raise NotFound("Invitation not found")
-    if inv.revoked_at is not None or inv.expires_at <= clock.now():
-        raise AppError("Invitation expired or revoked", code="invitation_expired", status=410)
-    if inv.uses >= inv.max_uses:
-        raise Conflict("Invitation has no uses left", code="invitation_exhausted")
-    return inv
+    if not _invite_valid(household):
+        raise AppError("Invitation expired", code="invitation_expired", status=410)
+    return household
 
 
 def preview_invitation(session: Session, actor: Actor, code: str) -> InvitationPreview:
-    inv = _usable_invitation(session, code)
-    household = repo.get_household(session, inv.household_id)
-    assert household is not None
-    inviter = session.get(User, inv.created_by)
+    household = _household_for_code(session, code)
     count = session.scalar(
         select(func.count())
         .select_from(HouseholdMember)
-        .where(HouseholdMember.household_id == inv.household_id, HouseholdMember.status != "left")
+        .where(HouseholdMember.household_id == household.id, HouseholdMember.status != "left")
     )
+    assert household.invite_expires_at is not None
     return InvitationPreview(
         household_name=household.name,
-        inviter=inviter.display_name if inviter else None,
         member_count=int(count or 0),
-        expires_at=inv.expires_at,
+        expires_at=household.invite_expires_at,
     )
 
 
-def accept_invitation(
-    session: Session, actor: Actor, code: str, data: InvitationAccept
-) -> HouseholdRead:
+def accept_invitation(session: Session, actor: Actor, code: str) -> HouseholdRead:
     from split_ranch.use_cases.rules import reresolve_open_expenses
 
-    inv = _usable_invitation(session, code, for_update=True)
-    household = repo.get_household(session, inv.household_id)
-    assert household is not None
+    household = _household_for_code(session, code, for_update=True)
     existing = repo.get_membership(session, household.id, actor.user_id)
     if existing is not None and existing.status != "left":
         raise Conflict(
@@ -284,13 +256,12 @@ def accept_invitation(
             extra={"household_id": str(household.id), "member_id": str(existing.id)},
         )
 
-    start = data.start_period or inv.start_period or "current"
     latest = erepo.get_latest_period(session, household.id, for_update=True)
     latest_seq = latest.seq if latest else 0
-    # With no open period, "current" also means the next one: a closed period's balance
-    # must not change because someone joined.
+    # Joining takes part in the open period. With no open period the member joins the next
+    # one: a closed period's balance must not change because someone joined.
     open_now = latest is not None and latest.status == "open"
-    joined = latest_seq if start == "current" and open_now else latest_seq + 1
+    joined = latest_seq if open_now else latest_seq + 1
 
     max_sort = session.scalar(
         select(func.max(HouseholdMember.sort_key)).where(
@@ -315,7 +286,6 @@ def accept_invitation(
             joined_period_seq=joined,
         )
         session.add(member)
-    inv.uses += 1
     session.flush()
     audit(
         session,
@@ -324,9 +294,9 @@ def accept_invitation(
         entity_id=member.id,
         actor_user_id=actor.user_id,
         action="join",
-        diff={"invitation_id": str(inv.id), "start_period": start},
+        diff={"joined_period_seq": joined},
     )
-    if start == "current" and open_now:
+    if open_now:
         # Whole-period membership: "all members" expenses of the open period include them now.
         reresolve_open_expenses(
             session,

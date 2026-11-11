@@ -1,19 +1,18 @@
 # Split Ranch API
 
-FastAPI service + Procrastinate worker (one package, `split_ranch`, two processes).
+FastAPI service (one package, `split_ranch`, one process; no background worker).
 Spec: `docs/01-architecture.md`, `docs/02-data-model.md`, `docs/03-business-rules.md`, `docs/04-api.md`.
 
 ```
 src/split_ranch/
 ├── domain/        pure money/split/settle (mirrors packages/domain, checked by packages/domain-vectors)
 ├── schemas/       strict Pydantic v2 models (extra=forbid, discriminated union on split_type)
-├── use_cases/     one function per business action (authz, transactions, revisions, jobs)
+├── use_cases/     one function per business action (authz, transactions, history)
 ├── repositories/  SQLAlchemy queries, always scoped by household_id
-├── models/        SQLAlchemy 2.0 ORM, schema "app"
+├── models/        SQLAlchemy 2.0 ORM, schema "app" (9 tables)
 ├── api/           thin routers + dependencies (JWT -> Actor, membership -> HouseholdActor)
-├── jobs/          Procrastinate app, tasks and transactional enqueue
 └── core/          settings, db, Supabase JWT verification, logging, errors, clock, uuid7
-migrations/        Alembic (owns only the `app` schema; Procrastinate schema frozen in migrations/sql)
+migrations/        Alembic (owns only the `app` schema)
 tests/             parity/ unit/ integration/ (tenant isolation lives in integration/)
 ```
 
@@ -33,11 +32,10 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | Variable | Used by | Notes |
 |---|---|---|
 | `DATABASE_URL` | API | `postgresql+psycopg://…` — Supabase transaction pooler in the cloud (prepared statements are disabled) |
-| `DATABASE_URL_SESSION` | worker, migrations | session pooler (LISTEN/NOTIFY; IPv4 on Supabase Free). Falls back to `DATABASE_URL` |
-| `RUN_WORKER_IN_API` | API | `true` runs the Procrastinate worker inside the API process (prod on Render Free, which has no background workers). Default `false` |
+| `DATABASE_URL_SESSION` | migrations | session pooler (IPv4 on Supabase Free). Falls back to `DATABASE_URL` |
 | `SUPABASE_URL` | API | JWKS is fetched from `$SUPABASE_URL/auth/v1/.well-known/jwks.json` (cached 10 min) |
 | `SUPABASE_JWT_ISSUER` | API | expected `iss`; defaults to `$SUPABASE_URL/auth/v1` |
-| `SUPABASE_SECRET_KEY` | worker | account deletion only (not implemented yet) |
+| `SUPABASE_SECRET_KEY` | API | account deletion only (not implemented yet) |
 | `SENTRY_DSN` | API | Sentry is initialised only when set (`send_default_pii=False`) |
 | `APP_ENV` | all | `dev` / `test` / `staging` / `prod` (`/v1/docs` is disabled in prod) |
 | `TEST_DATABASE_URL` | tests | optional, see below |
@@ -57,20 +55,20 @@ uv run alembic check                 # no pending autogenerate diff
   deferred share-sum constraint triggers, append-only triggers and **RLS enabled with no policies**.
   If a `split_api` role exists, grants are applied; creating that role (it needs a password) is an
   infra task.
-* `0002` applies Procrastinate's schema (frozen copy of procrastinate 3.10.0's `schema.sql`) inside
-  `app`. Upgrading Procrastinate needs a new migration applying the library's migration files; the
-  dependency is pinned to `>=3.10,<3.11` for that reason.
+* `0002` applied a job-queue schema (SQL in `migrations/sql`) that `0005` removed; `0003` made
+  periods manual; `0004` dropped server-side Quick splits and payment links.
+* `0005` simplifies the schema to 9 tables: split rules as JSON, one `history` table, no settlement
+  snapshots, one invite code per household, no idempotency/Sheets/push tables and no job queue
+  (see `docs/02-data-model.md`). It migrates existing data both ways.
+
+Migrations run against the database in `DATABASE_URL_SESSION`; in development that is the cloud
+Supabase project, so run them deliberately.
 
 ## Run
 
 ```sh
 uv run uvicorn split_ranch.main:app --reload --port 8000          # API, routes under /v1
-uv run procrastinate --app=split_ranch.jobs.app.app worker         # worker (job queue + hourly idempotency purge)
 ```
-
-In production there is a single process. With `RUN_WORKER_IN_API=true`, the FastAPI lifespan starts the
-worker as an asyncio task and stops it gracefully on shutdown. `retry_stalled_jobs` (every 10 min)
-requeues jobs that a killed instance left in `doing`.
 
 `/healthz` and `/readyz` are served both at the root (platform probes) and under `/v1`.
 OpenAPI: `/v1/openapi.json` (Swagger UI at `/v1/docs` outside prod).
@@ -99,5 +97,5 @@ share-sum violations still fail the test. Parity tests read `../../packages/doma
 
 ## Not implemented yet
 
-Google Sheets sync and push notifications (jobs are enqueued transactionally and the worker tasks
-log "not implemented"), `DELETE /me` (account deletion), rate limiting, recurring expenses.
+Google Sheets sync and push notifications (no tables and no background jobs yet: each will add what
+it needs), `DELETE /me` (account deletion), rate limiting, recurring expenses.

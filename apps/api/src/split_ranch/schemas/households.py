@@ -1,4 +1,4 @@
-"""Users, households, members, invitations and categories."""
+"""Users, households, members, invitation code and categories."""
 
 from datetime import datetime
 from typing import Literal
@@ -8,7 +8,6 @@ from pydantic import Field
 from split_ranch.schemas.common import Id, ReadModel, StrictModel
 
 Role = Literal["admin", "member"]
-StartPeriod = Literal["current", "next"]
 
 
 # ------------------------------------------------------------------ users
@@ -39,11 +38,6 @@ class MeUpdate(StrictModel):
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
 
 
-class PushTokenIn(StrictModel):
-    expo_token: str = Field(min_length=10, max_length=255)
-    platform: Literal["android", "ios"]
-
-
 # ------------------------------------------------------------- households
 
 
@@ -72,8 +66,6 @@ class HouseholdRead(ReadModel):
     id: Id
     name: str
     timezone: str
-    currency: str
-    version: int
     created_at: datetime
     members: list[MemberRead]
     my_member_id: Id
@@ -87,31 +79,18 @@ class MemberRoleUpdate(StrictModel):
 # ------------------------------------------------------------ invitations
 
 
-class InvitationCreate(StrictModel):
-    expires_in_days: int = Field(default=7, ge=1, le=30)
-    max_uses: int = Field(default=5, ge=1, le=50)
-    start_period: StartPeriod | None = None
-
-
 class InvitationRead(ReadModel):
-    id: Id
+    """The household's join code (one per household, valid 7 days)."""
+
     code: str
     url: str
     expires_at: datetime
-    max_uses: int
-    uses: int
-    start_period: str | None
 
 
 class InvitationPreview(ReadModel):
     household_name: str
-    inviter: str | None
     member_count: int
     expires_at: datetime
-
-
-class InvitationAccept(StrictModel):
-    start_period: StartPeriod | None = None
 
 
 # ------------------------------------------------------------- categories

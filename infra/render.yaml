@@ -1,11 +1,10 @@
-# Render Blueprint — one Free web service (Frankfurt) running FastAPI + the Procrastinate worker
-# in the same process (RUN_WORKER_IN_API). Render has no free background workers, and the
-# pre-deploy command needs a paid plan, so migrations run at the end of the build.
+# Render Blueprint — one Free web service (Frankfurt) running the FastAPI API. There is no
+# background worker: nothing runs outside a request. The pre-deploy command needs a paid plan,
+# so migrations run at the end of the build.
 # The database is Supabase Postgres (not managed here). Env vars come from the env group
 # (see infra/README.md).
 #
-# Free instances spin down after 15 min without traffic and take ~1 min to wake up; queued jobs
-# run when the next request wakes the instance.
+# Free instances spin down after 15 min without traffic and take ~1 min to wake up.
 services:
   - type: web
     name: split-ranch-api
@@ -22,6 +21,4 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.12"
-      - key: RUN_WORKER_IN_API
-        value: "true"
       - fromGroup: split-ranch-prod

@@ -6,7 +6,7 @@ Monorepo, pnpm workspaces for JS/TS and **uv** for Python. No Turborepo/Nx at fi
 split-ranch/
 ├── apps/
 │   ├── mobile/                 # Expo app (see 05-mobile-app)
-│   └── api/                    # FastAPI + worker
+│   └── api/                    # FastAPI API
 │       ├── pyproject.toml      # uv-managed; package "split_ranch"
 │       ├── src/split_ranch/    # domain/ schemas/ use_cases/ repositories/ models/ api/ jobs/ integrations/ core/
 │       ├── migrations/         # Alembic
@@ -19,7 +19,7 @@ split-ranch/
 ├── supabase/
 │   └── config.toml             # Supabase CLI local stack: auth providers, JWT settings, exposed schemas
 ├── infra/
-│   ├── render.yaml             # Render blueprint: one Free web service (API + in-process worker); DB lives in Supabase
+│   ├── render.yaml             # Render blueprint: one Free web service (API); DB lives in Supabase
 │   └── README.md               # free-tier setup checklist, limits, secrets rotation, restore drill, Google Sheets setup
 ├── docs/                       # these documents
 ├── .github/workflows/
@@ -55,7 +55,6 @@ Root scripts (`package.json`):
 | `pnpm db:up` / `db:down` | `supabase start` / `supabase stop` |
 | `pnpm db:reset` | `supabase db reset` (empty DB) then `alembic upgrade head` + seed |
 | `pnpm api:dev` | `cd apps/api && uv run uvicorn split_ranch.main:app --reload` |
-| `pnpm worker:dev` | `cd apps/api && uv run procrastinate --app=split_ranch.jobs.app.app worker` |
 | `pnpm api:migrate` | `alembic upgrade head` |
 | `pnpm api:seed` | demo data |
 | `pnpm mobile:dev` | `expo start --dev-client` (dev build installed on device/emulator) |
@@ -71,12 +70,11 @@ Physical device → local API: use `adb reverse tcp:8000 tcp:8000`.
 ```
 # API (transaction pooler in cloud; local stack uses the direct port)
 DATABASE_URL=postgresql+psycopg://split_api:split_api@localhost:54322/postgres
-# worker + migrations (session pooler in cloud, IPv4: needs LISTEN/NOTIFY)
+# migrations (session pooler in cloud, IPv4)
 DATABASE_URL_SESSION=postgresql+psycopg://split_api:split_api@localhost:54322/postgres
-RUN_WORKER_IN_API=false         # true in prod (Render Free has no background workers)
 SUPABASE_URL=http://localhost:54321
 SUPABASE_JWT_ISSUER=http://localhost:54321/auth/v1
-SUPABASE_SECRET_KEY=            # worker only (account deletion)
+SUPABASE_SECRET_KEY=            # server only (future account deletion)
 GOOGLE_SERVICE_ACCOUNT_JSON_B64=
 GOOGLE_SHEETS_SPREADSHEET_ID=   # user-owned spreadsheet shared with the service account
 SENTRY_DSN=

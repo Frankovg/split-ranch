@@ -11,8 +11,7 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 - [ ] OAuth consent screen: External, app name, scopes `openid email profile`. Leave it in **Testing** mode and add both of your Google accounts as test users. That avoids Google's app verification, and these basic scopes do not need it anyway.
 - [ ] OAuth client **Web**: its client ID and secret go to Supabase's Google provider and to `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
 - [ ] OAuth client **Android** per signing key: package `com.splitranch.app` plus the SHA-1 of each EAS keystore you use (`eas credentials`).
-- [ ] Enable the Sheets API; create service account `sheets-writer`; download its JSON key, base64-encode it and store it as `GOOGLE_SERVICE_ACCOUNT_JSON_B64` (Render secret).
-- [ ] Google Sheets (no Workspace): in **your own** Google Drive, create the spreadsheet `Split Ranch — <Household>`. Share it with the service account's email as **Editor** and with your partner as Viewer. Put its ID (from the URL) in `GOOGLE_SHEETS_SPREADSHEET_ID`. Service accounts have no Drive quota of their own, but they can edit a file you own (see docs/06).
+- Google Sheets export is not built yet: no service account or spreadsheet is needed until it is (see docs/06).
 
 ## 2. Supabase (Free plan; one project `split-ranch-prod`, region Frankfurt `eu-central-1`)
 - [ ] Auth → Providers: **Google only** (client ID = Web client ID; also add the Android client ID to "Authorized Client IDs"); email, phone and anonymous sign-ins **off**; nonce check on.
@@ -26,8 +25,8 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 - [ ] Verify: with the publishable key, `GET {SUPABASE_URL}/rest/v1/expenses` must fail (schema not exposed).
 
 ## 3. Render (Free web service, region Frankfurt)
-- [ ] New Blueprint from `infra/render.yaml`. It defines **one** web service. The API and the Procrastinate worker share that process (`RUN_WORKER_IN_API=true`), because Render has no free background workers. Migrations run at the end of the build, because the pre-deploy command is paid-only.
-- [ ] Env group `split-ranch-prod`: `DATABASE_URL`, `DATABASE_URL_SESSION`, `SUPABASE_URL`, `SUPABASE_JWT_ISSUER` (`https://<ref>.supabase.co/auth/v1`), `SUPABASE_SECRET_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON_B64`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `SENTRY_DSN`, `APP_ENV=prod`.
+- [ ] New Blueprint from `infra/render.yaml`. It defines **one** web service running the API (there is no background worker). Migrations run at the end of the build, because the pre-deploy command is paid-only.
+- [ ] Env group `split-ranch-prod`: `DATABASE_URL`, `DATABASE_URL_SESSION`, `SUPABASE_URL`, `SUPABASE_JWT_ISSUER` (`https://<ref>.supabase.co/auth/v1`), `SUPABASE_SECRET_KEY`, `SENTRY_DSN`, `APP_ENV=prod`.
 - [ ] Deploys: automatic from `main` once CI passes (`autoDeployTrigger: checksPass`).
 
 ## 4. Expo / EAS (free tier)
@@ -50,11 +49,10 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 | Supabase | 500 MB DB, 50k MAU, 5 GB egress, **2 free projects** | Years of a household's expenses fit in a few MB |
 | Supabase | **Pauses after ~7 days of low activity** | Regular use of the app keeps it active; the weekly backup is a safety net, not a guarantee. If it pauses anyway, resume it in the dashboard (data kept, restorable up to 1 year) |
 | Supabase | No backups, no PITR | Covered by §6 |
-| Render | Spins down after 15 min idle; **~1 min cold start** | The first request after a quiet spell is slow. Queued jobs (Sheets sync) run once the instance is awake |
+| Render | Spins down after 15 min idle; **~1 min cold start** | The first request after a quiet spell is slow |
 | Render | 750 instance hours/month per workspace | One service is at most ~744 h, so it fits even if it never sleeps |
-| Render | No free workers, no pre-deploy command | Worker runs in the API process; migrations run in the build |
+| Render | No free workers, no pre-deploy command | The app needs no worker; migrations run in the build |
 | GitHub Actions | Private repo: 2,000 min/month, 500 MB artifacts | Backup job ≈ 1–2 min/day, small artifacts |
-| Google Sheets API | 60 writes/min per service account | We sync only closed periods, so a few requests per month |
 
 ## Runbooks
 - **Secret rotation**: rotate in the provider, update the Render env group / EAS env / GitHub secret, redeploy. For Supabase JWT keys use "rotate": the old key stays valid in JWKS until revoked, so the API keeps accepting live sessions.

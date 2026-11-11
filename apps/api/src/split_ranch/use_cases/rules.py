@@ -2,32 +2,30 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from split_ranch.core import clock
 from split_ranch.core.actor import HouseholdActor
 from split_ranch.core.errors import Conflict, NotFound, Unprocessable
 from split_ranch.domain import BASIS_POINTS_TOTAL
-from split_ranch.models import Category, SplitRule, SplitRuleShare
+from split_ranch.models import Category, Household
 from split_ranch.repositories import households as hrepo
 from split_ranch.schemas.households import CategoryCreate, CategoryRead, CategoryUpdate
 from split_ranch.schemas.split import (
-    EqualSplit,
-    ExactSplit,
+    CategoryRuleRead,
     PercentagesSplit,
-    PersonalSplit,
-    RuleShareRead,
-    SingleSplit,
-    SplitRuleRead,
     SplitRulesRead,
     SplitSpec,
-    WeightsSplit,
+    spec_from_json,
+    spec_to_json,
 )
 from split_ranch.use_cases.common import audit, require_admin
 from split_ranch.use_cases.expenses import reresolve_open_expenses
+from split_ranch.use_cases.split_resolution import spec_member_ids
 
 __all__ = [
     "archive_category",
@@ -145,124 +143,71 @@ def archive_category(session: Session, actor: HouseholdActor, category_id: UUID)
 
 
 # ------------------------------------------------------------------ rules
-
-
-def _rule_read(session: Session, household_id: UUID, rule: SplitRule) -> SplitRuleRead:
-    return SplitRuleRead(
-        id=rule.id,
-        scope=rule.scope,
-        category_id=rule.category_id,
-        split_type=rule.split_type,
-        version=rule.version,
-        shares=[
-            RuleShareRead(
-                member_id=s.member_id,
-                weight=s.weight,
-                basis_points=s.basis_points,
-                amount_cents=s.amount_cents,
-            )
-            for s in hrepo.rule_shares(session, household_id, rule.id)
-        ],
-    )
+#
+# A rule is the `SplitSpec` JSON stored on the household (default) or on a category.
 
 
 def list_rules(session: Session, actor: HouseholdActor) -> SplitRulesRead:
-    rules = hrepo.list_rules(session, actor.household_id)
-    default = next((r for r in rules if r.scope == "household_default"), None)
+    household = _household(session, actor)
     return SplitRulesRead(
-        default=_rule_read(session, actor.household_id, default) if default else None,
+        default=spec_from_json(household.split_rule),
         categories=[
-            _rule_read(session, actor.household_id, r) for r in rules if r.scope == "category"
+            CategoryRuleRead(category_id=c.id, split=spec_from_json(c.split_rule))
+            for c in hrepo.list_categories(session, actor.household_id, include_archived=True)
+            if c.split_rule is not None
         ],
     )
 
 
-def _rows(spec: SplitSpec) -> list[SplitRuleShare]:
-    if isinstance(spec, PersonalSplit):
-        return []
-    if isinstance(spec, EqualSplit):
-        return [SplitRuleShare(member_id=s.member_id) for s in spec.shares or []]
-    if isinstance(spec, WeightsSplit):
-        return [SplitRuleShare(member_id=s.member_id, weight=s.weight) for s in spec.shares]
-    if isinstance(spec, PercentagesSplit):
-        if sum(s.basis_points for s in spec.shares) != BASIS_POINTS_TOTAL:
-            raise Unprocessable(
-                f"basis points must sum to {BASIS_POINTS_TOTAL}", code="split_mismatch"
-            )
-        return [
-            SplitRuleShare(member_id=s.member_id, basis_points=s.basis_points) for s in spec.shares
-        ]
-    if isinstance(spec, ExactSplit):
-        return [
-            SplitRuleShare(member_id=s.member_id, amount_cents=s.amount_cents) for s in spec.shares
-        ]
-    assert isinstance(spec, SingleSplit)
-    return [SplitRuleShare(member_id=spec.shares[0].member_id)]
+def _household(session: Session, actor: HouseholdActor, *, for_update: bool = False) -> Household:
+    household = hrepo.get_household(session, actor.household_id, for_update=for_update)
+    if household is None:
+        raise NotFound("Household not found")
+    return household
 
 
-def _upsert_rule(
-    session: Session,
-    actor: HouseholdActor,
-    scope: str,
-    spec: SplitSpec,
-    category_id: UUID | None = None,
-) -> SplitRule:
-    rows = _rows(spec)
+def _validated_rule(session: Session, actor: HouseholdActor, spec: SplitSpec) -> dict[str, Any]:
+    """Check the members and percentages of a rule and return its JSON to store."""
+    if isinstance(spec, PercentagesSplit) and (
+        sum(s.basis_points for s in spec.shares) != BASIS_POINTS_TOTAL
+    ):
+        raise Unprocessable(f"basis points must sum to {BASIS_POINTS_TOTAL}", code="split_mismatch")
     members = {m.id: m for m in hrepo.list_members(session, actor.household_id)}
-    for row in rows:
-        member = members.get(row.member_id)
+    for member_id in spec_member_ids(spec):
+        member = members.get(member_id)
         if member is None or member.status == "left":
             raise Unprocessable(
-                f"Member {row.member_id} is not in this household", code="invalid_split"
+                f"Member {member_id} is not in this household", code="invalid_split"
             )
-    rule = hrepo.get_rule(session, actor.household_id, scope, category_id, for_update=True)
-    before = None
-    if rule is None:
-        rule = SplitRule(
-            household_id=actor.household_id,
-            scope=scope,
-            category_id=category_id,
-            split_type=spec.split_type,
-            updated_by=actor.user_id,
-        )
-        session.add(rule)
-        session.flush()
-    else:
-        before = _rule_read(session, actor.household_id, rule).model_dump(mode="json")
-        session.execute(
-            delete(SplitRuleShare).where(
-                SplitRuleShare.household_id == actor.household_id,
-                SplitRuleShare.split_rule_id == rule.id,
-            )
-        )
-        rule.split_type = spec.split_type
-        rule.version += 1
-        rule.updated_by = actor.user_id
-    order = list(members)
-    for row in sorted(rows, key=lambda r: order.index(r.member_id)):
-        row.split_rule_id = rule.id
-        row.household_id = actor.household_id
-        row.sort_key = order.index(row.member_id)
-        session.add(row)
-    session.flush()
+    return spec_to_json(spec)
+
+
+def _record_rule_change(
+    session: Session,
+    actor: HouseholdActor,
+    entity_id: UUID,
+    action: str,
+    before: dict[str, Any] | None,
+    after: dict[str, Any] | None,
+) -> None:
     audit(
         session,
         household_id=actor.household_id,
         entity="split_rule",
-        entity_id=rule.id,
+        entity_id=entity_id,
         actor_user_id=actor.user_id,
-        action="set",
-        diff={
-            "before": before,
-            "after": _rule_read(session, actor.household_id, rule).model_dump(mode="json"),
-        },
+        action=action,
+        diff={"before": before, "after": after},
     )
-    return rule
 
 
-def set_default_rule(session: Session, actor: HouseholdActor, spec: SplitSpec) -> SplitRuleRead:
+def set_default_rule(session: Session, actor: HouseholdActor, spec: SplitSpec) -> SplitSpec:
     require_admin(actor)
-    rule = _upsert_rule(session, actor, "household_default", spec)
+    household = _household(session, actor, for_update=True)
+    rule = _validated_rule(session, actor, spec)
+    _record_rule_change(session, actor, household.id, "set", household.split_rule, rule)
+    household.split_rule = rule
+    session.flush()
     reresolve_open_expenses(
         session,
         actor.household_id,
@@ -271,17 +216,20 @@ def set_default_rule(session: Session, actor: HouseholdActor, spec: SplitSpec) -
         split_origin="household_default",
     )
     session.commit()
-    return _rule_read(session, actor.household_id, rule)
+    return spec_from_json(rule)
 
 
 def set_category_rule(
     session: Session, actor: HouseholdActor, category_id: UUID, spec: SplitSpec
-) -> SplitRuleRead:
+) -> CategoryRuleRead:
     require_admin(actor)
     category = _category(session, actor, category_id)
     if category.archived_at is not None:
         raise Conflict("Category is archived", code="category_archived")
-    rule = _upsert_rule(session, actor, "category", spec, category_id)
+    rule = _validated_rule(session, actor, spec)
+    _record_rule_change(session, actor, category.id, "set", category.split_rule, rule)
+    category.split_rule = rule
+    session.flush()
     # Open-period expenses of this category that follow a rule pick up the new one.
     for origin in ("category", "household_default"):
         reresolve_open_expenses(
@@ -293,25 +241,16 @@ def set_category_rule(
             category_id=category_id,
         )
     session.commit()
-    return _rule_read(session, actor.household_id, rule)
+    return CategoryRuleRead(category_id=category.id, split=spec_from_json(rule))
 
 
 def delete_category_rule(session: Session, actor: HouseholdActor, category_id: UUID) -> None:
     require_admin(actor)
-    _category(session, actor, category_id)
-    rule = hrepo.get_rule(session, actor.household_id, "category", category_id, for_update=True)
-    if rule is None:
+    category = _category(session, actor, category_id)
+    if category.split_rule is None:
         return
-    audit(
-        session,
-        household_id=actor.household_id,
-        entity="split_rule",
-        entity_id=rule.id,
-        actor_user_id=actor.user_id,
-        action="delete",
-        diff={"before": _rule_read(session, actor.household_id, rule).model_dump(mode="json")},
-    )
-    session.delete(rule)
+    _record_rule_change(session, actor, category.id, "delete", category.split_rule, None)
+    category.split_rule = None
     session.flush()
     reresolve_open_expenses(
         session,

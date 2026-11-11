@@ -13,7 +13,7 @@ Goal: a chat (text and voice) that records expenses for the user â€” "Ayer paguÃ
 | Identity from JWT only | The model can never choose `user_id`/`household_id`; the tool runtime injects the `Actor` |
 | `POST /expenses/preview` | Lets the assistant show the resolved split before saving |
 | Revisions table | Every AI-originated change is auditable and reversible |
-| Idempotency keys | Safe retries when the model repeats a tool call |
+| Client-generated ids | Safe retries when the model repeats a tool call (creating the same expense id twice returns the stored one) |
 
 ## Flow
 

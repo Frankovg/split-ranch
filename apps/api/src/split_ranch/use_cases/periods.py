@@ -1,10 +1,8 @@
-"""Periods, live balance, close/reopen, snapshots and transfer state machine."""
+"""Periods, live balance, close/reopen, settlement and transfer state machine."""
 
 from __future__ import annotations
 
-import hashlib
-from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 import structlog
@@ -15,14 +13,7 @@ from split_ranch.core import clock
 from split_ranch.core.actor import HouseholdActor
 from split_ranch.core.errors import Conflict, Forbidden, NotFound, Unprocessable
 from split_ranch.domain import Balance, LedgerExpense, NetEntry, Share, compute_balances, settle
-from split_ranch.jobs.queue import enqueue
-from split_ranch.models import (
-    Household,
-    HouseholdMember,
-    Period,
-    SettlementSnapshot,
-    SettlementTransfer,
-)
+from split_ranch.models import Household, HouseholdMember, Period, SettlementTransfer
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as hrepo
 from split_ranch.schemas.expenses import (
@@ -31,7 +22,6 @@ from split_ranch.schemas.expenses import (
     PeriodRead,
     ReopenIn,
     SettlementRead,
-    SnapshotRead,
     TransferConfirmIn,
     TransferDisputeIn,
     TransferRead,
@@ -79,9 +69,8 @@ def _member_order(session: Session, household_id: UUID, seq: int) -> list[str]:
     return [str(m.id) for m in hrepo.period_members(session, household_id, seq)]
 
 
-def compute_period_ledger(
-    session: Session, household_id: UUID, period: Period
-) -> tuple[list[Balance], str]:
+def compute_period_ledger(session: Session, household_id: UUID, period: Period) -> list[Balance]:
+    """Balances of a period, always recomputed from its live expenses."""
     expenses = erepo.ledger_expenses(session, household_id, period.id)
     shares = erepo.shares_for(session, household_id, [e.id for e in expenses])
     ledger = [
@@ -93,34 +82,16 @@ def compute_period_ledger(
         )
         for e in expenses
     ]
-    balances = compute_balances(_member_order(session, household_id, period.seq), ledger)
-    digest = hashlib.sha256(
-        "|".join(sorted(f"{e.id}:{e.version}" for e in expenses)).encode()
-    ).hexdigest()
-    return balances, digest
+    return compute_balances(_member_order(session, household_id, period.seq), ledger)
 
 
-def _balances_json(balances: Sequence[Balance]) -> list[dict[str, Any]]:
-    return [
-        {"member_id": b.id, "paid": b.paid_cents, "owed": b.owed_cents, "net": b.net_cents}
-        for b in balances
-    ]
-
-
-def _supersede_current(session: Session, household_id: UUID, period: Period) -> int:
-    """Supersede the current snapshot and cancel its pending transfers. Returns its seq."""
-    current = erepo.current_snapshot(session, household_id, period.id)
-    if current is None:
-        latest = erepo.snapshots(session, household_id, period.id)
-        return latest[-1].seq if latest else 0
-    for t in erepo.snapshot_transfers(session, household_id, current.id, for_update=True):
+def _cancel_pending_transfers(session: Session, household_id: UUID, period: Period) -> None:
+    """Cancel the period's live transfers before recomputing (or reopening) it."""
+    for t in erepo.live_transfers(session, household_id, period.id, for_update=True):
         if t.status in ("sent", "confirmed", "disputed"):
             raise Conflict("Period is locked by a paid transfer", code="period_locked")
-        if t.status == "pending":
-            t.status = "cancelled"
-            t.version += 1
-    current.superseded_at = clock.now()
-    return current.seq
+        t.status = "cancelled"
+        t.version += 1
 
 
 def _mark_settled(session: Session, household_id: UUID, period: Period) -> None:
@@ -148,33 +119,19 @@ def _mark_settled(session: Session, household_id: UUID, period: Period) -> None:
             m.status = "left"
 
 
-def write_snapshot(
-    session: Session, household: Household, period: Period, trigger: str
-) -> SettlementSnapshot:
-    """Compute balances + greedy transfers and store them as a new current snapshot."""
-    seq = _supersede_current(session, household.id, period) + 1
-    balances, digest = compute_period_ledger(session, household.id, period)
+def settle_period(session: Session, household: Household, period: Period) -> None:
+    """(Re)compute the period's minimal transfers from its balances.
+
+    Previous pending transfers are cancelled first; a period with nothing to pay is settled.
+    """
+    _cancel_pending_transfers(session, household.id, period)
+    balances = compute_period_ledger(session, household.id, period)
     transfers = settle([NetEntry(b.id, b.net_cents) for b in balances])
-    snapshot = SettlementSnapshot(
-        household_id=household.id,
-        period_id=period.id,
-        seq=seq,
-        trigger=trigger,
-        balances=_balances_json(balances),
-        transfers=[
-            {"from_member_id": t.from_id, "to_member_id": t.to_id, "amount_cents": t.amount_cents}
-            for t in transfers
-        ],
-        input_hash=digest,
-    )
-    session.add(snapshot)
-    session.flush()
     for t in transfers:
         session.add(
             SettlementTransfer(
                 household_id=household.id,
                 period_id=period.id,
-                snapshot_id=snapshot.id,
                 from_member_id=UUID(t.from_id),
                 to_member_id=UUID(t.to_id),
                 amount_cents=t.amount_cents,
@@ -188,37 +145,22 @@ def write_snapshot(
     else:
         _mark_settled(session, household.id, period)
     session.flush()
-    enqueue(
-        session,
-        "sync_period_tab",
-        {"household_id": str(household.id), "period_id": str(period.id)},
-        queue="sheets",
-        queueing_lock=f"sheets:{period.id}",
-    )
-    return snapshot
 
 
 def _close(
     session: Session, household: Household, period: Period, actor_user_id: UUID | None
 ) -> None:
-    trigger = "reopen_close" if period.reopened_count > 0 else "close"
     period.status = "closed"
     period.closed_at = clock.now()
     period.closed_by = actor_user_id
     period.version += 1
-    write_snapshot(session, household, period, trigger)
-    enqueue(
-        session,
-        "notify_period_closed",
-        {"household_id": str(household.id), "period_id": str(period.id)},
-        queue="push",
-    )
+    settle_period(session, household, period)
 
 
 def after_edit_in_closed_period(session: Session, household: Household, period: Period) -> None:
-    """Edit after close (unlocked): new snapshot, old pending transfers cancelled."""
+    """Edit after close (unlocked): pending transfers are replaced by recomputed ones."""
     period.version += 1
-    write_snapshot(session, household, period, "edit_after_close")
+    settle_period(session, household, period)
 
 
 # ------------------------------------------------------------------ reads
@@ -282,15 +224,10 @@ def get_period(session: Session, actor: HouseholdActor, key: PeriodKey) -> Perio
     return _period_read(session, actor.household_id, load_period(session, actor.household_id, key))
 
 
-def _snapshot_read(s: SettlementSnapshot) -> SnapshotRead:
-    return SnapshotRead.model_validate(s)
-
-
 def get_balance(session: Session, actor: HouseholdActor, key: PeriodKey) -> PeriodBalanceRead:
     household = _household(session, actor.household_id)
     period = load_period(session, household.id, key)
-    balances, digest = compute_period_ledger(session, household.id, period)
-    snapshot = erepo.current_snapshot(session, household.id, period.id)
+    balances = compute_period_ledger(session, household.id, period)
     return PeriodBalanceRead(
         period=_period_read(session, household.id, period),
         balances=[
@@ -302,24 +239,18 @@ def get_balance(session: Session, actor: HouseholdActor, key: PeriodKey) -> Peri
             )
             for b in balances
         ],
-        snapshot=_snapshot_read(snapshot) if snapshot else None,
-        drift=snapshot is not None and snapshot.input_hash != digest,
     )
 
 
 def get_settlement(session: Session, actor: HouseholdActor, key: PeriodKey) -> SettlementRead:
     household = _household(session, actor.household_id)
     period = load_period(session, household.id, key)
-    all_snapshots = erepo.snapshots(session, household.id, period.id)
-    current = next((s for s in reversed(all_snapshots) if s.superseded_at is None), None)
-    transfers = (
-        erepo.snapshot_transfers(session, household.id, current.id) if current is not None else []
-    )
     return SettlementRead(
         period=_period_read(session, household.id, period),
-        snapshot=_snapshot_read(current) if current else None,
-        transfers=[TransferRead.model_validate(t) for t in transfers],
-        previous_snapshots=[_snapshot_read(s) for s in all_snapshots if s is not current],
+        transfers=[
+            TransferRead.model_validate(t)
+            for t in erepo.live_transfers(session, household.id, period.id)
+        ],
     )
 
 
@@ -402,7 +333,7 @@ def reopen_period(
         raise Conflict(
             "Period has sent or confirmed transfers and cannot be reopened", code="period_locked"
         )
-    _supersede_current(session, household.id, period)
+    _cancel_pending_transfers(session, household.id, period)
     period.status = "open"
     period.closed_at = None
     period.closed_by = None
@@ -416,7 +347,8 @@ def reopen_period(
         entity_id=period.id,
         actor_user_id=actor.user_id,
         action="reopen",
-        diff={"reason": data.reason},
+        diff={"seq": period.seq},
+        reason=data.reason,
     )
     session.commit()
     return _period_read(session, household.id, period)
@@ -485,7 +417,7 @@ def confirm_transfer(
     assert period is not None
     remaining = [
         t
-        for t in erepo.snapshot_transfers(session, actor.household_id, transfer.snapshot_id)
+        for t in erepo.live_transfers(session, actor.household_id, transfer.period_id)
         if t.status != "confirmed"
     ]
     if not remaining and period.status == "closed":
@@ -525,6 +457,6 @@ __all__ = [
     "period_state",
     "reopen_period",
     "require_open_period",
+    "settle_period",
     "start_period",
-    "write_snapshot",
 ]

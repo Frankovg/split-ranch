@@ -35,24 +35,14 @@ def make_house(
     client: TestClient,
     make_user: Callable[[str], TestUser],
     names: tuple[str, ...] = ("Juli", "Franco", "Ana"),
-    *,
-    start_period: str = "current",
 ) -> House:
     users = {n: make_user(n) for n in names}
     admin = users[names[0]]
     house = ok(client.post("/v1/households", json={"name": "Casa"}, headers=admin.headers), 201)
     hid = house["id"]
     for n in names[1:]:
-        inv = ok(
-            client.post(f"/v1/households/{hid}/invitations", json={}, headers=admin.headers), 201
-        )
-        ok(
-            client.post(
-                f"/v1/invitations/{inv['code']}/accept",
-                json={"start_period": start_period},
-                headers=users[n].headers,
-            )
-        )
+        inv = ok(client.post(f"/v1/households/{hid}/invitations", headers=admin.headers))
+        ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=users[n].headers))
     house = ok(client.get(f"/v1/households/{hid}", headers=admin.headers))
     by_user = {u.id: n for n, u in users.items()}
     members = {by_user[uuid.UUID(m["user_id"])]: m["id"] for m in house["members"]}

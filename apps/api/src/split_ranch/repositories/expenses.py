@@ -8,14 +8,7 @@ from uuid import UUID
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from split_ranch.models import (
-    Expense,
-    ExpenseRevision,
-    ExpenseShare,
-    Period,
-    SettlementSnapshot,
-    SettlementTransfer,
-)
+from split_ranch.models import Expense, ExpenseShare, History, Period, SettlementTransfer
 
 
 def get_expense(
@@ -52,28 +45,15 @@ def list_expenses(
     session: Session,
     household_id: UUID,
     *,
-    viewer_user_id: UUID,
     limit: int,
     after: tuple[date, UUID] | None = None,
     period_id: UUID | None = None,
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
     q: str | None = None,
-    status: str | None = None,
 ) -> Sequence[Expense]:
-    """Keyset pagination on (expense_date DESC, id DESC). Drafts only for their creator."""
+    """Keyset pagination on (expense_date DESC, id DESC)."""
     stmt = select(Expense).where(Expense.household_id == household_id, Expense.deleted_at.is_(None))
-    if status == "draft":
-        stmt = stmt.where(Expense.status == "draft", Expense.created_by_user_id == viewer_user_id)
-    elif status == "confirmed":
-        stmt = stmt.where(Expense.status == "confirmed")
-    else:
-        stmt = stmt.where(
-            or_(
-                Expense.status == "confirmed",
-                and_(Expense.status == "draft", Expense.created_by_user_id == viewer_user_id),
-            )
-        )
     if period_id is not None:
         stmt = stmt.where(Expense.period_id == period_id)
     if category_id is not None:
@@ -93,14 +73,13 @@ def list_expenses(
 
 
 def ledger_expenses(session: Session, household_id: UUID, period_id: UUID) -> Sequence[Expense]:
-    """Confirmed, non-deleted expenses of a period (personal ones included; filtered later)."""
+    """Non-deleted expenses of a period (personal ones included; filtered later)."""
     return session.scalars(
         select(Expense)
         .where(
             Expense.household_id == household_id,
             Expense.period_id == period_id,
             Expense.deleted_at.is_(None),
-            Expense.status == "confirmed",
         )
         .order_by(Expense.created_at, Expense.id)
     ).all()
@@ -125,13 +104,15 @@ def open_period_expenses(
     return session.scalars(stmt).all()
 
 
-def revisions(session: Session, household_id: UUID, expense_id: UUID) -> Sequence[ExpenseRevision]:
+def revisions(session: Session, household_id: UUID, expense_id: UUID) -> Sequence[History]:
     return session.scalars(
-        select(ExpenseRevision)
+        select(History)
         .where(
-            ExpenseRevision.household_id == household_id, ExpenseRevision.expense_id == expense_id
+            History.household_id == household_id,
+            History.entity == "expense",
+            History.entity_id == expense_id,
         )
-        .order_by(ExpenseRevision.version)
+        .order_by(History.version)
     ).all()
 
 
@@ -189,41 +170,16 @@ def list_periods(
     return session.scalars(stmt.order_by(Period.seq.desc()).limit(limit)).all()
 
 
-def current_snapshot(
-    session: Session, household_id: UUID, period_id: UUID
-) -> SettlementSnapshot | None:
-    return session.scalars(
-        select(SettlementSnapshot)
-        .where(
-            SettlementSnapshot.household_id == household_id,
-            SettlementSnapshot.period_id == period_id,
-            SettlementSnapshot.superseded_at.is_(None),
-        )
-        .order_by(SettlementSnapshot.seq.desc())
-    ).first()
-
-
-def snapshots(
-    session: Session, household_id: UUID, period_id: UUID
-) -> Sequence[SettlementSnapshot]:
-    return session.scalars(
-        select(SettlementSnapshot)
-        .where(
-            SettlementSnapshot.household_id == household_id,
-            SettlementSnapshot.period_id == period_id,
-        )
-        .order_by(SettlementSnapshot.seq)
-    ).all()
-
-
-def snapshot_transfers(
-    session: Session, household_id: UUID, snapshot_id: UUID, *, for_update: bool = False
+def live_transfers(
+    session: Session, household_id: UUID, period_id: UUID, *, for_update: bool = False
 ) -> Sequence[SettlementTransfer]:
+    """The period's current settlement: every transfer that was not cancelled."""
     stmt = (
         select(SettlementTransfer)
         .where(
             SettlementTransfer.household_id == household_id,
-            SettlementTransfer.snapshot_id == snapshot_id,
+            SettlementTransfer.period_id == period_id,
+            SettlementTransfer.status != "cancelled",
         )
         .order_by(SettlementTransfer.created_at, SettlementTransfer.id)
     )
