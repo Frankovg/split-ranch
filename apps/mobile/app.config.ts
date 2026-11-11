@@ -13,7 +13,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.splitranch.app',
     adaptiveIcon: {
-      backgroundColor: '#F6EEE7',
+      backgroundColor: '#AE4728',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
