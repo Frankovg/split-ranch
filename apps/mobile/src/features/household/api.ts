@@ -78,7 +78,7 @@ export function useSettlement(householdId: string | undefined, period: PeriodKey
   });
 }
 
-/** Any period or transfer change can alter balances, snapshots and lists: refresh the household. */
+/** Any period or transfer change can alter balances, transfers and lists: refresh the household. */
 function useInvalidateHousehold(householdId: string) {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: queryKeys.household(householdId) });
@@ -147,12 +147,10 @@ export function useCreateInvitation(householdId: string) {
 export function useCreateExpense(householdId: string) {
   const qc = useQueryClient();
   return useMutation({
+    // The client-generated `input.id` makes the POST idempotent: a retry returns the
+    // stored expense instead of creating a duplicate.
     mutationFn: (input: ExpenseCreateInput) =>
-      apiFetch<Expense>(`/households/${householdId}/expenses`, {
-        ...json(input),
-        // Same id as the body: a retried POST returns the stored expense instead of a duplicate.
-        headers: { 'Idempotency-Key': input.id },
-      }),
+      apiFetch<Expense>(`/households/${householdId}/expenses`, json(input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['household', householdId] }),
   });
 }

@@ -1,4 +1,4 @@
-"""Expense CRUD: idempotency, client ids, ETag/If-Match, drafts, revisions, list."""
+"""Expense CRUD: client ids (idempotency), ETag/If-Match, revisions, list."""
 
 from __future__ import annotations
 
@@ -39,7 +39,8 @@ def test_strict_input(client: TestClient, house: House) -> None:
         {"amount_cents": 10.5},
         {"amount_cents": 0},
         {"amount_cents": 100_000_001},
-        {"currency": "USD"},
+        {"currency": "EUR"},
+        {"status": "draft"},
         {"user_id": str(uuid.uuid4())},
         {"split": {"split_type": "thirds"}},
     ):
@@ -58,37 +59,24 @@ def test_source_restricted_to_manual(client: TestClient, house: House) -> None:
     assert r.status_code == 422
 
 
-def test_idempotency_key(client: TestClient, house: House) -> None:
-    key = str(uuid.uuid4())
-    hdr = house.h("Juli", **{"Idempotency-Key": key})
-    first = client.post(house.url("/expenses"), json=_body(house), headers=hdr)
-    assert first.status_code == 201
-    assert first.headers["ETag"] == '"1"'
-    again = client.post(house.url("/expenses"), json=_body(house), headers=hdr)
-    assert again.status_code == 201
-    assert again.json()["id"] == first.json()["id"]
-    r = client.post(house.url("/expenses"), json=_body(house, amount_cents=2000), headers=hdr)
-    assert r.status_code == 422 and r.json()["code"] == "idempotency_key_reuse"
+def test_client_supplied_id_makes_create_idempotent(client: TestClient, house: House) -> None:
+    eid = str(uuid7())
+    first = client.post(house.url("/expenses"), json=_body(house, id=eid), headers=house.h("Juli"))
+    assert first.status_code == 201 and first.headers["ETag"] == '"1"'
+    assert first.json()["id"] == eid
+    # Same payload replay (double tap, offline retry) -> the stored expense, no duplicate.
+    again = ok(
+        client.post(house.url("/expenses"), json=_body(house, id=eid), headers=house.h("Juli"))
+    )
+    assert again["id"] == eid
     items = ok(client.get(house.url("/expenses"), headers=house.h("Juli")))["items"]
     assert len(items) == 1
-
-
-def test_client_supplied_id(client: TestClient, house: House) -> None:
-    eid = str(uuid7())
-    created = ok(
-        client.post(house.url("/expenses"), json=_body(house, id=eid), headers=house.h("Juli")), 201
-    )
-    assert created["id"] == eid
-    # Same payload replay (offline retry) -> existing returned.
-    assert (
-        ok(client.post(house.url("/expenses"), json=_body(house, id=eid), headers=house.h("Juli")))[
-            "id"
-        ]
-        == eid
-    )
     r = client.post(
         house.url("/expenses"), json=_body(house, id=eid, amount_cents=5), headers=house.h("Juli")
     )
+    assert r.status_code == 409 and r.json()["code"] == "id_conflict"
+    # Another member reusing the id is a conflict too.
+    r = client.post(house.url("/expenses"), json=_body(house, id=eid), headers=house.h("Ana"))
     assert r.status_code == 409 and r.json()["code"] == "id_conflict"
 
 
@@ -168,31 +156,6 @@ def test_delete_soft(client: TestClient, house: House) -> None:
     assert ok(client.get(house.url("/expenses"), headers=house.h("Juli")))["items"] == []
     revs = ok(client.get(f"{url}/revisions", headers=house.h("Juli")))
     assert revs[-1]["action"] == "delete"
-
-
-def test_drafts(client: TestClient, house: House) -> None:
-    d = add_expense(
-        client, house, "Ana", amount=1000, payer="Ana", date="2026-03-03", status="draft"
-    )
-    assert d["status"] == "draft"
-    assert client.get(house.url(f"/expenses/{d['id']}"), headers=house.h("Juli")).status_code == 404
-    assert ok(client.get(house.url("/expenses"), headers=house.h("Juli")))["items"] == []
-    assert (
-        len(ok(client.get(house.url("/expenses?status=draft"), headers=house.h("Ana")))["items"])
-        == 1
-    )
-    bal = ok(client.get(house.url("/periods/1/balance"), headers=house.h("Ana")))
-    assert all(b["net_cents"] == 0 for b in bal["balances"])
-    confirmed = ok(
-        client.post(
-            house.url(f"/expenses/{d['id']}/confirm"), headers=house.h("Ana", **{"If-Match": '"1"'})
-        )
-    )
-    assert confirmed["status"] == "confirmed" and confirmed["version"] == 2
-    r = client.post(
-        house.url(f"/expenses/{d['id']}/confirm"), headers=house.h("Ana", **{"If-Match": '"2"'})
-    )
-    assert r.status_code == 409
 
 
 def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
@@ -290,7 +253,11 @@ def test_new_expense_in_closed_period(client: TestClient, house: House) -> None:
         ),
         201,
     )
+    # The settlement was recomputed: only the new pending transfers are live, and they
+    # cover exactly what the balance says is owed.
     settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
-    assert settlement["snapshot"]["seq"] == 2
+    assert settlement.keys() == {"period", "transfers"}
+    assert all(t["status"] == "pending" for t in settlement["transfers"])
     bal = ok(client.get(house.url("/periods/1/balance"), headers=house.h("Juli")))
-    assert bal["drift"] is False
+    owed = -sum(b["net_cents"] for b in bal["balances"] if b["net_cents"] < 0)
+    assert sum(t["amount_cents"] for t in settlement["transfers"]) == owed

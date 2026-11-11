@@ -75,9 +75,9 @@ export function HomeScreen() {
     });
 
   return (
-    <SafeAreaView edges={['bottom']} className="flex-1 bg-background">
+    <SafeAreaView edges={['bottom']} className='flex-1 bg-background'>
       <ScrollView
-        contentContainerClassName="gap-4 px-4 py-4"
+        contentContainerClassName='gap-4 px-4 py-4'
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -89,45 +89,45 @@ export function HomeScreen() {
             }}
           />
         }>
-        <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-bold" role="heading">
+        <View className='flex-row items-center justify-between'>
+          <Text className='text-2xl font-bold' role='heading'>
             {h.name}
           </Text>
-          <Badge variant="secondary">
+          <Badge variant='secondary'>
             <Text>{t(`home.period_${period.status as 'open' | 'closed' | 'settled'}`)}</Text>
           </Badge>
         </View>
 
         <Card>
           <CardHeader>
-            <Text className="text-muted-foreground">
+            <Text className='text-muted-foreground'>
               {t('home.yourBalance', { seq: period.seq })}
             </Text>
-            <Text className="text-sm text-muted-foreground">
+            <Text className='text-sm text-muted-foreground'>
               {dates.to
                 ? t('period.range', { from: dates.from, to: dates.to })
                 : t('period.since', { from: dates.from })}
             </Text>
           </CardHeader>
-          <CardContent className="gap-1">
+          <CardContent className='gap-1'>
             <MoneyText
               cents={myNet}
-              size="3xl"
+              size='3xl'
               tone={myNet > 0 ? 'positive' : myNet < 0 ? 'negative' : 'default'}
             />
-            <Text className="text-muted-foreground">
+            <Text className='text-muted-foreground'>
               {myNet > 0
                 ? t('money.youAreOwed', { amount: displayMoney(myNet, locale) })
                 : myNet < 0
                   ? t('money.youOwe', { amount: displayMoney(-myNet, locale) })
                   : t('money.settled')}
             </Text>
-            <Text className="text-sm text-muted-foreground">
+            <Text className='text-sm text-muted-foreground'>
               {t('home.totalSpent', { amount: displayMoney(period.total_cents, locale) })}
             </Text>
             <Button
-              variant="outline"
-              className="mt-3"
+              variant='outline'
+              className='mt-3'
               onPress={() =>
                 router.push({ pathname: '/period/[seq]', params: { seq: String(period.seq) } })
               }>
@@ -138,13 +138,13 @@ export function HomeScreen() {
         </Card>
 
         {isOpen ? (
-          <Button size="lg" onPress={() => router.push('/expense/new')}>
+          <Button size='lg' onPress={() => router.push('/expense/new')}>
             <Icon as={Plus} size={20} />
             <Text>{t('expenses.add')}</Text>
           </Button>
         ) : (
-          <View className="gap-2">
-            <Text className="text-center text-sm text-muted-foreground">
+          <View className='gap-2'>
+            <Text className='text-center text-sm text-muted-foreground'>
               {t('period.noOpenPeriod', { seq: period.seq })}
             </Text>
             <StartPeriodButton householdId={h.id} latest={period} />
@@ -152,9 +152,9 @@ export function HomeScreen() {
         )}
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
+          <CardHeader className='flex-row items-center justify-between'>
             <CardTitle>{t('home.members')}</CardTitle>
-            <Button variant="ghost" size="sm" disabled={invite.isPending} onPress={onInvite}>
+            <Button variant='ghost' size='sm' disabled={invite.isPending} onPress={onInvite}>
               <Icon as={UserPlus} size={18} />
               <Text>{t('home.invite')}</Text>
             </Button>
@@ -163,7 +163,7 @@ export function HomeScreen() {
             {activeMembers(h).map((m) => {
               const net = balance.data.balances.find((b) => b.member_id === m.id)?.net_cents ?? 0;
               return (
-                <View key={m.id} className="flex-row items-center justify-between py-2">
+                <View key={m.id} className='flex-row items-center justify-between py-2'>
                   <Text>{memberName(h, m.id, t)}</Text>
                   <MoneyText
                     cents={net}
@@ -177,9 +177,9 @@ export function HomeScreen() {
 
         {recent.length > 0 ? (
           <Card>
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className='flex-row items-center justify-between'>
               <CardTitle>{t('home.recent')}</CardTitle>
-              <Button variant="link" size="sm" onPress={() => router.push('/expenses')}>
+              <Button variant='link' size='sm' onPress={() => router.push('/expenses')}>
                 <Text>{t('home.seeAll')}</Text>
               </Button>
             </CardHeader>
@@ -209,14 +209,14 @@ export function HomeScreen() {
                 <View key={p.id}>
                   {i > 0 ? <Separator /> : null}
                   <Pressable
-                    accessibilityRole="button"
+                    accessibilityRole='button'
                     onPress={() =>
                       router.push({ pathname: '/period/[seq]', params: { seq: String(p.seq) } })
                     }
-                    className="flex-row items-center gap-3 py-3 active:opacity-70">
-                    <View className="flex-1 gap-0.5">
+                    className='flex-row items-center gap-3 py-3 active:opacity-70'>
+                    <View className='flex-1 gap-0.5'>
                       <Text>{t('period.title', { seq: p.seq })}</Text>
-                      <Text className="text-sm text-muted-foreground">
+                      <Text className='text-sm text-muted-foreground'>
                         {(() => {
                           const d = periodDates(p, locale, h.timezone);
                           return d.to
@@ -229,7 +229,7 @@ export function HomeScreen() {
                       <Text>{t(`home.period_${p.status}`)}</Text>
                     </Badge>
                     <MoneyText cents={p.total_cents} />
-                    <Icon as={ChevronRight} size={18} className="text-muted-foreground" />
+                    <Icon as={ChevronRight} size={18} className='text-muted-foreground' />
                   </Pressable>
                 </View>
               ))}

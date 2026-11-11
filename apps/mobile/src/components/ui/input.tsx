@@ -1,8 +1,9 @@
 // Source: react-native-reusables input (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink.
+import { type ComponentProps, type RefAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { Platform, TextInput } from 'react-native';
 
-function Input({ className, ...props }: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
+function Input({ className, ...props }: ComponentProps<typeof TextInput> & RefAttributes<TextInput>) {
   return (
     <TextInput
       className={cn(

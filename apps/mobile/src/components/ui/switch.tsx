@@ -1,4 +1,5 @@
 // Source: react-native-reusables switch (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: hitSlop 16 so the touch target is >= 48dp.
+import { type ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 import * as SwitchPrimitives from '@rn-primitives/switch';
 import { Platform } from 'react-native';
@@ -6,7 +7,7 @@ import { Platform } from 'react-native';
 function Switch({
   className,
   ...props
-}: React.ComponentProps<typeof SwitchPrimitives.Root>) {
+}: ComponentProps<typeof SwitchPrimitives.Root>) {
   return (
     <SwitchPrimitives.Root
       className={cn(

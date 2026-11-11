@@ -36,21 +36,17 @@ export interface Household {
   id: string;
   name: string;
   timezone: string;
-  currency: string;
-  version: number;
   created_at: string;
   members: Member[];
   my_member_id: string;
   my_role: string;
 }
 
+/** The household's join code: one per household, valid 7 days, reusable by anyone invited. */
 export interface Invitation {
-  id: string;
   code: string;
   url: string;
   expires_at: string;
-  max_uses: number;
-  uses: number;
 }
 
 export interface Category {
@@ -78,7 +74,6 @@ export interface Expense {
   description: string;
   expense_date: string;
   split_type: string;
-  status: string;
   shares: Share[];
   created_at: string;
   deleted_at: string | null;
@@ -121,6 +116,7 @@ export interface Transfer {
   confirmed_at: string | null;
 }
 
+/** The period's live transfers (the API leaves cancelled ones out). */
 export interface Settlement {
   period: Period;
   transfers: Transfer[];
@@ -136,7 +132,6 @@ export interface Balance {
 export interface PeriodBalance {
   period: Period;
   balances: Balance[];
-  drift: boolean;
 }
 
 export interface ExpenseCreateInput {

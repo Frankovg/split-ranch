@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 
 import sentry_sdk
 import structlog
@@ -26,33 +24,6 @@ log = structlog.get_logger(__name__)
 API_PREFIX = "/v1"
 
 
-WORKER_SHUTDOWN_TIMEOUT_SECONDS = 20
-
-
-@asynccontextmanager
-async def _in_process_worker() -> AsyncGenerator[None, None]:
-    """Run the Procrastinate worker as a task of the API's event loop.
-
-    Imported lazily: the jobs module builds its connector from the settings at import time.
-    """
-    from split_ranch.jobs.app import app as job_app
-
-    async with job_app.open_async():
-        worker = asyncio.create_task(job_app.run_worker_async(install_signal_handlers=False))
-        log.info("in_process_worker_started")
-        try:
-            yield
-        finally:
-            worker.cancel()
-            try:
-                await asyncio.wait_for(worker, timeout=WORKER_SHUTDOWN_TIMEOUT_SECONDS)
-            except asyncio.CancelledError:
-                log.info("in_process_worker_stopped")
-            except TimeoutError:
-                # Jobs left in `doing` are picked up by retry_stalled_jobs on the next start.
-                log.warning("in_process_worker_stopped_ungracefully")
-
-
 def create_app(
     settings: Settings | None = None,
     *,
@@ -62,15 +33,6 @@ def create_app(
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_json)
     init_sentry(settings)
-    run_worker = settings.run_worker_in_api
-
-    @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
-        if not run_worker:
-            yield
-            return
-        async with _in_process_worker():
-            yield
 
     app = FastAPI(
         title="Split Ranch",
@@ -78,7 +40,6 @@ def create_app(
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,
         redoc_url=None,
-        lifespan=lifespan,
     )
     app.state.settings = settings
     app.state.engine = engine or create_db_engine(settings)

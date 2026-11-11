@@ -3,9 +3,9 @@
 Shared by household rules, expense overrides and (future) AI tools.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, TypeAdapter, model_validator
 
 from split_ranch.domain import BASIS_POINTS_TOTAL
 from split_ranch.schemas.common import Id, ReadModel, StrictModel
@@ -101,22 +101,25 @@ class ShareRead(ReadModel):
     exact_cents: int | None = None
 
 
-class RuleShareRead(ReadModel):
-    member_id: Id
-    weight: int | None = None
-    basis_points: int | None = None
-    amount_cents: int | None = None
-
-
-class SplitRuleRead(ReadModel):
-    id: Id
-    scope: str
-    category_id: Id | None
-    split_type: str
-    version: int
-    shares: list[RuleShareRead]
+class CategoryRuleRead(ReadModel):
+    category_id: Id
+    split: SplitSpec
 
 
 class SplitRulesRead(ReadModel):
-    default: SplitRuleRead | None
-    categories: list[SplitRuleRead]
+    default: SplitSpec
+    categories: list[CategoryRuleRead]
+
+
+_SPEC_ADAPTER: TypeAdapter[SplitSpec] = TypeAdapter(SplitSpec)
+
+
+def spec_to_json(spec: SplitSpec) -> dict[str, Any]:
+    """The JSON stored in `households.split_rule` / `categories.split_rule`."""
+    data: dict[str, Any] = spec.model_dump(mode="json", exclude_none=True)
+    return data
+
+
+def spec_from_json(data: dict[str, Any]) -> SplitSpec:
+    # Stored JSON has UUIDs as strings: allow that coercion.
+    return _SPEC_ADAPTER.validate_python(data, strict=False)

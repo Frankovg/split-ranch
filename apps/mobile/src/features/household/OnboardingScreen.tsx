@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -19,8 +19,8 @@ export function invitationCode(input: string): string {
 /** Shown when the user has no household yet: create one or join with an invitation. */
 export function OnboardingScreen() {
   const { t } = useTranslation();
-  const [name, setName] = React.useState('');
-  const [code, setCode] = React.useState('');
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const create = useCreateHousehold();
   const accept = useAcceptInvitation();
   const busy = create.isPending || accept.isPending;
@@ -32,11 +32,11 @@ export function OnboardingScreen() {
           <CardTitle>{t('onboarding.title')}</CardTitle>
           <CardDescription>{t('onboarding.body')}</CardDescription>
         </CardHeader>
-        <CardContent className="gap-3">
-          <View className="gap-1.5">
-            <Label nativeID="household-name">{t('onboarding.name')}</Label>
+        <CardContent className='gap-3'>
+          <View className='gap-1.5'>
+            <Label nativeID='household-name'>{t('onboarding.name')}</Label>
             <Input
-              aria-labelledby="household-name"
+              aria-labelledby='household-name'
               value={name}
               onChangeText={setName}
               placeholder={t('onboarding.namePlaceholder')}
@@ -53,25 +53,25 @@ export function OnboardingScreen() {
         </CardContent>
       </Card>
 
-      <Text className="text-center text-muted-foreground">{t('onboarding.or')}</Text>
+      <Text className='text-center text-muted-foreground'>{t('onboarding.or')}</Text>
 
       <Card>
         <CardHeader>
           <CardTitle>{t('onboarding.joinTitle')}</CardTitle>
         </CardHeader>
-        <CardContent className="gap-3">
-          <View className="gap-1.5">
-            <Label nativeID="invite-code">{t('onboarding.code')}</Label>
+        <CardContent className='gap-3'>
+          <View className='gap-1.5'>
+            <Label nativeID='invite-code'>{t('onboarding.code')}</Label>
             <Input
-              aria-labelledby="invite-code"
+              aria-labelledby='invite-code'
               value={code}
               onChangeText={setCode}
-              autoCapitalize="none"
+              autoCapitalize='none'
               autoCorrect={false}
             />
           </View>
           <Button
-            variant="outline"
+            variant='outline'
             disabled={busy || invitationCode(code) === ''}
             onPress={() =>
               accept.mutate(invitationCode(code), {

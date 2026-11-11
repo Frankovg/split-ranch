@@ -1,10 +1,10 @@
 // Source: react-native-reusables toggle (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink.
+import { type ComponentProps, useContext } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import * as TogglePrimitive from '@rn-primitives/toggle';
 import { cva, type VariantProps } from 'class-variance-authority';
-import * as React from 'react';
 import { Platform } from 'react-native';
 
 const toggleVariants = cva(
@@ -43,7 +43,7 @@ function Toggle({
   variant,
   size,
   ...props
-}: React.ComponentProps<typeof TogglePrimitive.Root> & VariantProps<typeof toggleVariants>) {
+}: ComponentProps<typeof TogglePrimitive.Root> & VariantProps<typeof toggleVariants>) {
   return (
     <TextClassContext.Provider
       value={cn(
@@ -66,8 +66,8 @@ function Toggle({
   );
 }
 
-function ToggleIcon({ className, ...props }: React.ComponentProps<typeof Icon>) {
-  const textClass = React.useContext(TextClassContext);
+function ToggleIcon({ className, ...props }: ComponentProps<typeof Icon>) {
+  const textClass = useContext(TextClassContext);
   return <Icon className={cn('size-4 shrink-0', textClass, className)} {...props} />;
 }
 

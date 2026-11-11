@@ -1,4 +1,5 @@
 // Source: react-native-reusables separator (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
 import * as SeparatorPrimitive from '@rn-primitives/separator';
 
@@ -7,7 +8,7 @@ function Separator({
   orientation = 'horizontal',
   decorative = true,
   ...props
-}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
+}: ComponentProps<typeof SeparatorPrimitive.Root>) {
   return (
     <SeparatorPrimitive.Root
       decorative={decorative}

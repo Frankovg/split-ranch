@@ -11,12 +11,16 @@
     "adb:reverse": "node scripts/adb-reverse.mjs",
     "api:test": "cd apps/api && uv run pytest",
     "api:dev": "cd apps/api && uv run uvicorn split_ranch.main:app --reload --port 8000",
-    "worker:dev": "cd apps/api && uv run procrastinate --app=split_ranch.jobs.app.app worker",
-    "backend:dev": "concurrently --restart-tries 5 --restart-after exponential --names api,worker --prefix-colors cyan,magenta \"pnpm api:dev\" \"pnpm worker:dev\"",
     "db:up": "supabase start",
     "db:down": "supabase stop"
   },
   "devDependencies": {
-    "concurrently": "^10.0.7"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-import-resolver-node": "^0.4.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.18.1",
+    "globals": "^17.14.0",
+    "typescript-eslint": "^8.72.2"
   }
 }

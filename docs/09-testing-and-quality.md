@@ -35,7 +35,7 @@
 - every transfer amount > 0; no member both pays and receives.
 - deterministic for the same ordered input; permutation of input order with the same canonical order key → same output.
 
-Period/ledger invariants (integration, Hypothesis stateful testing): random sequences of create/edit/delete/close/edit-after-close/adjust → `Σ nets == 0` at every step; snapshot of a locked period never changes; adjustments make `period(M) + period(M+1)` equal to "as if edited in place".
+Period/ledger invariants (integration, Hypothesis stateful testing): random sequences of create/edit/delete/close/edit-after-close/adjust → `Σ nets == 0` at every step; balance of a locked period never changes; adjustments make `period(M) + period(M+1)` equal to "as if edited in place".
 
 ## TS ↔ Python parity with shared vectors
 
@@ -66,7 +66,6 @@ Example (`allocate.json`):
 ## Other test suites
 - **Tenant isolation** (see [08](08-security-and-privacy.md)): auto-generated from OpenAPI routes.
 - **Migrations**: upgrade from empty, downgrade last, `alembic check`.
-- **Jobs**: Procrastinate in-memory connector for unit tests; integration with real Postgres for retries/locks.
 - **Auth**: tests sign Supabase-shaped JWTs with a local ES256 key exposed through a fake JWKS (valid, expired, wrong issuer/audience, `anon`/`service_role` role, `HS256`, unknown `kid`); one manual smoke test with a real Google account through the cloud Supabase project.
 - **Supabase exposure check** (manual, after any change to Data API settings): the publishable key cannot read any `app` table through the Data API.
 

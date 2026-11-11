@@ -60,8 +60,8 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | New/edit expense | Amount keypad first (big numeric input), description, category chips, payer (default me), date, split section collapsed showing the resolved rule ("Igual entre 3 · por defecto"), expandable to change type/participants with live preview of shares |
 | Expenses list | FlashList grouped by day, filters (period, category, payer), search |
 | Expense detail | Shares, origin of rule, history link, edit/delete (reason sheet when needed, adjustment explanation when locked) |
-| Period | Status timeline, totals by category, balances, transfers with Pay / I've paid / Received actions, snapshot diff if recalculated |
-| Members & invitations | Share invite link (WhatsApp), roles, leave |
+| Period | Status timeline, totals by category, balances, transfers with I've paid / Received actions |
+| Members & invitations | Share the household's invite code (WhatsApp), roles, leave |
 | Categories & rules | Default rule editor (equal / weights / percentages with live 100% check), per-category rules |
 | Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips (tap to rename, mark "Soy yo" or remove), result card with a manual "Debe / Ha pagado" button per debtor, Share |
 | Settings | Profile, theme (system/light/dark), language, notifications, delete account |
@@ -107,7 +107,7 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 
 **MVP (read-mostly offline):**
 - Persisted query cache: everything seen is available offline (read).
-- Creating an expense offline: mutation is queued (TanStack Query paused mutations persisted to MMKV), shown optimistically with a "pending sync" badge. Client generates the UUIDv7 and an `Idempotency-Key`, so replays are safe.
+- Creating an expense offline: mutation is queued (TanStack Query paused mutations persisted to MMKV), shown optimistically with a "pending sync" badge. Client generates the expense UUIDv7, so replays return the stored expense instead of a duplicate.
 - Edits/deletes offline are **disabled** in MVP (button shows "Necesitas conexión").
 - Quick splits are fully offline by design and never leave the phone (no sync).
 

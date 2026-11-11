@@ -1,4 +1,4 @@
-"""Users: ensure_user, profile, push tokens."""
+"""Users: ensure_user and profile."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from split_ranch.core.actor import Actor
 from split_ranch.core.errors import NotFound
 from split_ranch.core.security import TokenClaims
-from split_ranch.models import Household, HouseholdMember, PushToken, User
-from split_ranch.schemas.households import MembershipRead, MeRead, MeUpdate, PushTokenIn, UserRead
+from split_ranch.models import Household, HouseholdMember, User
+from split_ranch.schemas.households import MembershipRead, MeRead, MeUpdate, UserRead
 
 
 class _EnsureUserCache:
@@ -113,29 +113,3 @@ def update_profile(session: Session, actor: Actor, data: MeUpdate) -> MeRead:
         user.locale = data.locale
     session.commit()
     return get_me(session, actor)
-
-
-def register_push_token(session: Session, actor: Actor, data: PushTokenIn) -> None:
-    stmt = insert(PushToken).values(
-        user_id=actor.user_id, expo_token=data.expo_token, platform=data.platform
-    )
-    stmt = stmt.on_conflict_do_update(
-        index_elements=[PushToken.expo_token],
-        set_={
-            "user_id": actor.user_id,
-            "platform": data.platform,
-            "last_seen_at": func.now(),
-            "disabled_at": None,
-        },
-    )
-    session.execute(stmt)
-    session.commit()
-
-
-def delete_push_token(session: Session, actor: Actor, token: str) -> None:
-    row = session.scalars(
-        select(PushToken).where(PushToken.user_id == actor.user_id, PushToken.expo_token == token)
-    ).first()
-    if row is not None:
-        session.delete(row)
-        session.commit()

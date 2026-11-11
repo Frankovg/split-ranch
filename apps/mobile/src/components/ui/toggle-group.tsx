@@ -1,14 +1,14 @@
 // Source: react-native-reusables toggle-group (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps, createContext, useContext } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { TextClassContext } from '@/components/ui/text';
 import { toggleVariants } from '@/components/ui/toggle';
 import { cn } from '@/lib/utils';
 import * as ToggleGroupPrimitive from '@rn-primitives/toggle-group';
 import type { VariantProps } from 'class-variance-authority';
-import * as React from 'react';
 import { Platform } from 'react-native';
 
-const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariants> | null>(null);
+const ToggleGroupContext = createContext<VariantProps<typeof toggleVariants> | null>(null);
 
 function ToggleGroup({
   className,
@@ -16,7 +16,7 @@ function ToggleGroup({
   size,
   children,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Root> &
+}: ComponentProps<typeof ToggleGroupPrimitive.Root> &
   VariantProps<typeof toggleVariants>) {
   return (
     <ToggleGroupPrimitive.Root
@@ -35,7 +35,7 @@ function ToggleGroup({
 }
 
 function useToggleGroupContext() {
-  const context = React.useContext(ToggleGroupContext);
+  const context = useContext(ToggleGroupContext);
   if (context === null) {
     throw new Error(
       'ToggleGroup compound components cannot be rendered outside the ToggleGroup component'
@@ -52,7 +52,7 @@ function ToggleGroupItem({
   isFirst,
   isLast,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> &
+}: ComponentProps<typeof ToggleGroupPrimitive.Item> &
   VariantProps<typeof toggleVariants> & {
     isFirst?: boolean;
     isLast?: boolean;
@@ -93,8 +93,8 @@ function ToggleGroupItem({
   );
 }
 
-function ToggleGroupIcon({ className, ...props }: React.ComponentProps<typeof Icon>) {
-  const textClass = React.useContext(TextClassContext);
+function ToggleGroupIcon({ className, ...props }: ComponentProps<typeof Icon>) {
+  const textClass = useContext(TextClassContext);
   return <Icon className={cn('size-4 shrink-0', textClass, className)} {...props} />;
 }
 

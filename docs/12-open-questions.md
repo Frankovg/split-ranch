@@ -8,7 +8,7 @@ Each item has a **default** that the plan already assumes. Change the default by
 | Who closes the period? | Any member, by hand; any member starts the next period. No automatic close (changed 2026-11-09). Admins reopen the latest period |
 | Who confirms a payment? | The receiver (creditor) |
 | Joins/leaves during a period | Whole-period membership |
-| Hosting | Supabase (Postgres + Auth, Frankfurt) + Render Frankfurt for the FastAPI web service and worker |
+| Hosting | Supabase (Postgres + Auth, Frankfurt) + Render Frankfurt for the FastAPI web service |
 | Auth | Supabase Auth with native Google sign-in |
 | Receipt photos | Out of scope (no file storage) |
 | Docs language | English |
@@ -45,14 +45,14 @@ Each item has a **default** that the plan already assumes. Change the default by
 ## Technical
 22. **Google Sign-In library**: paid Universal Sign-In vs free Credential-Manager library. **Default:** decide in spike T-0.4; abstraction either way.
 23. **NativeWind 4.2 (Tailwind 3) now vs wait for v5 / use Uniwind (Tailwind 4).** **Default:** NativeWind 4.2 now; migrate when v5 is stable (est. small effort thanks to tokens in CSS variables).
-24. **Job queue**: Procrastinate (Postgres) vs Celery + Redis. **Default:** Procrastinate.
+24. **Job queue**: **Decided 2026-11-11:** none until a feature needs background work. Push notifications should first try Expo's own APIs or sending within the request.
 25. **SQLAlchemy 2.1** just reached release-candidate/final. **Default:** pin 2.0.x for MVP; upgrade in a dedicated task.
 26. **Analytics** (product usage). **Default:** none in MVP; if needed, a privacy-friendly EU tool with consent.
 27. **App name/domain/package id** (`com.splitranch.app`?). **Default:** placeholder until branding; must be fixed before the first Play upload (package id is permanent).
 28. **App UI language**: Spanish first, English second. **Default:** yes.
 
 ## Supabase
-29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Decided 2026-11-09:** one Render **Free** web service in Frankfurt, with the worker inside the API process; we accept the ~1 min cold start after 15 min idle. Revisit (Render Starter, or a separate worker) only if more households join.
+29. **Where to run FastAPI and the worker.** Supabase cannot host Python services. **Decided 2026-11-09:** one Render **Free** web service in Frankfurt (API only; no worker since 2026-11-11); we accept the ~1 min cold start after 15 min idle. Revisit (Render Starter, or a separate worker) only if more households join.
 30. ~~Supabase anonymous sign-ins for Quick splits.~~ Not needed: Quick splits are never saved on the server.
 31. ~~PITR add-on for prod~~ **Decided 2026-11-09:** Supabase Free plan (no backups, no PITR). A weekly encrypted `supabase db dump` runs in GitHub Actions (`.github/workflows/db-backup.yml`), so the worst case is losing up to a week of data (run the workflow by hand before risky changes).
 32. **Use Supabase Realtime** for live balance updates between members. **Default:** no; TanStack Query refetch on focus + push notifications are enough, and Realtime on our private schema would require exposing it.

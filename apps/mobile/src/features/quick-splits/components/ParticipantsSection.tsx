@@ -1,5 +1,5 @@
+import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react-native';
-import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -44,8 +44,8 @@ function ParticipantDialog({
   const update = useQuickSplitsStore((s) => s.updateParticipant);
   const remove = useQuickSplitsStore((s) => s.removeParticipant);
   const setMe = useQuickSplitsStore((s) => s.setMe);
-  const [name, setName] = React.useState(participant.name);
-  const [isMe, setIsMe] = React.useState(event.meId === participant.id);
+  const [name, setName] = useState(participant.name);
+  const [isMe, setIsMe] = useState(event.meId === participant.id);
   const duplicate = isDuplicateName(event, name, participant.id);
   const valid = normaliseName(name) !== '' && !duplicate;
 
@@ -71,21 +71,21 @@ function ParticipantDialog({
         <DialogHeader>
           <DialogTitle>{t('quick.editParticipant', { name: participant.name })}</DialogTitle>
         </DialogHeader>
-        <View className="gap-1.5">
-          <Label nativeID="participant-name">{t('quick.participantName')}</Label>
-          <Input value={name} onChangeText={setName} aria-labelledby="participant-name" aria-invalid={duplicate} />
-          {duplicate ? <Text className="text-sm text-destructive">{t('quick.duplicateName')}</Text> : null}
+        <View className='gap-1.5'>
+          <Label nativeID='participant-name'>{t('quick.participantName')}</Label>
+          <Input value={name} onChangeText={setName} aria-labelledby='participant-name' aria-invalid={duplicate} />
+          {duplicate ? <Text className='text-sm text-destructive'>{t('quick.duplicateName')}</Text> : null}
         </View>
-        <View className="min-h-12 flex-row items-center gap-3">
+        <View className='min-h-12 flex-row items-center gap-3'>
           <Switch checked={isMe} onCheckedChange={setIsMe} accessibilityLabel={t('quick.thisIsMe')} />
-          <Text className="flex-1" onPress={() => setIsMe((v) => !v)}>
+          <Text className='flex-1' onPress={() => setIsMe((v) => !v)}>
             {t('quick.thisIsMe')}
           </Text>
         </View>
-        <DialogFooter className="flex-row flex-wrap justify-between gap-2">
-          <Button variant="ghost" onPress={onRemove}>
-            <Icon as={Trash2} size={18} className="text-destructive" />
-            <Text className="text-destructive">{t('quick.removeParticipant', { name: participant.name })}</Text>
+        <DialogFooter className='flex-row flex-wrap justify-between gap-2'>
+          <Button variant='ghost' onPress={onRemove}>
+            <Icon as={Trash2} size={18} className='text-destructive' />
+            <Text className='text-destructive'>{t('quick.removeParticipant', { name: participant.name })}</Text>
           </Button>
           <Button onPress={onSave} disabled={!valid}>
             <Text>{t('common.save')}</Text>
@@ -99,8 +99,8 @@ function ParticipantDialog({
 export function ParticipantsSection({ event }: { event: QuickEvent }) {
   const { t } = useTranslation();
   const addParticipant = useQuickSplitsStore((s) => s.addParticipant);
-  const [name, setName] = React.useState('');
-  const [editing, setEditing] = React.useState<QuickParticipant | null>(null);
+  const [name, setName] = useState('');
+  const [editing, setEditing] = useState<QuickParticipant | null>(null);
   const duplicate = name.trim() !== '' && isDuplicateName(event, name);
 
   const onAdd = () => {
@@ -113,41 +113,41 @@ export function ParticipantsSection({ event }: { event: QuickEvent }) {
       <CardHeader>
         <CardTitle>{t('quick.participants')}</CardTitle>
       </CardHeader>
-      <CardContent className="gap-3">
-        <View className="flex-row flex-wrap gap-2">
+      <CardContent className='gap-3'>
+        <View className='flex-row flex-wrap gap-2'>
           {event.participants.map((p) => (
             <Button
               key={p.id}
-              variant="outline"
-              size="sm"
-              className="rounded-full pl-1"
+              variant='outline'
+              size='sm'
+              className='rounded-full pl-1'
               onPress={() => setEditing(p)}
               accessibilityLabel={t('quick.editParticipant', { name: p.name })}>
-              <Avatar alt={p.name} className="size-8">
+              <Avatar alt={p.name} className='size-8'>
                 <AvatarFallback>
-                  <Text className="text-xs">{initials(p.name)}</Text>
+                  <Text className='text-xs'>{initials(p.name)}</Text>
                 </AvatarFallback>
               </Avatar>
               <Text>{p.id === event.meId ? t('quick.nameYou', { name: p.name }) : p.name}</Text>
             </Button>
           ))}
         </View>
-        <View className="flex-row items-start gap-2">
-          <View className="flex-1 gap-1">
+        <View className='flex-row items-start gap-2'>
+          <View className='flex-1 gap-1'>
             <Input
               value={name}
               onChangeText={setName}
               placeholder={t('quick.participantPlaceholder')}
               accessibilityLabel={t('quick.participantName')}
               onSubmitEditing={onAdd}
-              submitBehavior="submit"
-              returnKeyType="done"
+              submitBehavior='submit'
+              returnKeyType='done'
               aria-invalid={duplicate}
             />
-            {duplicate ? <Text className="text-sm text-destructive">{t('quick.duplicateName')}</Text> : null}
+            {duplicate ? <Text className='text-sm text-destructive'>{t('quick.duplicateName')}</Text> : null}
           </View>
           <Button
-            size="icon"
+            size='icon'
             onPress={onAdd}
             disabled={normaliseName(name) === '' || duplicate}
             accessibilityLabel={t('quick.addParticipant')}>

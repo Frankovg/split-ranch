@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect } from 'react';
 import { queryClient } from '@/lib/query/client';
 import { bindAuthAutoRefresh, supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
@@ -11,7 +11,7 @@ import { useSessionStore } from '@/stores/session';
 export function AuthListener() {
   const setSession = useSessionStore((s) => s.setSession);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const client = supabase;
     if (!client) {
       setSession(null);

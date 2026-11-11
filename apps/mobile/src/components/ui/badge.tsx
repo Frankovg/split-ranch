@@ -1,4 +1,5 @@
 // Source: react-native-reusables badge (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps, type RefAttributes } from 'react';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { Slot } from '@rn-primitives/slot';
@@ -50,7 +51,7 @@ const badgeTextVariants = cva('text-xs font-medium', {
   },
 });
 
-type BadgeProps = React.ComponentProps<typeof View> & React.RefAttributes<View> & {
+type BadgeProps = ComponentProps<typeof View> & RefAttributes<View> & {
   asChild?: boolean;
 } & VariantProps<typeof badgeVariants>;
 

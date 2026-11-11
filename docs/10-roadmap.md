@@ -29,7 +29,7 @@ gantt
 | T-0.2 CI skeleton | ci.yml runs lint/type/test for empty packages; gitleaks; branch protection |
 | T-0.3 **UI stack spike** on Expo SDK 58: NativeWind 4.2 + Tailwind 3 + React Native Reusables (Button, Dialog, Select, Tabs), dark mode, font scaling | Dev build on a real Android device; decision recorded (go / fallback SDK 57 / Uniwind) in [13](13-design-system.md) |
 | T-0.4 **Google sign-in spike** (Universal Sign-In vs free Credential Manager lib) → `supabase.auth.signInWithIdToken` + FastAPI JWKS verification | Real device signs in to the Supabase project; a FastAPI endpoint accepts the Supabase token and rejects anon/expired ones; library choice + licence cost recorded |
-| T-0.5 FastAPI skeleton: settings, structlog, Sentry, `/healthz` `/readyz`, SQLAlchemy 2 async session, Alembic init, Procrastinate worker hello-job | Tests green; worker processes a job from a DB row |
+| T-0.5 FastAPI skeleton: settings, structlog, Sentry, `/healthz` `/readyz`, SQLAlchemy 2 async session, Alembic init | Tests green |
 | T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API + in-process worker) + EAS project (`development`/`preview`) + weekly backup workflow | URL responds and reaches the DB via the shared pooler; in-process worker receives NOTIFY via session mode; preview APK installs; backup artifact produced |
 
 Risks: version incompatibilities (mitigated by spikes and pinning).
@@ -105,7 +105,7 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | T-6.2 `ensure_household_spreadsheet` (verify access, write `Léeme`) | Missing share → clear error state, no crash |
 | T-6.3 Pure renderer for the 4 tabs + content hash | Snapshot tests |
 | T-6.4 `sync_period_tab` with backoff and error states | Simulated 429 → retries and succeeds; unchanged hash → no API calls |
-| T-6.5 Triggers: period close and edit after close only (already enqueued by `write_snapshot`) | Edit after close updates only that period's tabs; the open period is never written |
+| T-6.5 Triggers: period close and edit after close only (background task after the commit) | Edit after close updates only that period's tabs; the open period is never written |
 | T-6.6 Sheets status in app settings | Shows last sync / error |
 
 ## P7 — MVP hardening and release (2 w)
@@ -147,7 +147,7 @@ P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, remi
 | UI library churn (NativeWind v5 RC, SDK 58 new) | Medium | Medium | Spike T-0.3, pin versions, Reusables supports NativeWind and Uniwind |
 | Google Sign-In library/licensing | Medium | Medium | Spike T-0.4, abstraction layer |
 | Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, closed periods only, hashes |
-| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | In-process worker + stalled-job retry, weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
+| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | No background work (nothing to lose on a spin-down), weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
 | Rules complexity confuses users | Medium | High | Show "why this split" (`split_origin`) everywhere; sensible defaults |
 | Edits after close / adjustments misunderstood | Medium | Medium | Diff UI, clear copy, E2E tests |
 | Solo developer bandwidth | High | High | Strict phase gates; Quick splits as early release to validate UI stack |

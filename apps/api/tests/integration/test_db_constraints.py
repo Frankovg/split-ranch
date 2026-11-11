@@ -62,14 +62,38 @@ def test_cross_tenant_member_rejected(db_session: Session, expense: tuple[str, s
     sp.rollback()
 
 
-def test_revisions_append_only(db_session: Session, expense: tuple[str, str, str]) -> None:
+def test_history_append_only(db_session: Session, expense: tuple[str, str, str]) -> None:
     eid, _, _ = expense
     sp = db_session.begin_nested()
     with pytest.raises(DBAPIError, match="append-only"):
         db_session.execute(
-            text("UPDATE app.expense_revisions SET reason = 'x' WHERE expense_id = :e"), {"e": eid}
+            text("UPDATE app.history SET reason = 'x' WHERE entity_id = :e"), {"e": eid}
         )
     sp.rollback()
+
+
+def test_schema_has_nine_tables(db_session: Session) -> None:
+    tables = (
+        db_session.execute(
+            text(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'app' "
+                "AND tablename <> 'alembic_version' ORDER BY tablename"
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert tables == [
+        "categories",
+        "expense_shares",
+        "expenses",
+        "history",
+        "household_members",
+        "households",
+        "periods",
+        "settlement_transfers",
+        "users",
+    ]
 
 
 def test_rls_enabled_everywhere(db_session: Session) -> None:

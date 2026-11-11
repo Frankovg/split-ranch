@@ -25,9 +25,9 @@ export function memberName(household: Household, memberId: string, t: TFunction)
 export function LoadingScreen() {
   return (
     <Screen>
-      <Skeleton className="h-32 w-full rounded-xl" />
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <Skeleton className="h-20 w-full rounded-xl" />
+      <Skeleton className='h-32 w-full rounded-xl' />
+      <Skeleton className='h-20 w-full rounded-xl' />
+      <Skeleton className='h-20 w-full rounded-xl' />
     </Screen>
   );
 }
@@ -60,12 +60,12 @@ export function ExpenseRow({
     .filter(Boolean)
     .join(' · ');
   return (
-    <View className="flex-row items-center gap-3 py-3">
-      <View className="flex-1 gap-0.5">
-        <Text className="font-medium" numberOfLines={2}>
+    <View className='flex-row items-center gap-3 py-3'>
+      <View className='flex-1 gap-0.5'>
+        <Text className='font-medium' numberOfLines={2}>
           {expense.description}
         </Text>
-        <Text className="text-sm text-muted-foreground">
+        <Text className='text-sm text-muted-foreground'>
           {t('expenses.paidBy', { name: payer })} · {meta}
         </Text>
       </View>

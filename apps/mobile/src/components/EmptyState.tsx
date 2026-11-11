@@ -17,15 +17,15 @@ type EmptyStateProps = {
 export function EmptyState({ icon, title, body, action, className }: EmptyStateProps) {
   return (
     <View className={cn('items-center justify-center gap-3 px-6 py-12', className)}>
-      <View className="rounded-full bg-muted p-4" importantForAccessibility="no-hide-descendants">
-        <Icon as={icon} size={32} className="text-muted-foreground" />
+      <View className='rounded-full bg-muted p-4' importantForAccessibility='no-hide-descendants'>
+        <Icon as={icon} size={32} className='text-muted-foreground' />
       </View>
-      <Text className="text-center text-lg font-semibold" role="heading">
+      <Text className='text-center text-lg font-semibold' role='heading'>
         {title}
       </Text>
-      {body ? <Text className="text-center text-muted-foreground">{body}</Text> : null}
+      {body ? <Text className='text-center text-muted-foreground'>{body}</Text> : null}
       {action ? (
-        <Button onPress={action.onPress} className="mt-2">
+        <Button onPress={action.onPress} className='mt-2'>
           <Text>{action.label}</Text>
         </Button>
       ) : null}

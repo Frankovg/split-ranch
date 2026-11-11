@@ -1,4 +1,4 @@
-"""Expenses: create, preview, read, list, update, delete, confirm, revisions, adjustments."""
+"""Expenses: create, preview, read, list, update, delete, revisions, adjustments."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from split_ranch.core import clock
 from split_ranch.core.actor import HouseholdActor
 from split_ranch.core.errors import Conflict, Forbidden, NotFound, Unprocessable
 from split_ranch.domain import DomainError
-from split_ranch.models import Expense, ExpenseRevision, ExpenseShare, Household, Period
+from split_ranch.models import Expense, ExpenseShare, History, Household, Period
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import households as hrepo
 from split_ranch.schemas.expenses import (
@@ -32,8 +32,7 @@ from split_ranch.schemas.expenses import (
     RevisionRead,
     SplitPreviewRead,
 )
-from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec
-from split_ranch.use_cases import idempotency
+from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec, spec_from_json
 from split_ranch.use_cases.common import check_version, require_active
 from split_ranch.use_cases.periods import (
     PeriodKey,
@@ -46,8 +45,8 @@ from split_ranch.use_cases.split_resolution import (
     Resolution,
     ResolvedShare,
     RuleData,
-    RuleRow,
     resolve_expense_split,
+    rule_from_spec,
     spec_from_stored,
 )
 
@@ -65,19 +64,22 @@ def _household(session: Session, household_id: UUID) -> Household:
     return household
 
 
-def _rule_data(
-    session: Session, household_id: UUID, scope: str, category_id: UUID | None = None
+def _category_rule(
+    session: Session, household_id: UUID, category_id: UUID | None
 ) -> RuleData | None:
-    if scope == "category" and category_id is None:
+    if category_id is None:
         return None
-    rule = hrepo.get_rule(session, household_id, scope, category_id)
-    if rule is None:
+    category = hrepo.get_category(session, household_id, category_id)
+    if category is None or category.split_rule is None:
         return None
-    rows = [
-        RuleRow(s.member_id, s.weight, s.basis_points, s.amount_cents)
-        for s in hrepo.rule_shares(session, household_id, rule.id)
-    ]
-    return RuleData(rule.split_type, rows)
+    return rule_from_spec(spec_from_json(category.split_rule))
+
+
+def _default_rule(session: Session, household_id: UUID) -> RuleData | None:
+    household = hrepo.get_household(session, household_id)
+    if household is None:
+        return None
+    return rule_from_spec(spec_from_json(household.split_rule))
 
 
 def _resolve(
@@ -99,8 +101,8 @@ def _resolve(
         payer_member_id=payer_member_id,
         override=split,
         participants=participants,
-        category_rule=_rule_data(session, household_id, "category", category_id),
-        default_rule=_rule_data(session, household_id, "household_default"),
+        category_rule=_category_rule(session, household_id, category_id),
+        default_rule=_default_rule(session, household_id),
         period_members=period_ids,
         canonical_order=[m.id for m in members],
         allowed_members=allowed_members,
@@ -175,7 +177,6 @@ def snapshot_json(session: Session, expense: Expense) -> dict[str, Any]:
         "split_origin": expense.split_origin,
         "participant_mode": expense.participant_mode,
         "rule_fallback": expense.rule_fallback,
-        "status": expense.status,
         "source": expense.source,
         "deleted_at": expense.deleted_at.isoformat() if expense.deleted_at else None,
         "version": expense.version,
@@ -201,9 +202,10 @@ def _revision(
     reason: str | None = None,
 ) -> None:
     session.add(
-        ExpenseRevision(
-            expense_id=expense.id,
+        History(
             household_id=expense.household_id,
+            entity="expense",
+            entity_id=expense.id,
             version=expense.version,
             action=action,
             actor_user_id=actor_user_id,
@@ -245,7 +247,6 @@ def to_read(
         category_id=expense.category_id,
         payer_member_id=expense.payer_member_id,
         amount_cents=expense.amount_cents,
-        currency=expense.currency,
         description=expense.description,
         notes=expense.notes,
         expense_date=expense.expense_date,
@@ -253,7 +254,6 @@ def to_read(
         split_origin=expense.split_origin,
         participant_mode=expense.participant_mode,
         rule_fallback=expense.rule_fallback,
-        status=expense.status,
         source=expense.source,
         adjusts_expense_id=expense.adjusts_expense_id,
         shares=[
@@ -280,9 +280,7 @@ def _load_visible(
     session: Session, actor: HouseholdActor, expense_id: UUID, *, for_update: bool = False
 ) -> Expense:
     expense = erepo.get_expense(session, actor.household_id, expense_id, for_update=for_update)
-    if expense is None or (
-        expense.status == "draft" and expense.created_by_user_id != actor.user_id
-    ):
+    if expense is None:
         raise NotFound("Expense not found")
     return expense
 
@@ -352,19 +350,16 @@ def create_expense(
     actor: HouseholdActor,
     data: ExpenseCreate,
     *,
-    idempotency_key: str | None = None,
     trusted_source: bool = False,
 ) -> CreateResult:
-    """Create an expense. Public clients may only use `source='manual'`."""
+    """Create an expense. Public clients may only use `source='manual'`.
+
+    Idempotent through the client-generated `id`: retrying the same expense returns the
+    stored one (200) instead of creating a duplicate.
+    """
     require_active(actor)
     if data.source != "manual" and not trusted_source:
         raise Unprocessable("Only manual expenses can be created by clients", code="invalid_source")
-
-    endpoint = f"POST /households/{actor.household_id}/expenses"
-    payload_hash = idempotency.request_hash(data.model_dump(mode="json"))
-    replay = idempotency.lookup(session, actor.user_id, idempotency_key, endpoint, payload_hash)
-    if replay is not None:
-        return CreateResult(replay.status, replay.body, int(replay.body.get("version", 1)))
 
     if data.id is not None:
         existing = erepo.get_expense(session, actor.household_id, data.id)
@@ -405,15 +400,12 @@ def create_expense(
         category_id=data.category_id,
         payer_member_id=data.payer_member_id,
         amount_cents=data.amount_cents,
-        currency=data.currency,
         description=data.description.strip(),
         notes=data.notes,
         expense_date=data.expense_date,
         split_type=resolution.split_type,
         split_origin=resolution.split_origin,
-        status=data.status,
         source=data.source,
-        source_transcript=data.source_transcript,
         created_by_user_id=actor.user_id,
         updated_by_user_id=actor.user_id,
         version=1,
@@ -424,11 +416,10 @@ def create_expense(
     session.flush()
     _write_shares(session, expense, resolution)
     _revision(session, expense, "create", actor.user_id, None, data.reason)
-    if state == "closed" and expense.status == "confirmed":
+    if state == "closed":
         after_edit_in_closed_period(session, household, period)
     session.flush()
     body = to_read(session, actor, expense, period=period).model_dump(mode="json")
-    idempotency.store(session, actor.user_id, idempotency_key, endpoint, payload_hash, 201, body)
     session.commit()
     return CreateResult(201, body, expense.version)
 
@@ -465,7 +456,6 @@ def list_expenses(
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
     q: str | None = None,
-    status: str | None = None,
 ) -> tuple[list[ExpenseRead], str | None]:
     limit = max(1, min(limit, MAX_PAGE))
     period_id: UUID | None = None
@@ -477,14 +467,12 @@ def list_expenses(
     rows = erepo.list_expenses(
         session,
         actor.household_id,
-        viewer_user_id=actor.user_id,
         limit=limit + 1,
         after=_decode_cursor(cursor) if cursor else None,
         period_id=period_id,
         category_id=category_id,
         payer_member_id=payer_member_id,
         q=q,
-        status=status,
     )
     cache: dict[UUID, str] = {}
     items = [to_read(session, actor, e, state_cache=cache) for e in rows[:limit]]
@@ -648,7 +636,7 @@ def update_expense(
     expense.updated_by_user_id = actor.user_id
     session.flush()
     _revision(session, expense, "update", actor.user_id, before, data.reason)
-    if expense.status == "confirmed" and state == "closed":
+    if state == "closed":
         after_edit_in_closed_period(session, household, period)
     session.commit()
     return to_read(session, actor, expense, period=period)
@@ -684,40 +672,9 @@ def delete_expense(
     expense.updated_by_user_id = actor.user_id
     session.flush()
     _revision(session, expense, "delete", actor.user_id, before, data.reason)
-    if state == "closed" and expense.status == "confirmed":
-        after_edit_in_closed_period(session, household, period)
-    session.commit()
-
-
-def confirm_draft(
-    session: Session,
-    actor: HouseholdActor,
-    expense_id: UUID,
-    reason: str | None,
-    if_match: int | None,
-) -> ExpenseRead:
-    expense = _load_visible(session, actor, expense_id, for_update=True)
-    if expense.deleted_at is not None:
-        raise NotFound("Expense not found")
-    _require_edit_rights(actor, expense)
-    check_version(if_match, expense.version, current_body=to_read(session, actor, expense))
-    if expense.status != "draft":
-        raise Conflict("Expense is not a draft", code="not_draft")
-    household = _household(session, actor.household_id)
-    period = erepo.get_period(session, household.id, expense.period_id, for_update=True)
-    assert period is not None
-    state = period_state(session, period)
-    _gate_period(state, reason)
-    before = snapshot_json(session, expense)
-    expense.status = "confirmed"
-    expense.version += 1
-    expense.updated_by_user_id = actor.user_id
-    session.flush()
-    _revision(session, expense, "confirm", actor.user_id, before, reason)
     if state == "closed":
         after_edit_in_closed_period(session, household, period)
     session.commit()
-    return to_read(session, actor, expense, period=period)
 
 
 # ------------------------------------------------------------ adjustments
@@ -729,7 +686,7 @@ def create_adjustment(
     """Correct an expense of a locked/settled period with reversal + correction rows
     in the current open period (docs/03 "Adjustments")."""
     original = _load_visible(session, actor, expense_id, for_update=True)
-    if original.deleted_at is not None or original.status != "confirmed":
+    if original.deleted_at is not None:
         raise NotFound("Expense not found")
     _require_edit_rights(actor, original)
     household = _household(session, actor.household_id)
@@ -757,7 +714,6 @@ def create_adjustment(
         split_type="personal" if personal else "exact",
         split_origin="override",
         participant_mode="subset",
-        status="confirmed",
         source="adjustment",
         adjusts_expense_id=original.id,
         created_by_user_id=actor.user_id,
@@ -823,7 +779,6 @@ def create_adjustment(
             expense_date=today,
             split_type=resolution.split_type,
             split_origin=resolution.split_origin,
-            status="confirmed",
             source="adjustment",
             adjusts_expense_id=original.id,
             created_by_user_id=actor.user_id,

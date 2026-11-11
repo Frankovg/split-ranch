@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -30,7 +29,6 @@ def test_non_member_gets_404_everywhere(
         "member_id": house.members["Franco"],
         "category_id": house.categories["Supermercado"],
         "transfer_id": settlement["transfers"][0]["id"],
-        "invitation_id": str(uuid.uuid4()),
         "period": "1",
     }
     outsider = make_user("Mallory")

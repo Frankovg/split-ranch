@@ -1,18 +1,11 @@
-"""Households, invitations, members, categories and split rules."""
+"""Households, invitation code, members, categories and split rules."""
 
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Response
 
-from split_ranch.api.deps import (
-    ActorDep,
-    HouseholdActorDep,
-    IfMatchDep,
-    SessionDep,
-    SettingsDep,
-    etag,
-)
+from split_ranch.api.deps import ActorDep, HouseholdActorDep, SessionDep, SettingsDep
 from split_ranch.schemas.households import (
     CategoryCreate,
     CategoryRead,
@@ -20,69 +13,47 @@ from split_ranch.schemas.households import (
     HouseholdCreate,
     HouseholdRead,
     HouseholdUpdate,
-    InvitationAccept,
-    InvitationCreate,
     InvitationPreview,
     InvitationRead,
     MemberRoleUpdate,
 )
-from split_ranch.schemas.split import SplitRuleRead, SplitRulesRead, SplitSpec
+from split_ranch.schemas.split import CategoryRuleRead, SplitRulesRead, SplitSpec
 from split_ranch.use_cases import households, rules
 
 router = APIRouter(tags=["households"])
 
 
 @router.post("/households", status_code=201)
-def create_household(
-    data: HouseholdCreate, actor: ActorDep, session: SessionDep, response: Response
-) -> HouseholdRead:
-    result = households.create_household(session, actor, data)
-    response.headers.update(etag(result.version))
-    return result
+def create_household(data: HouseholdCreate, actor: ActorDep, session: SessionDep) -> HouseholdRead:
+    return households.create_household(session, actor, data)
 
 
 @router.get("/households/{household_id}")
-def get_household(
-    actor: HouseholdActorDep, session: SessionDep, response: Response
-) -> HouseholdRead:
-    result = households.get_household(session, actor)
-    response.headers.update(etag(result.version))
-    return result
+def get_household(actor: HouseholdActorDep, session: SessionDep) -> HouseholdRead:
+    return households.get_household(session, actor)
 
 
 @router.patch("/households/{household_id}")
 def update_household(
-    data: HouseholdUpdate,
-    actor: HouseholdActorDep,
-    session: SessionDep,
-    if_match: IfMatchDep,
-    response: Response,
+    data: HouseholdUpdate, actor: HouseholdActorDep, session: SessionDep
 ) -> HouseholdRead:
-    result = households.update_household(session, actor, data, if_match)
-    response.headers.update(etag(result.version))
-    return result
+    return households.update_household(session, actor, data)
 
 
 # ------------------------------------------------------------ invitations
 
 
-@router.post("/households/{household_id}/invitations", status_code=201)
-def create_invitation(
-    actor: HouseholdActorDep,
-    session: SessionDep,
-    settings: SettingsDep,
-    data: Annotated[InvitationCreate | None, Body()] = None,
+@router.post("/households/{household_id}/invitations")
+def get_invitation(
+    actor: HouseholdActorDep, session: SessionDep, settings: SettingsDep
 ) -> InvitationRead:
-    return households.create_invitation(
-        session, actor, data or InvitationCreate(), base_url=settings.public_web_url
-    )
+    """The household's join code: the current one while valid, else a new one."""
+    return households.get_or_create_invitation(session, actor, base_url=settings.public_web_url)
 
 
-@router.delete("/households/{household_id}/invitations/{invitation_id}", status_code=204)
-def revoke_invitation(
-    invitation_id: UUID, actor: HouseholdActorDep, session: SessionDep
-) -> Response:
-    households.revoke_invitation(session, actor, invitation_id)
+@router.delete("/households/{household_id}/invitations", status_code=204)
+def revoke_invitation(actor: HouseholdActorDep, session: SessionDep) -> Response:
+    households.revoke_invitation(session, actor)
     return Response(status_code=204)
 
 
@@ -92,13 +63,8 @@ def preview_invitation(code: str, actor: ActorDep, session: SessionDep) -> Invit
 
 
 @router.post("/invitations/{code}/accept")
-def accept_invitation(
-    code: str,
-    actor: ActorDep,
-    session: SessionDep,
-    data: Annotated[InvitationAccept | None, Body()] = None,
-) -> HouseholdRead:
-    return households.accept_invitation(session, actor, code, data or InvitationAccept())
+def accept_invitation(code: str, actor: ActorDep, session: SessionDep) -> HouseholdRead:
+    return households.accept_invitation(session, actor, code)
 
 
 # ---------------------------------------------------------------- members
@@ -162,7 +128,7 @@ def list_split_rules(actor: HouseholdActorDep, session: SessionDep) -> SplitRule
 @router.put("/households/{household_id}/split-rules/default")
 def set_default_rule(
     spec: Annotated[SplitSpec, Body()], actor: HouseholdActorDep, session: SessionDep
-) -> SplitRuleRead:
+) -> SplitSpec:
     return rules.set_default_rule(session, actor, spec)
 
 
@@ -172,7 +138,7 @@ def set_category_rule(
     spec: Annotated[SplitSpec, Body()],
     actor: HouseholdActorDep,
     session: SessionDep,
-) -> SplitRuleRead:
+) -> CategoryRuleRead:
     return rules.set_category_rule(session, actor, category_id, spec)
 
 

@@ -1,5 +1,5 @@
+import { useState } from 'react';
 import { Plus } from 'lucide-react-native';
-import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { MoneyText } from '@/components/MoneyText';
@@ -14,7 +14,7 @@ import { ExpenseDialog } from './ExpenseDialog';
 export function ItemisedSection({ event }: { event: QuickEvent }) {
   const { t } = useTranslation();
   // undefined = closed, null = new expense, object = editing
-  const [editing, setEditing] = React.useState<QuickExpense | null | undefined>(undefined);
+  const [editing, setEditing] = useState<QuickExpense | null | undefined>(undefined);
   const names = new Map(event.participants.map((p) => [p.id, p.name]));
 
   return (
@@ -22,20 +22,20 @@ export function ItemisedSection({ event }: { event: QuickEvent }) {
       <CardHeader>
         <CardTitle>{t('quick.expenses')}</CardTitle>
       </CardHeader>
-      <CardContent className="gap-2">
+      <CardContent className='gap-2'>
         {event.expenses.length === 0 ? (
-          <Text className="text-muted-foreground">{t('quick.noExpenses')}</Text>
+          <Text className='text-muted-foreground'>{t('quick.noExpenses')}</Text>
         ) : (
           event.expenses.map((e) => (
             <Pressable
               key={e.id}
-              role="button"
+              role='button'
               onPress={() => setEditing(e)}
               accessibilityHint={t('quick.editExpense')}
-              className="min-h-14 flex-row items-center gap-3 rounded-md border border-border px-3 py-2 active:bg-accent">
-              <View className="flex-1">
-                <Text className="font-medium">{e.description || t('quick.expenses')}</Text>
-                <Text className="text-sm text-muted-foreground">
+              className='min-h-14 flex-row items-center gap-3 rounded-md border border-border px-3 py-2 active:bg-accent'>
+              <View className='flex-1'>
+                <Text className='font-medium'>{e.description || t('quick.expenses')}</Text>
+                <Text className='text-sm text-muted-foreground'>
                   {t('quick.expenseSummary', {
                     payer: names.get(e.payerId) ?? '?',
                     count: e.participantIds.length,
@@ -47,7 +47,7 @@ export function ItemisedSection({ event }: { event: QuickEvent }) {
           ))
         )}
         <Button
-          variant="outline"
+          variant='outline'
           onPress={() => setEditing(null)}
           disabled={event.participants.length === 0}>
           <Icon as={Plus} size={18} />

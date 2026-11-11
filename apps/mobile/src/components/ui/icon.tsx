@@ -1,13 +1,13 @@
 // Source: react-native-reusables icon (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type RefAttributes, useContext } from 'react';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import type { LucideIcon, LucideProps } from 'lucide-react-native';
 import { cssInterop } from 'nativewind';
-import * as React from 'react';
 
 type IconProps = LucideProps & {
   as: LucideIcon;
-} & React.RefAttributes<LucideIcon>;
+} & RefAttributes<LucideIcon>;
 
 function IconImpl({ as: IconComponent, ...props }: IconProps) {
   return <IconComponent {...props} />;
@@ -44,7 +44,7 @@ cssInterop(IconImpl, {
  * @param {...LucideProps} ...props - Additional Lucide icon props passed to the "as" icon.
  */
 function Icon({ as: IconComponent, className, size = 14, ...props }: IconProps) {
-  const textClass = React.useContext(TextClassContext);
+  const textClass = useContext(TextClassContext);
   return (
     <IconImpl
       as={IconComponent}

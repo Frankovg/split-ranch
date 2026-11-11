@@ -20,18 +20,16 @@ ExpenseSource = Literal["manual", "ai_text", "ai_voice", "recurring"]
 
 
 class ExpenseCreate(StrictModel):
+    # Client-generated id: retrying a create with the same id returns the stored expense.
     id: Id | None = None
     amount_cents: AmountCents
-    currency: Literal["EUR"] = "EUR"
     description: str = Field(min_length=1, max_length=140)
     category_id: Id | None = None
     payer_member_id: Id
     expense_date: Day
     split: SplitSpec | None = None
     participants: list[Id] | None = Field(default=None, min_length=1, max_length=50)
-    status: Literal["draft", "confirmed"] = "confirmed"
     source: ExpenseSource = "manual"
-    source_transcript: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=1000)
     # Default: the open period. A closed (unlocked) one needs a `reason`.
     period_seq: PeriodSeq | None = None
@@ -92,7 +90,6 @@ class ExpenseRead(ReadModel):
     category_id: Id | None
     payer_member_id: Id
     amount_cents: int
-    currency: str
     description: str
     notes: str | None
     expense_date: date
@@ -100,7 +97,6 @@ class ExpenseRead(ReadModel):
     split_origin: str
     participant_mode: str
     rule_fallback: bool
-    status: str
     source: str
     adjusts_expense_id: Id | None
     shares: list[ShareRead]
@@ -159,17 +155,6 @@ class TransferRead(ReadModel):
     version: int
 
 
-class SnapshotRead(ReadModel):
-    id: Id
-    seq: int
-    trigger: str
-    balances: list[dict[str, Any]]
-    transfers: list[dict[str, Any]]
-    input_hash: str
-    created_at: datetime
-    superseded_at: datetime | None
-
-
 class PeriodRead(ReadModel):
     id: Id
     seq: int
@@ -187,15 +172,13 @@ class PeriodRead(ReadModel):
 class PeriodBalanceRead(ReadModel):
     period: PeriodRead
     balances: list[BalanceRead]
-    snapshot: SnapshotRead | None
-    drift: bool
 
 
 class SettlementRead(ReadModel):
+    """The period's live transfers (cancelled ones are left out)."""
+
     period: PeriodRead
-    snapshot: SnapshotRead | None
     transfers: list[TransferRead]
-    previous_snapshots: list[SnapshotRead]
 
 
 class ReopenIn(StrictModel):

@@ -1,6 +1,6 @@
+import { type ReactNode, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Inbox, Moon, Plus, Sun } from 'lucide-react-native';
-import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -52,13 +52,13 @@ const BUTTON_VARIANTS = ['default', 'secondary', 'outline', 'ghost', 'destructiv
 
 const sampleSchema = z.object({ name: z.string().min(1, 'Required') });
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="gap-3">{children}</CardContent>
+      <CardContent className='gap-3'>{children}</CardContent>
     </Card>
   );
 }
@@ -67,10 +67,10 @@ export function GalleryScreen() {
   const { t } = useTranslation();
   const scheme = useAppColorScheme();
   const setTheme = usePreferencesStore((s) => s.setTheme);
-  const [cents, setCents] = React.useState<number | null>(8750);
-  const [checked, setChecked] = React.useState(true);
-  const [tab, setTab] = React.useState('a');
-  const [toggle, setToggle] = React.useState('equal');
+  const [cents, setCents] = useState<number | null>(8750);
+  const [checked, setChecked] = useState(true);
+  const [tab, setTab] = useState('a');
+  const [toggle, setToggle] = useState('equal');
   const { control } = useForm<{ name: string }>({
     resolver: zodResolver(sampleSchema),
     defaultValues: { name: '' },
@@ -80,13 +80,13 @@ export function GalleryScreen() {
   return (
     <Screen>
       <Button
-        variant="outline"
+        variant='outline'
         onPress={() => setTheme(scheme === 'dark' ? 'light' : 'dark')}
         accessibilityLabel={t('gallery.toggleTheme')}>
         <Icon as={scheme === 'dark' ? Sun : Moon} size={18} />
         <Text>{t('gallery.toggleTheme')}</Text>
       </Button>
-      <Text className="text-sm text-muted-foreground">{t('gallery.fontScale')}</Text>
+      <Text className='text-sm text-muted-foreground'>{t('gallery.fontScale')}</Text>
 
       <Section title={t('gallery.buttons')}>
         {BUTTON_VARIANTS.map((v) => (
@@ -94,14 +94,14 @@ export function GalleryScreen() {
             <Text>{v}</Text>
           </Button>
         ))}
-        <View className="flex-row flex-wrap gap-2">
-          <Button size="sm">
+        <View className='flex-row flex-wrap gap-2'>
+          <Button size='sm'>
             <Text>sm</Text>
           </Button>
-          <Button size="lg">
+          <Button size='lg'>
             <Text>lg</Text>
           </Button>
-          <Button size="icon" accessibilityLabel={t('common.add')}>
+          <Button size='icon' accessibilityLabel={t('common.add')}>
             <Icon as={Plus} size={20} />
           </Button>
           <Button disabled>
@@ -111,18 +111,18 @@ export function GalleryScreen() {
       </Section>
 
       <Section title={t('gallery.inputs')}>
-        <View className="gap-1.5">
-          <Label nativeID="g-input">Input</Label>
-          <Input placeholder="Lorem" aria-labelledby="g-input" />
+        <View className='gap-1.5'>
+          <Label nativeID='g-input'>Input</Label>
+          <Input placeholder='Lorem' aria-labelledby='g-input' />
         </View>
-        <Textarea placeholder="Textarea" accessibilityLabel="Textarea" />
-        <MoneyInput size="lg" valueCents={cents} onChangeCents={setCents} accessibilityLabel="MoneyInput" />
-        <MoneyInput valueCents={null} onChangeCents={() => {}} accessibilityLabel="MoneyInput" />
+        <Textarea placeholder='Textarea' accessibilityLabel='Textarea' />
+        <MoneyInput size='lg' valueCents={cents} onChangeCents={setCents} accessibilityLabel='MoneyInput' />
+        <MoneyInput valueCents={null} onChangeCents={() => {}} accessibilityLabel='MoneyInput' />
         <FormField
           control={control}
-          name="name"
-          label="FormField"
-          description="React Hook Form + Zod"
+          name='name'
+          label='FormField'
+          description='React Hook Form + Zod'
           render={({ field, inputId }) => (
             <Input
               nativeID={inputId}
@@ -134,60 +134,60 @@ export function GalleryScreen() {
           )}
         />
         <Select defaultValue={{ value: 'ana', label: 'Ana' }}>
-          <SelectTrigger accessibilityLabel="Select">
-            <SelectValue placeholder="Select" />
+          <SelectTrigger accessibilityLabel='Select'>
+            <SelectValue placeholder='Select' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ana" label="Ana" />
-            <SelectItem value="bea" label="Bea" />
-            <SelectItem value="carlos" label="Carlos" />
+            <SelectItem value='ana' label='Ana' />
+            <SelectItem value='bea' label='Bea' />
+            <SelectItem value='carlos' label='Carlos' />
           </SelectContent>
         </Select>
-        <View className="min-h-12 flex-row items-center gap-3">
-          <Switch checked={checked} onCheckedChange={setChecked} accessibilityLabel="Switch" />
+        <View className='min-h-12 flex-row items-center gap-3'>
+          <Switch checked={checked} onCheckedChange={setChecked} accessibilityLabel='Switch' />
           <Text>Switch</Text>
         </View>
-        <ToggleGroup type="single" variant="outline" value={toggle} onValueChange={(v) => v && setToggle(v)}>
+        <ToggleGroup type='single' variant='outline' value={toggle} onValueChange={(v) => v && setToggle(v)}>
           {['equal', 'weights', 'percentages'].map((v, i, all) => (
-            <ToggleGroupItem key={v} value={v} isFirst={i === 0} isLast={i === all.length - 1} className="flex-1">
+            <ToggleGroupItem key={v} value={v} isFirst={i === 0} isLast={i === all.length - 1} className='flex-1'>
               <Text>{v}</Text>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="a">
+            <TabsTrigger value='a'>
               <Text>Tab A</Text>
             </TabsTrigger>
-            <TabsTrigger value="b">
+            <TabsTrigger value='b'>
               <Text>Tab B</Text>
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="a">
+          <TabsContent value='a'>
             <Text>A</Text>
           </TabsContent>
-          <TabsContent value="b">
+          <TabsContent value='b'>
             <Text>B</Text>
           </TabsContent>
         </Tabs>
       </Section>
 
       <Section title={t('gallery.feedback')}>
-        <View className="flex-row flex-wrap gap-2">
+        <View className='flex-row flex-wrap gap-2'>
           <Badge>
             <Text>default</Text>
           </Badge>
-          <Badge variant="secondary">
+          <Badge variant='secondary'>
             <Text>secondary</Text>
           </Badge>
-          <Badge variant="outline">
+          <Badge variant='outline'>
             <Text>outline</Text>
           </Badge>
-          <Badge variant="destructive">
+          <Badge variant='destructive'>
             <Text>destructive</Text>
           </Badge>
         </View>
-        <View className="flex-row items-center gap-2">
+        <View className='flex-row items-center gap-2'>
           {['AN', 'BE', 'CA'].map((i) => (
             <Avatar key={i} alt={i}>
               <AvatarFallback>
@@ -197,12 +197,12 @@ export function GalleryScreen() {
           ))}
         </View>
         <Separator />
-        <MoneyText cents={8750} size="3xl" />
-        <MoneyText cents={6563} tone="positive" accessibilityPrefix={t('money.youAreOwed', { amount: '' })} />
-        <MoneyText cents={-2188} tone="negative" accessibilityPrefix={t('money.youOwe', { amount: '' })} />
-        <MoneyText cents={123456789} size="xl" />
-        <Skeleton className="h-6 w-2/3" />
-        <Skeleton className="h-14 w-full" />
+        <MoneyText cents={8750} size='3xl' />
+        <MoneyText cents={6563} tone='positive' accessibilityPrefix={t('money.youAreOwed', { amount: '' })} />
+        <MoneyText cents={-2188} tone='negative' accessibilityPrefix={t('money.youOwe', { amount: '' })} />
+        <MoneyText cents={123456789} size='xl' />
+        <Skeleton className='h-6 w-2/3' />
+        <Skeleton className='h-14 w-full' />
         <Card>
           <CardHeader>
             <CardTitle>Card</CardTitle>
@@ -211,7 +211,7 @@ export function GalleryScreen() {
         </Card>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline">
+            <Button variant='outline'>
               <Text>Dialog</Text>
             </Button>
           </DialogTrigger>
@@ -222,7 +222,7 @@ export function GalleryScreen() {
             </DialogHeader>
           </DialogContent>
         </Dialog>
-        <Button variant="secondary" onPress={() => toast.success(t('common.copied'))}>
+        <Button variant='secondary' onPress={() => toast.success(t('common.copied'))}>
           <Text>Toast</Text>
         </Button>
         <EmptyState icon={Inbox} title={t('quick.emptyTitle')} body={t('quick.emptyBody')} />

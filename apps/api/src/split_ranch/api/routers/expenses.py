@@ -1,13 +1,13 @@
 """Expenses."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Header, Query, Response
+from fastapi import APIRouter, Body, Query, Response
 from fastapi.responses import JSONResponse
 
 from split_ranch.api.deps import HouseholdActorDep, IfMatchDep, SessionDep, etag
-from split_ranch.schemas.common import Page, ReasonIn
+from split_ranch.schemas.common import Page
 from split_ranch.schemas.expenses import (
     AdjustmentCreate,
     AdjustmentRead,
@@ -23,8 +23,6 @@ from split_ranch.use_cases import expenses
 
 router = APIRouter(prefix="/households/{household_id}/expenses", tags=["expenses"])
 
-IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_length=64)]
-
 
 @router.get("")
 def list_expenses(
@@ -37,7 +35,6 @@ def list_expenses(
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
-    status: Literal["draft", "confirmed"] | None = None,
 ) -> Page[ExpenseRead]:
     items, next_cursor = expenses.list_expenses(
         session,
@@ -48,19 +45,15 @@ def list_expenses(
         category_id=category_id,
         payer_member_id=payer_member_id,
         q=q,
-        status=status,
     )
     return Page[ExpenseRead](items=items, next_cursor=next_cursor)
 
 
 @router.post("", status_code=201, response_model=ExpenseRead)
 def create_expense(
-    data: ExpenseCreate,
-    actor: HouseholdActorDep,
-    session: SessionDep,
-    idempotency_key: IdempotencyKey = None,
+    data: ExpenseCreate, actor: HouseholdActorDep, session: SessionDep
 ) -> JSONResponse:
-    result = expenses.create_expense(session, actor, data, idempotency_key=idempotency_key)
+    result = expenses.create_expense(session, actor, data)
     return JSONResponse(result.body, status_code=result.status, headers=etag(result.version))
 
 
@@ -104,22 +97,6 @@ def delete_expense(
 ) -> Response:
     expenses.delete_expense(session, actor, expense_id, data or ExpenseDeleteIn(), if_match)
     return Response(status_code=204)
-
-
-@router.post("/{expense_id}/confirm")
-def confirm_expense(
-    expense_id: UUID,
-    actor: HouseholdActorDep,
-    session: SessionDep,
-    if_match: IfMatchDep,
-    response: Response,
-    data: Annotated[ReasonIn | None, Body()] = None,
-) -> ExpenseRead:
-    result = expenses.confirm_draft(
-        session, actor, expense_id, (data or ReasonIn()).reason, if_match
-    )
-    response.headers.update(etag(result.version))
-    return result
 
 
 @router.post("/{expense_id}/adjustments", status_code=201)

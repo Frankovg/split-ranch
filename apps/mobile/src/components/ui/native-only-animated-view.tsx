@@ -1,4 +1,5 @@
 // Source: react-native-reusables native-only-animated-view (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+import { type ComponentProps, type ReactNode, type RefAttributes } from 'react';
 import { Platform, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -14,13 +15,13 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  * </NativeOnlyAnimatedView>
  */
 function NativeOnlyAnimatedView(
-  props: (React.ComponentProps<typeof Animated.View> & React.RefAttributes<typeof Animated.View> 
-    & { as?: "View" }) | (React.ComponentProps<typeof AnimatedPressable> & React.RefAttributes<typeof AnimatedPressable> & { as: "Pressable" })
+  props: (ComponentProps<typeof Animated.View> & RefAttributes<typeof Animated.View> 
+    & { as?: 'View' }) | (ComponentProps<typeof AnimatedPressable> & RefAttributes<typeof AnimatedPressable> & { as: 'Pressable' })
 ) {
   if (Platform.OS === 'web') {
-    return <>{props.children as React.ReactNode}</>;
+    return <>{props.children as ReactNode}</>;
   } else {
-    if (props.as === "Pressable"){
+    if (props.as === 'Pressable'){
       return <AnimatedPressable {...props} />;
     }
     return <Animated.View {...props} />;

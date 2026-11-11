@@ -37,7 +37,7 @@ export function StartPeriodButton({
       },
     ]);
   return (
-    <Button size="lg" disabled={start.isPending} onPress={onPress}>
+    <Button size='lg' disabled={start.isPending} onPress={onPress}>
       <Icon as={Play} size={20} />
       <Text>{t('period.start')}</Text>
     </Button>

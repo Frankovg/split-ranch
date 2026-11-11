@@ -1,4 +1,4 @@
-"""Helpers shared by use cases: authorisation, versions, audit."""
+"""Helpers shared by use cases: authorisation, versions, history."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from split_ranch.core.actor import HouseholdActor
 from split_ranch.core.errors import Forbidden, PreconditionFailed, PreconditionRequired
-from split_ranch.models import AuditLog
+from split_ranch.models import History
 
 
 def require_admin(actor: HouseholdActor) -> None:
@@ -46,20 +46,23 @@ def check_version(
 def audit(
     session: Session,
     *,
-    household_id: UUID | None,
+    household_id: UUID,
     entity: str,
     entity_id: UUID,
     actor_user_id: UUID | None,
     action: str,
     diff: dict[str, Any],
+    reason: str | None = None,
 ) -> None:
+    """Record a household event (period, member, category, rule...) in `history`."""
     session.add(
-        AuditLog(
+        History(
             household_id=household_id,
             entity=entity,
             entity_id=entity_id,
             actor_user_id=actor_user_id,
             action=action,
-            diff=diff,
+            reason=reason,
+            after=diff,
         )
     )

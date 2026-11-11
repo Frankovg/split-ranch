@@ -39,22 +39,22 @@ export function TotalModeSection({ event }: { event: QuickEvent }) {
       <CardHeader>
         <CardTitle>{t('quick.total')}</CardTitle>
       </CardHeader>
-      <CardContent className="gap-4">
+      <CardContent className='gap-4'>
         <MoneyInput
-          size="lg"
+          size='lg'
           valueCents={event.total.amountCents}
           onChangeCents={(cents) => setTotalAmount(event.id, cents)}
           accessibilityLabel={t('quick.total')}
         />
 
-        <View className="gap-1.5">
-          <Label nativeID="total-payer">{t('quick.payer')}</Label>
+        <View className='gap-1.5'>
+          <Label nativeID='total-payer'>{t('quick.payer')}</Label>
           <Select
             value={payerOption}
             onValueChange={(option) =>
               setTotalPayer(event.id, !option || option.value === NO_PAYER ? null : option.value)
             }>
-            <SelectTrigger aria-labelledby="total-payer">
+            <SelectTrigger aria-labelledby='total-payer'>
               <SelectValue placeholder={t('quick.noPayer')} />
             </SelectTrigger>
             <SelectContent>
@@ -66,13 +66,13 @@ export function TotalModeSection({ event }: { event: QuickEvent }) {
           </Select>
         </View>
 
-        <View className="gap-2">
-          <Text className="font-semibold">{t('quick.split')}</Text>
+        <View className='gap-2'>
+          <Text className='font-semibold'>{t('quick.split')}</Text>
           {event.participants.map((p) => {
             const included = !event.total.excludedIds.includes(p.id);
             const weight = event.total.weights[p.id] ?? 1;
             return (
-              <View key={p.id} className="min-h-14 flex-row flex-wrap items-center gap-3">
+              <View key={p.id} className='min-h-14 flex-row flex-wrap items-center gap-3'>
                 <Switch
                   checked={included}
                   onCheckedChange={() => toggleExcluded(event.id, p.id)}
@@ -80,23 +80,23 @@ export function TotalModeSection({ event }: { event: QuickEvent }) {
                 />
                 <Text className={included ? 'flex-1' : 'flex-1 text-muted-foreground line-through'}>{p.name}</Text>
                 {included ? (
-                  <View className="flex-row items-center gap-1">
+                  <View className='flex-row items-center gap-1'>
                     <Button
-                      variant="ghost"
-                      size="icon"
+                      variant='ghost'
+                      size='icon'
                       disabled={weight <= 1}
                       onPress={() => setWeight(event.id, p.id, weight - 1)}
                       accessibilityLabel={t('quick.decreaseWeight', { name: p.name })}>
                       <Icon as={Minus} size={18} />
                     </Button>
                     <Text
-                      className="min-w-8 text-center tabular-nums"
+                      className='min-w-8 text-center tabular-nums'
                       accessibilityLabel={t('quick.weightOf', { name: p.name, weight })}>
                       ×{weight}
                     </Text>
                     <Button
-                      variant="ghost"
-                      size="icon"
+                      variant='ghost'
+                      size='icon'
                       disabled={weight >= MAX_WEIGHT}
                       onPress={() => setWeight(event.id, p.id, weight + 1)}
                       accessibilityLabel={t('quick.increaseWeight', { name: p.name })}>

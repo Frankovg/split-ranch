@@ -1,6 +1,6 @@
+import { useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import { router } from 'expo-router';
-import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -47,14 +47,14 @@ function NewExpenseForm({ household }: { household: Household }) {
   const period = useBalance(household.id, 'current').data?.period;
   const noOpenPeriod = period !== undefined && period.status !== 'open';
   // Stable per form: a double tap or a retry reuses the same id (idempotent POST).
-  const [expenseId] = React.useState(() => Crypto.randomUUID());
+  const [expenseId] = useState(() => Crypto.randomUUID());
 
-  const [description, setDescription] = React.useState('');
-  const [amountCents, setAmountCents] = React.useState<number | null>(null);
-  const [payer, setPayer] = React.useState(household.my_member_id);
-  const [categoryId, setCategoryId] = React.useState<string>('');
-  const [participants, setParticipants] = React.useState<string[]>(everyone);
-  const [submitted, setSubmitted] = React.useState(false);
+  const [description, setDescription] = useState('');
+  const [amountCents, setAmountCents] = useState<number | null>(null);
+  const [payer, setPayer] = useState(household.my_member_id);
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [participants, setParticipants] = useState<string[]>(everyone);
+  const [submitted, setSubmitted] = useState(false);
 
   const amountValid = amountCents !== null && amountCents > 0 && amountCents <= MAX_AMOUNT_CENTS;
   const descriptionValid = description.trim() !== '';
@@ -91,11 +91,11 @@ function NewExpenseForm({ household }: { household: Household }) {
 
   return (
     <Screen>
-      <View className="gap-1.5">
-        <Label nativeID="expense-amount">{t('expenses.amount')}</Label>
+      <View className='gap-1.5'>
+        <Label nativeID='expense-amount'>{t('expenses.amount')}</Label>
         <MoneyInput
-          nativeID="expense-amount"
-          size="lg"
+          nativeID='expense-amount'
+          size='lg'
           valueCents={amountCents}
           onChangeCents={setAmountCents}
           accessibilityLabel={t('expenses.amount')}
@@ -103,10 +103,10 @@ function NewExpenseForm({ household }: { household: Household }) {
         />
       </View>
 
-      <View className="gap-1.5">
-        <Label nativeID="expense-description">{t('expenses.description')}</Label>
+      <View className='gap-1.5'>
+        <Label nativeID='expense-description'>{t('expenses.description')}</Label>
         <Input
-          aria-labelledby="expense-description"
+          aria-labelledby='expense-description'
           value={description}
           onChangeText={setDescription}
           placeholder={t('expenses.descriptionPlaceholder')}
@@ -114,20 +114,20 @@ function NewExpenseForm({ household }: { household: Household }) {
           className={submitted && !descriptionValid ? 'border-destructive' : undefined}
         />
         {submitted && !descriptionValid ? (
-          <Text className="text-sm text-destructive">{t('expenses.descriptionRequired')}</Text>
+          <Text className='text-sm text-destructive'>{t('expenses.descriptionRequired')}</Text>
         ) : null}
       </View>
 
-      <View className="gap-1.5">
+      <View className='gap-1.5'>
         <Label>{t('expenses.payer')}</Label>
         <ToggleGroup
-          type="single"
-          variant="outline"
+          type='single'
+          variant='outline'
           value={payer}
           onValueChange={(v) => v && setPayer(v)}
-          className="flex-wrap justify-start gap-2">
+          className='flex-wrap justify-start gap-2'>
           {members.map((m) => (
-            <ToggleGroupItem key={m.id} value={m.id} className="rounded-md border-l">
+            <ToggleGroupItem key={m.id} value={m.id} className='rounded-md border-l'>
               <Text>{memberName(household, m.id, t)}</Text>
             </ToggleGroupItem>
           ))}
@@ -135,16 +135,16 @@ function NewExpenseForm({ household }: { household: Household }) {
       </View>
 
       {activeCategories.length > 0 ? (
-        <View className="gap-1.5">
+        <View className='gap-1.5'>
           <Label>{t('expenses.category')}</Label>
           <ToggleGroup
-            type="single"
-            variant="outline"
+            type='single'
+            variant='outline'
             value={categoryId}
             onValueChange={(v) => setCategoryId(v ?? '')}
-            className="flex-wrap justify-start gap-2">
+            className='flex-wrap justify-start gap-2'>
             {activeCategories.map((c) => (
-              <ToggleGroupItem key={c.id} value={c.id} className="rounded-md border-l">
+              <ToggleGroupItem key={c.id} value={c.id} className='rounded-md border-l'>
                 <Text>{c.name}</Text>
               </ToggleGroupItem>
             ))}
@@ -153,31 +153,31 @@ function NewExpenseForm({ household }: { household: Household }) {
       ) : null}
 
       {members.length > 1 ? (
-        <View className="gap-1.5">
+        <View className='gap-1.5'>
           <Label>{t('expenses.splitBetween')}</Label>
           <ToggleGroup
-            type="multiple"
-            variant="outline"
+            type='multiple'
+            variant='outline'
             value={participants}
             onValueChange={setParticipants}
-            className="flex-wrap justify-start gap-2">
+            className='flex-wrap justify-start gap-2'>
             {members.map((m) => (
-              <ToggleGroupItem key={m.id} value={m.id} className="rounded-md border-l">
+              <ToggleGroupItem key={m.id} value={m.id} className='rounded-md border-l'>
                 <Text>{memberName(household, m.id, t)}</Text>
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           {submitted && participants.length === 0 ? (
-            <Text className="text-sm text-destructive">{t('quick.selectAtLeastOne')}</Text>
+            <Text className='text-sm text-destructive'>{t('quick.selectAtLeastOne')}</Text>
           ) : null}
         </View>
       ) : null}
 
       {noOpenPeriod ? (
-        <Text className="text-sm text-destructive">{t('expenses.noOpenPeriod')}</Text>
+        <Text className='text-sm text-destructive'>{t('expenses.noOpenPeriod')}</Text>
       ) : null}
 
-      <Button size="lg" disabled={create.isPending || noOpenPeriod} onPress={onSave}>
+      <Button size='lg' disabled={create.isPending || noOpenPeriod} onPress={onSave}>
         <Text>{t('common.save')}</Text>
       </Button>
     </Screen>

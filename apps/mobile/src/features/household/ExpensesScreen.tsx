@@ -34,18 +34,18 @@ export function ExpensesScreen() {
   const categoryName = (id: string | null) => categories.data?.find((c) => c.id === id)?.name;
 
   return (
-    <SafeAreaView edges={['bottom']} className="flex-1 bg-background">
+    <SafeAreaView edges={['bottom']} className='flex-1 bg-background'>
       <FlatList
         data={expenses.data.items}
         keyExtractor={(e) => e.id}
-        contentContainerClassName="px-4 py-4"
+        contentContainerClassName='px-4 py-4'
         refreshControl={
           <RefreshControl refreshing={expenses.isRefetching} onRefresh={() => void expenses.refetch()} />
         }
         ListHeaderComponent={
-          <View className="gap-3 pb-2">
+          <View className='gap-3 pb-2'>
             {period ? (
-              <Text className="text-lg font-semibold" role="heading">
+              <Text className='text-lg font-semibold' role='heading'>
                 {t('period.title', { seq: period.seq })}
               </Text>
             ) : null}

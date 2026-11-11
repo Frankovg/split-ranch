@@ -1,4 +1,4 @@
-"""Households, invitations, members, categories and split rules."""
+"""Households, invitation code, members, categories and split rules."""
 
 from __future__ import annotations
 
@@ -31,7 +31,9 @@ def test_create_household_defaults(
     assert "Supermercado" in [c["name"] for c in cats]
     rules = ok(client.get(f"/v1/households/{house['id']}/split-rules", headers=juli.headers))
     assert rules["default"]["split_type"] == "equal"
-    assert rules["default"]["shares"] == []
+    assert not rules["default"].get("shares")
+    assert rules["categories"] == []
+    assert "currency" not in house and "version" not in house
     me = ok(client.get("/v1/me", headers=juli.headers))
     assert me["memberships"][0]["role"] == "admin"
 
@@ -45,79 +47,65 @@ def test_bad_timezone(client: TestClient, make_user: Callable[[str], TestUser]) 
     assert r.status_code == 422
 
 
-def test_household_update_requires_if_match(
-    client: TestClient, make_user: Callable[[str], TestUser]
-) -> None:
+def test_household_update(client: TestClient, make_user: Callable[[str], TestUser]) -> None:
     house = make_house(client, make_user, ("Juli", "Franco"))
-    r = client.patch(house.url(), json={"name": "Piso"}, headers=house.h("Juli"))
-    assert r.status_code == 428
-    r = client.patch(
-        house.url(), json={"name": "Piso"}, headers=house.h("Juli", **{"If-Match": '"7"'})
-    )
-    assert r.status_code == 412
-    assert r.json()["code"] == "version_conflict"
-    assert r.json()["current"]["version"] == 1
-    updated = ok(
-        client.patch(
-            house.url(), json={"name": "Piso"}, headers=house.h("Juli", **{"If-Match": '"1"'})
-        )
-    )
-    assert updated["name"] == "Piso" and updated["version"] == 2
-    r = client.patch(
-        house.url(), json={"name": "Casa"}, headers=house.h("Franco", **{"If-Match": '"2"'})
-    )
+    updated = ok(client.patch(house.url(), json={"name": "Piso"}, headers=house.h("Juli")))
+    assert updated["name"] == "Piso"
+    r = client.patch(house.url(), json={"name": "Casa"}, headers=house.h("Franco"))
     assert r.status_code == 403
     # Auto-close settings are gone.
-    r = client.patch(
-        house.url(), json={"grace_days": 5}, headers=house.h("Juli", **{"If-Match": '"2"'})
-    )
+    r = client.patch(house.url(), json={"grace_days": 5}, headers=house.h("Juli"))
     assert r.status_code == 422
 
 
-def test_invitation_lifecycle(
+def test_invitation_code(
     client: TestClient, make_user: Callable[[str], TestUser], frozen_clock: FrozenClock
 ) -> None:
     frozen_clock.set(datetime(2026, 3, 20, tzinfo=UTC))
-    juli, franco, ana = make_user("Juli"), make_user("Franco"), make_user("Ana")
+    juli, franco, ana, bea = (
+        make_user("Juli"),
+        make_user("Franco"),
+        make_user("Ana"),
+        make_user("Bea"),
+    )
     house = ok(client.post("/v1/households", json={"name": "Casa"}, headers=juli.headers), 201)
     hid = house["id"]
-    r = client.post(f"/v1/households/{hid}/invitations", json={"max_uses": 1}, headers=juli.headers)
-    inv = ok(r, 201)
+    inv = ok(client.post(f"/v1/households/{hid}/invitations", headers=juli.headers))
     assert len(inv["code"]) == 8 and inv["url"].endswith(inv["code"])
+    # One code per household: asking again returns the same one while it is valid.
+    assert ok(client.post(f"/v1/households/{hid}/invitations", headers=juli.headers)) == inv
 
     preview = ok(client.get(f"/v1/invitations/{inv['code']}", headers=franco.headers))
     assert preview == {
         "household_name": "Casa",
-        "inviter": "Juli",
         "member_count": 1,
         "expires_at": preview["expires_at"],
     }
-    # By default a new member joins the open period, whatever the date.
+    # A new member joins the open period, whatever the date; the code works for several.
     joined = ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=franco.headers))
     franco_member = next(m for m in joined["members"] if m["user_id"] == str(franco.id))
     assert franco_member["joined_period_seq"] == 1
     r = client.post(f"/v1/invitations/{inv['code']}/accept", headers=franco.headers)
-    assert r.status_code == 409  # exhausted (max_uses=1) or already member
-    r = client.post(f"/v1/invitations/{inv['code']}/accept", headers=ana.headers)
-    assert r.status_code == 409 and r.json()["code"] == "invitation_exhausted"
-
-    inv2 = ok(client.post(f"/v1/households/{hid}/invitations", json={}, headers=juli.headers), 201)
-    r = client.post(f"/v1/invitations/{inv2['code']}/accept", headers=franco.headers)
     assert r.status_code == 409 and r.json()["code"] == "already_member"
-    ok(client.delete(f"/v1/households/{hid}/invitations/{inv2['id']}", headers=juli.headers), 204)
-    r = client.get(f"/v1/invitations/{inv2['code']}", headers=ana.headers)
-    assert r.status_code == 410 and r.json()["code"] == "invitation_expired"
+    ok(client.post(f"/v1/invitations/{inv['code'].lower()}/accept", headers=ana.headers))
+    # Only admins hand out the code.
+    r = client.post(f"/v1/households/{hid}/invitations", headers=franco.headers)
+    assert r.status_code == 403
 
-    inv3 = ok(
-        client.post(
-            f"/v1/households/{hid}/invitations", json={"expires_in_days": 1}, headers=juli.headers
-        ),
-        201,
-    )
-    frozen_clock.set(datetime(2026, 3, 22, tzinfo=UTC))
-    r = client.get(f"/v1/invitations/{inv3['code']}", headers=ana.headers)
-    assert r.status_code == 410
-    assert client.get("/v1/invitations/ZZZZZZZZ", headers=ana.headers).status_code == 404
+    # Revoking invalidates the code; the next invitation gets a new one.
+    ok(client.delete(f"/v1/households/{hid}/invitations", headers=juli.headers), 204)
+    r = client.get(f"/v1/invitations/{inv['code']}", headers=bea.headers)
+    assert r.status_code == 404
+    inv2 = ok(client.post(f"/v1/households/{hid}/invitations", headers=juli.headers))
+    assert inv2["code"] != inv["code"]
+
+    # Codes expire after 7 days.
+    frozen_clock.set(datetime(2026, 3, 28, tzinfo=UTC))
+    r = client.get(f"/v1/invitations/{inv2['code']}", headers=bea.headers)
+    assert r.status_code == 410 and r.json()["code"] == "invitation_expired"
+    inv3 = ok(client.post(f"/v1/households/{hid}/invitations", headers=juli.headers))
+    assert inv3["code"] != inv2["code"]
+    assert client.get("/v1/invitations/ZZZZZZZZ", headers=bea.headers).status_code == 404
 
 
 def test_member_joining_current_period_is_included(
@@ -128,12 +116,7 @@ def test_member_joining_current_period_is_included(
     exp = add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-03-02")
     assert len(exp["shares"]) == 2
     ana = make_user("Ana")
-    inv = ok(
-        client.post(
-            house.url("/invitations"), json={"start_period": "current"}, headers=house.h("Juli")
-        ),
-        201,
-    )
+    inv = ok(client.post(house.url("/invitations"), headers=house.h("Juli")))
     joined = ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=ana.headers))
     ana_id = next(m["id"] for m in joined["members"] if m["user_id"] == str(ana.id))
     exp = ok(client.get(house.url(f"/expenses/{exp['id']}"), headers=house.h("Juli")))
@@ -297,18 +280,28 @@ def test_rule_precedence_and_fallback(
     assert luz["split_origin"] == "category"
     assert [s["amount_cents"] for s in luz["shares"]] == [334, 334, 333]
 
+    rules = ok(client.get(house.url("/split-rules"), headers=house.h("Franco")))
+    assert rules["categories"] == [
+        {"category_id": house.categories["Luz"], "split": {"split_type": "equal", "shares": None}}
+    ]
+
     # Category single rule pointing to a member who is not in the open period -> fallback.
+    # Someone joining while no period is open joins the next one: Dani joins while period 1
+    # is closed, then period 1 is reopened (nobody paid yet) without Dani in it.
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Franco")))
     dani = make_user("Dani")
-    inv = ok(
-        client.post(
-            house.url("/invitations"), json={"start_period": "next"}, headers=house.h("Juli")
-        ),
-        201,
-    )
+    inv = ok(client.post(house.url("/invitations"), headers=house.h("Juli")))
     joined = ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=dani.headers))
     dani = next(x for x in joined["members"] if x["user_id"] == str(dani.id))
     assert dani["joined_period_seq"] == 2
     dani_id = dani["id"]
+    ok(
+        client.post(
+            house.url("/periods/1/reopen"),
+            json={"reason": "Faltan gastos"},
+            headers=house.h("Juli"),
+        )
+    )
     ok(
         client.put(
             house.url(f"/categories/{house.categories['Gas']}/split-rule"),
