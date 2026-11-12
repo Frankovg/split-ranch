@@ -30,6 +30,14 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
 ## 🟠 Riesgos medios
 
 1. **Llamadas sin límite al JWKS con `kid` falsos.** `PyJWKClient` vuelve a descargar el JWKS cada vez que llega un `kid` desconocido. Cualquiera, sin autenticarse, puede mandar tokens con `kid` aleatorios: cada uno provoca una petición saliente a Supabase (con hasta 5 s de timeout) y ocupa un hilo del pool de FastAPI. Es una vía barata para tumbar el servicio. Convendría limitar las recargas (por ejemplo, como mucho una cada 30–60 s) o rechazar el `kid` desconocido hasta la siguiente recarga permitida.
+
+   **✅ Mitigado (2026-11-12):** desde la 2.14.0 PyJWT aplica un cooldown a las recargas por `kid` desconocido (GHSA-2gx3-rcp4-g85q). Cambios hechos:
+   - Versión mínima subida a `PyJWT>=2.15.1` en `pyproject.toml`.
+   - `cooldown_duration=30` explícito en [security.py](../apps/api/src/split_ranch/core/security.py).
+   - Quitado `cache_keys`: era un LRU sin caducidad que impedía revocar claves. Ahora el JWKS se cachea 600 s, como recomienda Supabase.
+   - `verify()` rechaza tokens sin `kid` o con un `kid` de más de 128 caracteres antes de consultar las claves.
+
+   Tests en [test_jwks_refetch.py](../apps/api/tests/unit/test_jwks_refetch.py), con un `PyJWKClient` real: límite de recargas, rotación de clave, revocación al caducar la caché y `kid` inválido.
 2. **El nonce de Google no se aplica.** En [google.ts](../apps/mobile/src/features/auth/google.ts) la librería antigua no permite meter el nonce en el ID token, así que Supabase no puede comprobarlo. Un ID token de Google interceptado o filtrado podría reutilizarse mientras no caduque. Ya está anotado como TODO (T-0.4, migrar a Credential Manager); conviene hacerlo antes de lanzar.
 3. **No hay rate limiting.** La documentación lo pide para auth y para las invitaciones. El código de invitación tiene 40 bits y dura 7 días, lo que hace inviable adivinarlo por fuerza bruta, pero `GET /invitations/{code}` devuelve el nombre del hogar y el número de miembros sin ningún límite de peticiones.
 
@@ -48,8 +56,8 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
 
 ## Prioridad sugerida
 
-1. Arreglar `require_admin` para exmiembros, con su test.
-2. Limitar las recargas del JWKS.
+1. ~~Arreglar `require_admin` para exmiembros, con su test.~~ Hecho.
+2. ~~Limitar las recargas del JWKS.~~ Hecho.
 3. Aplicar el nonce de Google (Credential Manager).
 4. `DELETE /me` y comprobación de `deleted_at` en `ensure_user`.
 5. Rate limiting, test de auth en todas las rutas y configuración explícita contra tráfico sin cifrar.

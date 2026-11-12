@@ -15,6 +15,7 @@ log = structlog.get_logger(__name__)
 
 # Only asymmetric algorithms: HS256 (shared secret) and "none" are always rejected.
 ALLOWED_ALGORITHMS = ("ES256", "ES384", "ES512", "RS256", "RS384", "RS512", "PS256", "EdDSA")
+MAX_KID_LENGTH = 128
 
 
 class SigningKeySource(Protocol):
@@ -39,14 +40,22 @@ class TokenVerifier:
         audience: str = "authenticated",
         leeway_seconds: int = 30,
         cache_seconds: int = 600,
+        refetch_cooldown_seconds: float = 30,
         key_source: SigningKeySource | None = None,
     ) -> None:
         self.issuer = issuer
         self.audience = audience
         self.leeway = leeway_seconds
-        # PyJWKClient caches the key set and refetches once on an unknown `kid`.
+        # The key set is cached for `cache_seconds`, so a key revoked in Supabase stops being
+        # trusted once it expires. The per-key LRU cache (`cache_keys`) stays off: it never
+        # expires. An unknown `kid` forces a refetch at most once per cooldown, so tokens
+        # with random `kid` values cannot flood the JWKS endpoint (PyJWT >= 2.14).
         self.key_source: SigningKeySource = key_source or jwt.PyJWKClient(
-            jwks_url, cache_keys=True, lifespan=cache_seconds, timeout=5
+            jwks_url,
+            cache_keys=False,
+            lifespan=cache_seconds,
+            cooldown_duration=refetch_cooldown_seconds,
+            timeout=5,
         )
 
     def verify(self, token: str) -> TokenClaims:
@@ -57,6 +66,9 @@ class TokenVerifier:
         alg = header.get("alg")
         if alg not in ALLOWED_ALGORITHMS:
             raise Unauthenticated("Unsupported token algorithm")
+        kid = header.get("kid")
+        if not isinstance(kid, str) or not kid or len(kid) > MAX_KID_LENGTH:
+            raise Unauthenticated("Missing or invalid key id")
         try:
             signing_key = self.key_source.get_signing_key_from_jwt(token)
         except jwt.PyJWKClientError as exc:
