@@ -18,6 +18,12 @@
       "sourceType": "github",
       "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
       "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
+    "vercel-react-native-skills": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-skills/SKILL.md",
+      "computedHash": "2e9088a7333666d8c2833b8ff58bd51b955501c42b4c7244f72b4cbf22dafcc4"
     }
   }
 }
