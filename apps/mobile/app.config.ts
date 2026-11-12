@@ -41,9 +41,12 @@ const config: ExpoConfig = {
         dark: { backgroundColor: '#15110F' },
       },
     ],
-    // Google Sign-In config plugin. Without Firebase, no options are required on Android;
-    // the web client id is passed at runtime via EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.
-    '@react-native-google-signin/google-signin',
+    // Google sign-in (react-native-nitro-google-signin) needs no config plugin on Android:
+    // the native module is autolinked and the web client id is passed at runtime via
+    // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Its plugin only adds the iOS URL scheme and throws
+    // without `iosUrlScheme`, so add it as
+    // ['react-native-nitro-google-signin', { iosUrlScheme: 'com.googleusercontent.apps.<ios-client-id>' }]
+    // when iOS is built.
   ],
   experiments: {
     typedRoutes: true,

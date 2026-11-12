@@ -88,11 +88,10 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 ## Google sign-in
 
 - Android's legacy Google Sign-In is deprecated in favour of **Credential Manager**.
-- Options:
-  1. `@react-native-google-signin/google-signin` — **Universal Sign-In** API uses Credential Manager (paid/sponsor tier); the free `GoogleSignin` API still uses the legacy SDK.
-  2. Free MIT alternatives built on Credential Manager (e.g. `react-native-nitro-google-signin`, thoughtbot's `react-native-social-auth`).
-- **Recommendation:** Phase 0 spike: try option 1 (best maintained, has an Expo config plugin and iOS support, and is the one Supabase's React Native guide uses) and decide whether the licence cost is acceptable; otherwise use the most active free Credential-Manager library. Either way, wrap it in `src/features/auth/google.ts` exposing `signInWithGoogle(): Promise<void>` so it can be swapped.
-- Flow inside that function: generate a random nonce → pass its SHA-256 to the Google library → receive the ID token → `supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce: rawNonce })`. Supabase verifies the Google token (its Google provider is configured with our **web client ID**; the Android client ID is registered in Google Cloud with the app's SHA-1 fingerprints for each EAS keystore).
+- **Library (decided 2026-11-12):** `react-native-nitro-google-signin` (MIT, Credential Manager on Android, built on Nitro Modules, which the app already uses for MMKV). The free API of `@react-native-google-signin/google-signin` still wraps the legacy SDK and cannot embed a nonce; its Credential Manager API (Universal Sign-In) is paid and remains the fallback. The library is wrapped in `src/features/auth/google.ts` (`signInWithGoogle(): Promise<void>`) so it can be swapped.
+- Flow inside that function: generate a random nonce → `GoogleOneTapSignIn.configure({ webClientId, nonce: sha256(rawNonce) })` on **every** attempt (the library only takes the nonce in `configure()` and otherwise uses an internal one it never returns) → `signIn` → `createAccount` → `presentExplicitSignIn` → check that the ID token's `nonce` claim equals the hash → `supabase.auth.signInWithIdToken({ provider: 'google', token: idToken, nonce: rawNonce })`. Supabase verifies the Google token and the nonce (its Google provider is configured with our **web client ID**; the Android client ID is registered in Google Cloud with the app's SHA-1 fingerprints for each EAS keystore).
+- The nonce is mandatory on the client: Supabase accepts a token without a nonce when the request has none, so the app never sends one. Sign-in attempts are serialized, because `configure()` is global native state.
+- No config plugin on Android (autolinking + runtime `webClientId`). The library's Expo plugin only adds the iOS URL scheme and requires `iosUrlScheme`; add it when iOS is built.
 - Fallback without a native library: `supabase.auth.signInWithOAuth` + `expo-web-browser` + deep-link redirect (works, but shows a browser tab; kept only as a plan B).
 - Sign-out: `supabase.auth.signOut()` (+ the Google library's `signOut` so the account picker shows again).
 
