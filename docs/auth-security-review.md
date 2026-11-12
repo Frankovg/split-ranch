@@ -25,7 +25,7 @@ Resumen: la base es sólida, pero hay un fallo de autorización real (un admin q
 
 Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy.md), que dice que un exmiembro solo tiene lectura. En los gastos esto sí se tuvo en cuenta: `_can_edit` en [expenses.py](../apps/api/src/split_ranch/use_cases/expenses.py) comprueba `status != "left"`.
 
-**Arreglo propuesto:** que `require_admin` también rechace a quien tiene `status == "left"`, o pasar el rol a `member` al salir, y añadir un test para este caso.
+**✅ Corregido (2026-11-12):** `HouseholdActor.is_admin` ([actor.py](../apps/api/src/split_ranch/core/actor.py)) ahora devuelve `False` cuando `status == "left"`, lo que cubre `require_admin`, `confirm_transfer` y `_can_edit`. El rol guardado se conserva por historial. Test: `test_former_admin_loses_admin_rights` en [test_households.py](../apps/api/tests/integration/test_households.py).
 
 ## 🟠 Riesgos medios
 

@@ -21,4 +21,5 @@ class HouseholdActor:
 
     @property
     def is_admin(self) -> bool:
-        return self.role == "admin"
+        """Admin rights end when the member has left: their stored role is kept for history."""
+        return self.role == "admin" and self.status != "left"
