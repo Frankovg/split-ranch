@@ -13,36 +13,49 @@ import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { currentMoneyLocale } from '@/i18n';
 import { displayMoney } from '@/lib/money';
+import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
 import {
   useActiveMembership,
   useBalance,
   useCategories,
   useCreateInvitation,
-  useExpenses,
   useHousehold,
   usePeriods,
+  useRecentExpenses,
 } from './api';
 import { activeMembers, ErrorScreen, ExpenseRow, LoadingScreen, memberName } from './components';
 import { periodDates } from './dates';
 import { OnboardingScreen } from './OnboardingScreen';
 import { StartPeriodButton } from './StartPeriodButton';
 
+/** Expenses shown in the "recent" card. */
+const RECENT_COUNT = 5;
+
 export function HomeScreen() {
   const { t } = useTranslation();
   const me = useActiveMembership();
-  const householdId = me.membership?.household_id;
+  const householdId = me.data?.household_id;
   const household = useHousehold(householdId);
   // "current" = the latest period: the open one, or the last closed one until someone
   // starts the next period.
   const balance = useBalance(householdId, 'current');
-  const expenses = useExpenses(householdId, 'current');
+  const expenses = useRecentExpenses(householdId, 'current', RECENT_COUNT);
   const categories = useCategories(householdId);
   const invite = useCreateInvitation(householdId ?? '');
   const periods = usePeriods(householdId);
+  useRefreshOnFocus(householdId);
+  const { isRefetchingByUser, refetchByUser } = useRefreshByUser(
+    me.refetch,
+    household.refetch,
+    balance.refetch,
+    expenses.refetch,
+    categories.refetch,
+    periods.refetch,
+  );
 
   if (me.isPending) return <LoadingScreen />;
   if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
-  if (!me.membership) return <OnboardingScreen />;
+  if (!me.data) return <OnboardingScreen />;
   if (household.isPending || balance.isPending) return <LoadingScreen />;
   if (household.isError || balance.isError) {
     return (
@@ -58,19 +71,24 @@ export function HomeScreen() {
 
   const h = household.data;
   const locale = currentMoneyLocale();
-  const myNet = balance.data.balances.find((b) => b.member_id === h.my_member_id)?.net_cents ?? 0;
+  const netByMember = new Map(balance.data.balances.map((b) => [b.member_id, b.net_cents]));
+  const myNet = netByMember.get(h.my_member_id) ?? 0;
   const period = balance.data.period;
-  const categoryName = (id: string | null) => categories.data?.find((c) => c.id === id)?.name;
-  const recent = (expenses.data?.items ?? []).slice(0, 5);
+  const categoryNames = new Map((categories.data ?? []).map((c) => [c.id, c.name]));
+  const recent = expenses.data?.items ?? [];
   const pastPeriods = (periods.data?.items ?? []).filter((p) => p.seq < period.seq);
   const isOpen = period.status === 'open';
   const dates = periodDates(period, locale, h.timezone);
-  const refreshing = household.isRefetching || balance.isRefetching || expenses.isRefetching;
 
   const onInvite = () =>
     invite.mutate(undefined, {
-      onSuccess: (inv) =>
-        void Share.share({ message: t('home.inviteMessage', { name: h.name, code: inv.code }) }),
+      onSuccess: async (inv) => {
+        try {
+          await Share.share({ message: t('home.inviteMessage', { name: h.name, code: inv.code }) });
+        } catch (error) {
+          console.warn('Share failed', error);
+        }
+      },
       onError: () => toast.error(t('home.inviteFailed')),
     });
 
@@ -79,15 +97,7 @@ export function HomeScreen() {
       <ScrollView
         contentContainerClassName='gap-4 px-4 py-4'
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              void me.refetch();
-              void household.refetch();
-              void balance.refetch();
-              void expenses.refetch();
-            }}
-          />
+          <RefreshControl refreshing={isRefetchingByUser} onRefresh={() => void refetchByUser()} />
         }>
         <View className='flex-row items-center justify-between'>
           <Text className='text-2xl font-bold' role='heading'>
@@ -161,7 +171,7 @@ export function HomeScreen() {
           </CardHeader>
           <CardContent>
             {activeMembers(h).map((m) => {
-              const net = balance.data.balances.find((b) => b.member_id === m.id)?.net_cents ?? 0;
+              const net = netByMember.get(m.id) ?? 0;
               return (
                 <View key={m.id} className='flex-row items-center justify-between py-2'>
                   <Text>{memberName(h, m.id, t)}</Text>
@@ -190,7 +200,7 @@ export function HomeScreen() {
                   <ExpenseRow
                     expense={e}
                     household={h}
-                    categoryName={categoryName(e.category_id)}
+                    categoryName={e.category_id ? categoryNames.get(e.category_id) : undefined}
                     t={t}
                   />
                 </View>

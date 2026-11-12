@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { LogOut, Palette } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
+import { useShallow } from 'zustand/react/shallow';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,8 +24,16 @@ const LANGUAGES: LanguagePreference[] = ['system', 'es', 'en'];
 
 export function SettingsScreen() {
   const { t } = useTranslation();
-  const { theme, language, setTheme, setLanguage } = usePreferencesStore();
-  const session = useSessionStore((s) => s.session);
+  const { theme, language, setTheme, setLanguage } = usePreferencesStore(
+    useShallow((s) => ({
+      theme: s.theme,
+      language: s.language,
+      setTheme: s.setTheme,
+      setLanguage: s.setLanguage,
+    })),
+  );
+  // Only the email: the session object changes on every token refresh.
+  const email = useSessionStore((s) => s.session?.user.email);
 
   const themeLabel: Record<ThemePreference, string> = {
     system: t('settings.themeSystem'),
@@ -80,9 +89,7 @@ export function SettingsScreen() {
           <CardTitle>{t('settings.account')}</CardTitle>
         </CardHeader>
         <CardContent className='gap-3'>
-          {session?.user.email ? (
-            <Text className='text-muted-foreground'>{t('auth.signedInAs', { email: session.user.email })}</Text>
-          ) : null}
+          {email ? <Text className='text-muted-foreground'>{t('auth.signedInAs', { email })}</Text> : null}
           <Button variant='outline' onPress={() => void signOut()}>
             <Icon as={LogOut} size={18} />
             <Text>{t('auth.signOut')}</Text>

@@ -34,9 +34,12 @@ export function QuickEditorScreen({ id }: { id: string }) {
   const setMode = useQuickSplitsStore((s) => s.setMode);
   const deleteEvent = useQuickSplitsStore((s) => s.deleteEvent);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Set right before deleting: the screen stays mounted during the exit animation.
+  const [deleting, setDeleting] = useState(false);
   const result = useMemo(() => (event ? computeQuickResult(event) : null), [event]);
 
   if (!event || !result) {
+    if (deleting) return null;
     return (
       <Screen>
         <EmptyState
@@ -115,7 +118,10 @@ export function QuickEditorScreen({ id }: { id: string }) {
               variant='destructive'
               onPress={() => {
                 setConfirmDelete(false);
-                router.back();
+                setDeleting(true);
+                // Opened from a deep link there is no screen to go back to.
+                if (router.canGoBack()) router.back();
+                else router.replace('/');
                 deleteEvent(event.id);
               }}>
               <Text>{t('common.delete')}</Text>

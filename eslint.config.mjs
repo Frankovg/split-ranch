@@ -1,7 +1,9 @@
 import js from '@eslint/js';
+import pluginQuery from '@tanstack/eslint-plugin-query';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import { importX } from 'eslint-plugin-import-x';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -53,6 +55,12 @@ export default defineConfig([
     languageOptions: {
       globals: { ...globals.browser, __DEV__: 'readonly' },
     },
+  },
+  {
+    // Hooks rules plus the React Compiler rules (the compiler is on via app.config.ts),
+    // and TanStack Query rules (e.g. no-rest-destructuring keeps tracked properties working).
+    files: ['apps/mobile/**/*.{ts,tsx}'],
+    extends: [reactHooks.configs.flat.recommended, pluginQuery.configs['flat/recommended']],
   },
   {
     files: ['**/*.config.{js,cjs}', 'apps/mobile/babel.config.js', 'apps/mobile/metro.config.js', 'apps/mobile/tailwind.config.js'],

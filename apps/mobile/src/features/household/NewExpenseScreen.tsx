@@ -22,17 +22,20 @@ import {
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
 import { todayIso } from './dates';
+import { OnboardingScreen } from './OnboardingScreen';
 import type { Household } from './types';
 
 export function NewExpenseScreen() {
   const { t } = useTranslation();
   const me = useActiveMembership();
-  const household = useHousehold(me.membership?.household_id);
+  const household = useHousehold(me.data?.household_id);
 
-  if (me.isPending || household.isPending) return <LoadingScreen />;
-  if (me.isError || household.isError || !household.data) {
-    return <ErrorScreen t={t} onRetry={() => void household.refetch()} />;
-  }
+  if (me.isPending) return <LoadingScreen />;
+  if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
+  // No household (e.g. deep link after leaving it): the household query never runs.
+  if (!me.data) return <OnboardingScreen />;
+  if (household.isPending) return <LoadingScreen />;
+  if (household.isError) return <ErrorScreen t={t} onRetry={() => void household.refetch()} />;
   return <NewExpenseForm household={household.data} />;
 }
 
@@ -72,7 +75,8 @@ function NewExpenseForm({ household }: { household: Household }) {
         description: description.trim(),
         category_id: categoryId || null,
         payer_member_id: payer,
-        expense_date: todayIso(),
+        // The household's calendar day, not the device's (they differ abroad).
+        expense_date: todayIso(household.timezone),
         // Everyone selected = let the household/category rule decide the split.
         participants: allSelected ? undefined : everyone.filter((id) => participants.includes(id)),
       },

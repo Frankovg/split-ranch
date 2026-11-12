@@ -47,6 +47,8 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
+    // Automatic memoization (babel-preset-expo runs babel-plugin-react-compiler on app code).
+    reactCompiler: true,
   },
   extra: {
     eas: {

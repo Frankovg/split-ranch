@@ -91,14 +91,27 @@ export function parseMoney(input: string): number | null {
   return cents;
 }
 
+// Intl constructors are expensive (notably on Hermes): build each formatter once.
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+const amountFormatters = new Map<string, Intl.NumberFormat>();
+
 /** Format cents as a localized currency string (default es-ES, EUR). */
 export function formatMoney(cents: number, locale = 'es-ES', currency = 'EUR'): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
+  const key = `${locale}|${currency}`;
+  let fmt = currencyFormatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { style: 'currency', currency });
+    currencyFormatters.set(key, fmt);
+  }
+  return fmt.format(cents / 100);
 }
 
 /** Format cents as a plain decimal string without currency symbol, e.g. 2188 -> "21,88". */
 export function formatAmount(cents: number, locale = 'es-ES'): string {
-  return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-    cents / 100,
-  );
+  let fmt = amountFormatters.get(locale);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    amountFormatters.set(locale, fmt);
+  }
+  return fmt.format(cents / 100);
 }

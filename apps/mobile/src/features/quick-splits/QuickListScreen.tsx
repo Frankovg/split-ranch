@@ -14,6 +14,7 @@ import { computeQuickResult } from './compute';
 import type { QuickEvent } from './types';
 
 function EventRow({ event }: { event: QuickEvent }) {
+  const { t } = useTranslation();
   const result = useMemo(() => computeQuickResult(event), [event]);
   return (
     <Pressable
@@ -21,7 +22,7 @@ function EventRow({ event }: { event: QuickEvent }) {
       role='button'
       className='min-h-14 flex-row items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 active:bg-accent'>
       <View className='flex-1 gap-0.5'>
-        <Text className='font-semibold'>{event.title}</Text>
+        <Text className='font-semibold'>{event.title.trim() || t('quick.defaultTitle')}</Text>
         <Text className='text-sm text-muted-foreground'>
           {event.participants.map((p) => p.name).join(', ')}
         </Text>
