@@ -43,7 +43,7 @@ Each item has a **default** that the plan already assumes. Change the default by
 21. ~~Incremental sync of the open period~~ **Decided 2026-11-09:** never. Only closed periods are exported (at close, and again after an edit to a closed period).
 
 ## Technical
-22. **Google Sign-In library**: paid Universal Sign-In vs free Credential-Manager library. **Default:** decide in spike T-0.4; abstraction either way.
+22. ~~Google Sign-In library~~ **Decided 2026-11-12:** `react-native-nitro-google-signin` (MIT, free, Credential Manager on Android), because it embeds our nonce in the ID token. Paid Universal Sign-In stays the fallback behind the same abstraction in `src/features/auth/google.ts`.
 23. **NativeWind 4.2 (Tailwind 3) now vs wait for v5 / use Uniwind (Tailwind 4).** **Default:** NativeWind 4.2 now; migrate when v5 is stable (est. small effort thanks to tokens in CSS variables).
 24. **Job queue**: **Decided 2026-11-11:** none until a feature needs background work. Push notifications should first try Expo's own APIs or sending within the request.
 25. **SQLAlchemy 2.1** just reached release-candidate/final. **Default:** pin 2.0.x for MVP; upgrade in a dedicated task.

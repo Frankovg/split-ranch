@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { currentMoneyLocale } from '@/i18n';
 import { displayMoney } from '@/lib/money';
+import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
 import {
   useActiveMembership,
   useBalance,
@@ -25,6 +26,7 @@ import {
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
 import { periodDates } from './dates';
+import { OnboardingScreen } from './OnboardingScreen';
 import { StartPeriodButton } from './StartPeriodButton';
 import type { Household, Period, PeriodKey, Transfer } from './types';
 
@@ -32,26 +34,40 @@ import type { Household, Period, PeriodKey, Transfer } from './types';
 export function PeriodScreen({ periodKey }: { periodKey: PeriodKey }) {
   const { t } = useTranslation();
   const me = useActiveMembership();
-  const householdId = me.membership?.household_id;
+  const householdId = me.data?.household_id;
   const household = useHousehold(householdId);
   const balance = useBalance(householdId, periodKey);
   const settlement = useSettlement(householdId, periodKey);
   const periods = usePeriods(householdId);
+  useRefreshOnFocus(householdId);
+  const { isRefetchingByUser, refetchByUser } = useRefreshByUser(
+    balance.refetch,
+    settlement.refetch,
+    periods.refetch,
+  );
   const loaded = settlement.data?.period;
   const title = loaded ? t('period.title', { seq: loaded.seq }) : '';
   // Only the latest period can be reopened or followed by a new one.
   const latestSeq = periods.data?.items[0]?.seq;
 
   let body: ReactNode;
-  if (me.isPending || household.isPending || balance.isPending || settlement.isPending) {
+  if (me.isPending) {
     body = <LoadingScreen />;
-  } else if (household.isError || balance.isError || settlement.isError || !household.data) {
+  } else if (me.isError) {
+    body = <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
+  } else if (!me.data) {
+    // No household (e.g. deep link after leaving it): the period queries never run.
+    body = <OnboardingScreen />;
+  } else if (household.isPending || balance.isPending || settlement.isPending) {
+    body = <LoadingScreen />;
+  } else if (household.isError || balance.isError || settlement.isError) {
     body = (
       <ErrorScreen
         t={t}
         onRetry={() => {
-          void balance.refetch();
-          void settlement.refetch();
+          if (household.isError) void household.refetch();
+          if (balance.isError) void balance.refetch();
+          if (settlement.isError) void settlement.refetch();
         }}
       />
     );
@@ -59,19 +75,15 @@ export function PeriodScreen({ periodKey }: { periodKey: PeriodKey }) {
     const h = household.data;
     const period = settlement.data.period;
     const isLatest = latestSeq === undefined || latestSeq === period.seq;
+    const balanceByMember = new Map(balance.data.balances.map((b) => [b.member_id, b]));
+    const locale = currentMoneyLocale();
     body = (
       <SafeAreaView edges={['bottom']} className='flex-1 bg-background'>
         <ScrollView
           contentContainerClassName='gap-4 px-4 py-4'
           keyboardShouldPersistTaps='handled'
           refreshControl={
-            <RefreshControl
-              refreshing={balance.isRefetching || settlement.isRefetching}
-              onRefresh={() => {
-                void balance.refetch();
-                void settlement.refetch();
-              }}
-            />
+            <RefreshControl refreshing={isRefetchingByUser} onRefresh={() => void refetchByUser()} />
           }>
           <SummaryCard household={h} period={period} title={title} />
 
@@ -81,9 +93,8 @@ export function PeriodScreen({ periodKey }: { periodKey: PeriodKey }) {
             </CardHeader>
             <CardContent>
               {activeMembers(h).map((m, i) => {
-                const b = balance.data.balances.find((x) => x.member_id === m.id);
+                const b = balanceByMember.get(m.id);
                 const net = b?.net_cents ?? 0;
-                const locale = currentMoneyLocale();
                 return (
                   <View key={m.id}>
                     {i > 0 ? <Separator /> : null}

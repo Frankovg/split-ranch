@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { queryKeys } from '@/lib/query/client';
 import type {
@@ -8,6 +8,7 @@ import type {
   Household,
   Invitation,
   Me,
+  Membership,
   Page,
   Period,
   PeriodBalance,
@@ -22,11 +23,21 @@ export function useMe() {
   return useQuery({ queryKey: queryKeys.me(), queryFn: () => apiFetch<Me>('/me') });
 }
 
-/** The household shown in the app: first membership that is not `left`. */
+/** First membership that is not `left`, or null. */
+function activeMembershipOf(me: Me): Membership | null {
+  return me.memberships.find((m) => m.status !== 'left') ?? null;
+}
+
+/**
+ * The household shown in the app: `data` is the first membership that is not `left`.
+ * Returned as-is (no spread) so TanStack's tracked properties keep re-renders minimal.
+ */
 export function useActiveMembership() {
-  const me = useMe();
-  const membership = me.data?.memberships.find((m) => m.status !== 'left') ?? null;
-  return { ...me, membership };
+  return useQuery({
+    queryKey: queryKeys.me(),
+    queryFn: () => apiFetch<Me>('/me'),
+    select: activeMembershipOf,
+  });
 }
 
 export function useHousehold(householdId: string | undefined) {
@@ -53,11 +64,45 @@ export function useBalance(householdId: string | undefined, period: PeriodKey) {
   });
 }
 
-export function useExpenses(householdId: string | undefined, period: PeriodKey) {
+/** The newest `limit` expenses of a period (e.g. the Home "recent" card). */
+export function useRecentExpenses(householdId: string | undefined, period: PeriodKey, limit: number) {
   return useQuery({
-    queryKey: queryKeys.expenses(householdId ?? '', { period: String(period) }),
+    queryKey: queryKeys.expenses(householdId ?? '', { period: String(period), limit }),
     queryFn: () =>
-      apiFetch<Page<Expense>>(`/households/${householdId}/expenses?period=${period}&limit=100`),
+      apiFetch<Page<Expense>>(`/households/${householdId}/expenses?period=${period}&limit=${limit}`),
+    enabled: !!householdId,
+  });
+}
+
+const EXPENSES_PAGE_SIZE = 50;
+
+/** Next page: the API cursor plus the period number, pinned from the first page. */
+interface ExpensesPageParam {
+  cursor: string | null;
+  period: PeriodKey;
+}
+
+/**
+ * All expenses of a period, newest first, loaded page by page (cursor pagination).
+ * Its own query key: infinite data ({ pages, pageParams }) cannot share a cache entry
+ * with a plain useQuery.
+ */
+export function useExpensesInfinite(householdId: string | undefined, period: PeriodKey) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.expenses(householdId ?? '', { period: String(period), infinite: true }),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ period: String(pageParam.period), limit: String(EXPENSES_PAGE_SIZE) });
+      if (pageParam.cursor) params.set('cursor', pageParam.cursor);
+      return apiFetch<Page<Expense>>(`/households/${householdId}/expenses?${params.toString()}`);
+    },
+    initialPageParam: { cursor: null, period } as ExpensesPageParam,
+    getNextPageParam: (lastPage, allPages): ExpensesPageParam | undefined => {
+      if (!lastPage.next_cursor) return undefined;
+      // Later pages ask for the first page's period number: if someone starts a new
+      // period meanwhile, "current" would point at it and mix two periods.
+      const seq = allPages[0]?.items[0]?.period.seq;
+      return { cursor: lastPage.next_cursor, period: seq ?? period };
+    },
     enabled: !!householdId,
   });
 }

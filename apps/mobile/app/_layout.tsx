@@ -13,6 +13,7 @@ import { Toaster } from 'sonner-native';
 import { AuthListener } from '@/features/auth/AuthListener';
 import { LanguageSync } from '@/i18n/LanguageSync';
 import { queryClient } from '@/lib/query/client';
+import { useAppStateFocus } from '@/lib/query/refresh';
 import { useSessionStore } from '@/stores/session';
 import { NAV_THEME } from '@/theme/navigation';
 import { ThemeSync, useAppColorScheme } from '@/theme/ThemeSync';
@@ -25,6 +26,7 @@ export default function RootLayout() {
   const scheme = useAppColorScheme();
   const status = useSessionStore((s) => s.status);
   const { t } = useTranslation();
+  useAppStateFocus();
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hide();

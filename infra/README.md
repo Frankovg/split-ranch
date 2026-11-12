@@ -10,7 +10,8 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 ## 1. Google Cloud (project `split-ranch`, no billing account needed)
 - [ ] OAuth consent screen: External, app name, scopes `openid email profile`. Leave it in **Testing** mode and add both of your Google accounts as test users. That avoids Google's app verification, and these basic scopes do not need it anyway.
 - [ ] OAuth client **Web**: its client ID and secret go to Supabase's Google provider and to `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
-- [ ] OAuth client **Android** per signing key: package `com.splitranch.app` plus the SHA-1 of each EAS keystore you use (`eas credentials`).
+- [ ] OAuth client **Android** per signing key: package `com.splitranch.app` plus the SHA-1 of each EAS keystore you use (`eas credentials`), and the debug keystore for local dev builds. Only register keys you own. If the app is ever distributed through Google Play, also add the **Play App Signing** SHA-1, or Credential Manager returns `cancelled` after the account pick.
+- [ ] Web client: no Authorized JavaScript origins, and no redirect URIs beyond what Supabase needs. Supabase accepts Google ID tokens without a nonce, so nothing else should be able to obtain ID tokens for this client.
 - Google Sheets export is not built yet: no service account or spreadsheet is needed until it is (see docs/06).
 
 ## 2. Supabase (Free plan; one project `split-ranch-prod`, region Frankfurt `eu-central-1`)

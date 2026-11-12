@@ -183,6 +183,48 @@ def test_roles_and_leaving(
     assert r.status_code in (403, 422)
 
 
+def test_former_admin_loses_admin_rights(
+    client: TestClient, make_user: Callable[[str], TestUser], frozen_clock: FrozenClock
+) -> None:
+    frozen_clock.set(datetime(2026, 3, 5, tzinfo=UTC))
+    house = make_house(client, make_user, ("Juli", "Franco", "Ana"))
+    m = house.members
+    ok(
+        client.patch(
+            house.url(f"/members/{m['Franco']}"), json={"role": "admin"}, headers=house.h("Juli")
+        )
+    )
+    # A second admin exists, so Franco may leave while still being an admin.
+    ok(client.post(house.url("/members/me/leave"), headers=house.h("Franco")))
+    add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-03-03")
+    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
+    ok(client.post(house.url("/periods"), headers=house.h("Juli")), 201)
+    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
+    for t in settlement["transfers"]:
+        ok(client.post(house.url(f"/transfers/{t['id']}/confirm"), headers=house.h("Juli")))
+    house_after = ok(client.get(house.url(), headers=house.h("Franco")))
+    franco = next(x for x in house_after["members"] if x["id"] == m["Franco"])
+    assert franco["status"] == "left" and franco["role"] == "admin"
+
+    h = house.h("Franco")
+    attempts = [
+        client.patch(house.url(), json={"name": "Mía"}, headers=h),
+        client.post(house.url("/invitations"), headers=h),
+        client.delete(house.url("/invitations"), headers=h),
+        client.patch(house.url(f"/members/{m['Ana']}"), json={"role": "admin"}, headers=h),
+        client.delete(house.url(f"/members/{m['Ana']}"), headers=h),
+        client.post(house.url("/categories"), json={"name": "Mascotas"}, headers=h),
+        client.put(house.url("/split-rules/default"), json={"split_type": "equal"}, headers=h),
+        client.post(
+            house.url("/periods/2/reopen"), json={"reason": "take back control"}, headers=h
+        ),
+    ]
+    for r in attempts:
+        assert r.status_code == 403, f"{r.request.method} {r.request.url} -> {r.status_code}"
+    # Read access remains.
+    assert client.get(house.url("/periods/1"), headers=h).status_code == 200
+
+
 def test_categories_crud(client: TestClient, make_user: Callable[[str], TestUser]) -> None:
     house = make_house(client, make_user, ("Juli", "Franco"))
     cat = ok(

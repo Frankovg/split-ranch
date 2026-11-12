@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { Input } from '@/components/ui/input';
@@ -46,10 +46,14 @@ export function MoneyInput({
   const [text, setText] = useState(() => toText(valueCents));
   const [touched, setTouched] = useState(false);
 
-  // Sync when the value is changed from outside (e.g. form reset).
-  useEffect(() => {
-    setText((current) => (parseMoney(current) === valueCents ? current : toText(valueCents)));
-  }, [valueCents]);
+  // Sync when the value is changed from outside (e.g. form reset). Adjusted during render
+  // (react.dev "adjusting state when a prop changes") instead of in an effect, which
+  // would cost an extra render with stale text.
+  const [prevValueCents, setPrevValueCents] = useState(valueCents);
+  if (valueCents !== prevValueCents) {
+    setPrevValueCents(valueCents);
+    if (parseMoney(text) !== valueCents) setText(toText(valueCents));
+  }
 
   const parsed = text.trim() === '' ? null : parseMoney(text);
   const parseError = touched && text.trim() !== '' && parsed === null ? t('money.invalid') : undefined;

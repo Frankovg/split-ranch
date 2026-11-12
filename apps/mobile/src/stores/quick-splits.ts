@@ -1,9 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import * as model from '@/features/quick-splits/model';
 import type { QuickEvent, QuickExpense, QuickMode, QuickParticipant } from '@/features/quick-splits/types';
-import { zustandStorage } from '@/lib/storage';
+import { createDebouncedMMKVStorage } from '@/lib/storage';
 
 /**
  * Local-only Quick splits (works signed out, fully offline). Persisted in MMKV.
@@ -81,7 +81,8 @@ export const useQuickSplitsStore = create<QuickSplitsState>()(
     },
     {
       name: 'quick-splits',
-      storage: createJSONStorage(() => zustandStorage),
+      // Debounced: title and amount inputs update the store on every keystroke.
+      storage: createDebouncedMMKVStorage<Pick<QuickSplitsState, 'events'>>(),
       version: 2,
       partialize: (s) => ({ events: s.events }),
       migrate: (persisted, version) => {
