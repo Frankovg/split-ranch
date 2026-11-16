@@ -20,9 +20,15 @@ class StrictModel(BaseModel):
 
 
 class ReadModel(BaseModel):
-    """Output model."""
+    """Output model.
 
-    model_config = ConfigDict(from_attributes=True)
+    Fields with defaults are always serialized, so the OpenAPI response schema marks them as
+    required (the generated TS client then types them as present).
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True, json_schema_serialization_defaults_required=True
+    )
 
 
 T = TypeVar("T")

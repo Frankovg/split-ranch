@@ -25,6 +25,7 @@
     "@rn-primitives/tabs": "^1.5.2",
     "@rn-primitives/toggle": "^1.5.2",
     "@rn-primitives/toggle-group": "^1.5.2",
+    "@split-ranch/api-client": "workspace:*",
     "@split-ranch/domain": "workspace:*",
     "@supabase/supabase-js": "^2.119.0",
     "@tanstack/react-query": "^5.106.1",

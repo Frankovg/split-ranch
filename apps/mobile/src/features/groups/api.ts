@@ -1,29 +1,25 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api';
+import { api, unwrap } from '@/lib/api';
 import { queryKeys } from '@/lib/query/client';
 import { usePreferencesStore } from '@/stores/preferences';
 import type {
-  Category,
   DateRange,
   Expense,
   ExpenseCreateInput,
   ExpenseUpdateInput,
-  Group,
-  GroupBalance,
-  Invitation,
   Me,
   Membership,
-  Page,
   Payment,
   PaymentCreateInput,
-  Summary,
 } from './types';
 
-const json = (body: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(body) });
-const ifMatch = (version: number) => ({ 'If-Match': `"${version}"` });
+/** Optimistic-concurrency header: the API rejects the change if the row changed meanwhile. */
+const ifMatch = (version: number) => ({ 'if-match': `"${version}"` });
+
+const fetchMe = () => unwrap(api.GET('/v1/me'));
 
 export function useMe() {
-  return useQuery({ queryKey: queryKeys.me(), queryFn: () => apiFetch<Me>('/me') });
+  return useQuery({ queryKey: queryKeys.me(), queryFn: fetchMe });
 }
 
 /** The chosen group if the user still belongs to it, else their first group, else null. */
@@ -39,19 +35,19 @@ export function useActiveMembership() {
   const activeGroupId = usePreferencesStore((s) => s.activeGroupId);
   return useQuery({
     queryKey: queryKeys.me(),
-    queryFn: () => apiFetch<Me>('/me'),
+    queryFn: fetchMe,
     select: (me: Me) => pickMembership(me, activeGroupId),
   });
 }
 
 export function useGroups() {
-  return useQuery({ queryKey: queryKeys.groups(), queryFn: () => apiFetch<Group[]>('/groups') });
+  return useQuery({ queryKey: queryKeys.groups(), queryFn: () => unwrap(api.GET('/v1/groups')) });
 }
 
 export function useGroup(groupId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.group(groupId ?? ''),
-    queryFn: () => apiFetch<Group>(`/groups/${groupId}`),
+    queryFn: () => unwrap(api.GET('/v1/groups/{group_id}', { params: { path: { group_id: groupId ?? '' } } })),
     enabled: !!groupId,
   });
 }
@@ -59,7 +55,8 @@ export function useGroup(groupId: string | undefined) {
 export function useCategories(groupId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.categories(groupId ?? ''),
-    queryFn: () => apiFetch<Category[]>(`/groups/${groupId}/categories`),
+    queryFn: () =>
+      unwrap(api.GET('/v1/groups/{group_id}/categories', { params: { path: { group_id: groupId ?? '' } } })),
     enabled: !!groupId,
   });
 }
@@ -67,23 +64,22 @@ export function useCategories(groupId: string | undefined) {
 export function useBalance(groupId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.balance(groupId ?? ''),
-    queryFn: () => apiFetch<GroupBalance>(`/groups/${groupId}/balance`),
+    queryFn: () =>
+      unwrap(api.GET('/v1/groups/{group_id}/balance', { params: { path: { group_id: groupId ?? '' } } })),
     enabled: !!groupId,
   });
-}
-
-function rangeParams(range: DateRange, extra: Record<string, string> = {}): URLSearchParams {
-  const params = new URLSearchParams(extra);
-  if (range.from) params.set('from', range.from);
-  if (range.to) params.set('to', range.to);
-  return params;
 }
 
 /** The newest `limit` expenses (the Home "recent" card). */
 export function useRecentExpenses(groupId: string | undefined, limit: number) {
   return useQuery({
     queryKey: queryKeys.expenses(groupId ?? '', { limit }),
-    queryFn: () => apiFetch<Page<Expense>>(`/groups/${groupId}/expenses?limit=${limit}`),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/expenses', {
+          params: { path: { group_id: groupId ?? '' }, query: { limit } },
+        }),
+      ),
     enabled: !!groupId,
   });
 }
@@ -97,11 +93,16 @@ const EXPENSES_PAGE_SIZE = 50;
 export function useExpensesInfinite(groupId: string | undefined, range: DateRange) {
   return useInfiniteQuery({
     queryKey: queryKeys.expenses(groupId ?? '', { ...range, infinite: true }),
-    queryFn: ({ pageParam }) => {
-      const params = rangeParams(range, { limit: String(EXPENSES_PAGE_SIZE) });
-      if (pageParam) params.set('cursor', pageParam);
-      return apiFetch<Page<Expense>>(`/groups/${groupId}/expenses?${params.toString()}`);
-    },
+    queryFn: ({ pageParam }) =>
+      // Unset range ends and the first page's null cursor are left out of the query string.
+      unwrap(
+        api.GET('/v1/groups/{group_id}/expenses', {
+          params: {
+            path: { group_id: groupId ?? '' },
+            query: { from: range.from, to: range.to, limit: EXPENSES_PAGE_SIZE, cursor: pageParam },
+          },
+        }),
+      ),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!groupId,
@@ -112,7 +113,12 @@ export function useExpensesInfinite(groupId: string | undefined, range: DateRang
 export function useSummary(groupId: string | undefined, range: DateRange) {
   return useQuery({
     queryKey: queryKeys.summary(groupId ?? '', { ...range }),
-    queryFn: () => apiFetch<Summary>(`/groups/${groupId}/summary?${rangeParams(range).toString()}`),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/summary', {
+          params: { path: { group_id: groupId ?? '' }, query: { from: range.from, to: range.to } },
+        }),
+      ),
     enabled: !!groupId,
   });
 }
@@ -120,7 +126,12 @@ export function useSummary(groupId: string | undefined, range: DateRange) {
 export function useExpense(groupId: string | undefined, expenseId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.expense(groupId ?? '', expenseId ?? ''),
-    queryFn: () => apiFetch<Expense>(`/groups/${groupId}/expenses/${expenseId}`),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/expenses/{expense_id}', {
+          params: { path: { group_id: groupId ?? '', expense_id: expenseId ?? '' } },
+        }),
+      ),
     enabled: !!groupId && !!expenseId,
   });
 }
@@ -128,7 +139,12 @@ export function useExpense(groupId: string | undefined, expenseId: string | unde
 export function usePayments(groupId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.payments(groupId ?? ''),
-    queryFn: () => apiFetch<Page<Payment>>(`/groups/${groupId}/payments?limit=50`),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/payments', {
+          params: { path: { group_id: groupId ?? '' }, query: { limit: 50 } },
+        }),
+      ),
     enabled: !!groupId,
   });
 }
@@ -154,7 +170,7 @@ export function useCreateGroup() {
   const invalidate = useInvalidateMembership();
   const setActiveGroupId = usePreferencesStore((s) => s.setActiveGroupId);
   return useMutation({
-    mutationFn: (name: string) => apiFetch<Group>('/groups', json({ name })),
+    mutationFn: (name: string) => unwrap(api.POST('/v1/groups', { body: { name } })),
     onSuccess: async (group) => {
       setActiveGroupId(group.id);
       await invalidate();
@@ -166,7 +182,8 @@ export function useAcceptInvitation() {
   const invalidate = useInvalidateMembership();
   const setActiveGroupId = usePreferencesStore((s) => s.setActiveGroupId);
   return useMutation({
-    mutationFn: (code: string) => apiFetch<Group>(`/invitations/${encodeURIComponent(code)}/accept`, json({})),
+    // Path params are URL-encoded by the client.
+    mutationFn: (code: string) => unwrap(api.POST('/v1/invitations/{code}/accept', { params: { path: { code } } })),
     onSuccess: async (group) => {
       setActiveGroupId(group.id);
       await invalidate();
@@ -176,7 +193,8 @@ export function useAcceptInvitation() {
 
 export function useCreateInvitation(groupId: string) {
   return useMutation({
-    mutationFn: () => apiFetch<Invitation>(`/groups/${groupId}/invitations`, json({})),
+    mutationFn: () =>
+      unwrap(api.POST('/v1/groups/{group_id}/invitations', { params: { path: { group_id: groupId } } })),
   });
 }
 
@@ -184,7 +202,8 @@ export function useRenameGroup(groupId: string) {
   const qc = useQueryClient();
   const invalidate = useInvalidateMembership();
   return useMutation({
-    mutationFn: (name: string) => apiFetch<Group>(`/groups/${groupId}`, json({ name }, 'PATCH')),
+    mutationFn: (name: string) =>
+      unwrap(api.PATCH('/v1/groups/{group_id}', { params: { path: { group_id: groupId } }, body: { name } })),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: queryKeys.group(groupId) });
       await invalidate();
@@ -195,7 +214,8 @@ export function useRenameGroup(groupId: string) {
 export function useLeaveGroup(groupId: string) {
   const invalidate = useInvalidateMembership();
   return useMutation({
-    mutationFn: () => apiFetch<null>(`/groups/${groupId}/members/me/leave`, json({})),
+    mutationFn: () =>
+      unwrap(api.POST('/v1/groups/{group_id}/members/me/leave', { params: { path: { group_id: groupId } } })),
     onSuccess: invalidate,
   });
 }
@@ -203,7 +223,12 @@ export function useLeaveGroup(groupId: string) {
 export function useRemoveMember(groupId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (memberId: string) => apiFetch<Group>(`/groups/${groupId}/members/${memberId}`, { method: 'DELETE' }),
+    mutationFn: (memberId: string) =>
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}/members/{member_id}', {
+          params: { path: { group_id: groupId, member_id: memberId } },
+        }),
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.group(groupId) }),
   });
 }
@@ -212,7 +237,12 @@ export function useDeleteGroup(groupId: string) {
   const invalidate = useInvalidateMembership();
   return useMutation({
     mutationFn: (confirmName: string) =>
-      apiFetch<null>(`/groups/${groupId}`, json({ confirm_name: confirmName }, 'DELETE')),
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}', {
+          params: { path: { group_id: groupId } },
+          body: { confirm_name: confirmName },
+        }),
+      ),
     onSuccess: invalidate,
   });
 }
@@ -222,7 +252,8 @@ export function useCreateExpense(groupId: string) {
   return useMutation({
     // The client-generated `input.id` makes the POST idempotent: a retry returns the
     // stored expense instead of creating a duplicate.
-    mutationFn: (input: ExpenseCreateInput) => apiFetch<Expense>(`/groups/${groupId}/expenses`, json(input)),
+    mutationFn: (input: ExpenseCreateInput) =>
+      unwrap(api.POST('/v1/groups/{group_id}/expenses', { params: { path: { group_id: groupId } }, body: input })),
     onSuccess: invalidate,
   });
 }
@@ -231,10 +262,12 @@ export function useUpdateExpense(groupId: string) {
   const invalidate = useInvalidateGroup(groupId);
   return useMutation({
     mutationFn: ({ expense, changes }: { expense: Expense; changes: ExpenseUpdateInput }) =>
-      apiFetch<Expense>(`/groups/${groupId}/expenses/${expense.id}`, {
-        ...json(changes, 'PATCH'),
-        headers: ifMatch(expense.version),
-      }),
+      unwrap(
+        api.PATCH('/v1/groups/{group_id}/expenses/{expense_id}', {
+          params: { path: { group_id: groupId, expense_id: expense.id }, header: ifMatch(expense.version) },
+          body: changes,
+        }),
+      ),
     onSettled: invalidate,
   });
 }
@@ -243,10 +276,11 @@ export function useDeleteExpense(groupId: string) {
   const invalidate = useInvalidateGroup(groupId);
   return useMutation({
     mutationFn: (expense: Expense) =>
-      apiFetch<null>(`/groups/${groupId}/expenses/${expense.id}`, {
-        method: 'DELETE',
-        headers: ifMatch(expense.version),
-      }),
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}/expenses/{expense_id}', {
+          params: { path: { group_id: groupId, expense_id: expense.id }, header: ifMatch(expense.version) },
+        }),
+      ),
     onSettled: invalidate,
   });
 }
@@ -255,21 +289,35 @@ export function useRecordPayment(groupId: string) {
   const invalidate = useInvalidateGroup(groupId);
   return useMutation({
     // Client-generated id: a retry returns the stored payment (no double payment).
-    mutationFn: (input: PaymentCreateInput) => apiFetch<Payment>(`/groups/${groupId}/payments`, json(input)),
+    mutationFn: (input: PaymentCreateInput) =>
+      unwrap(api.POST('/v1/groups/{group_id}/payments', { params: { path: { group_id: groupId } }, body: input })),
     onSettled: invalidate,
   });
 }
 
 export type PaymentAction = 'confirm' | 'dispute' | 'cancel';
 
+function postPaymentAction(groupId: string, payment: Payment, action: PaymentAction, note?: string) {
+  const params = {
+    path: { group_id: groupId, payment_id: payment.id },
+    header: ifMatch(payment.version),
+  };
+  switch (action) {
+    case 'confirm':
+      return api.POST('/v1/groups/{group_id}/payments/{payment_id}/confirm', { params, body: { note } });
+    case 'cancel':
+      return api.POST('/v1/groups/{group_id}/payments/{payment_id}/cancel', { params, body: { note } });
+    case 'dispute':
+      // A dispute needs a note; an empty one is rejected by the API like a missing one.
+      return api.POST('/v1/groups/{group_id}/payments/{payment_id}/dispute', { params, body: { note: note ?? '' } });
+  }
+}
+
 export function usePaymentAction(groupId: string) {
   const invalidate = useInvalidateGroup(groupId);
   return useMutation({
     mutationFn: ({ payment, action, note }: { payment: Payment; action: PaymentAction; note?: string }) =>
-      apiFetch<Payment>(`/groups/${groupId}/payments/${payment.id}/${action}`, {
-        ...json(note ? { note } : {}),
-        headers: ifMatch(payment.version),
-      }),
+      unwrap(postPaymentAction(groupId, payment, action, note)),
     onSettled: invalidate,
   });
 }

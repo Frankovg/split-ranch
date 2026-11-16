@@ -10,6 +10,7 @@ Split Ranch: Android-first app for shared expenses in groups (flat, trip, couple
 - `apps/mobile` — Expo SDK 58 / React Native dev-client app (not Expo Go), Expo Router, NativeWind, Zustand, i18next (Spanish default, English).
 - `packages/domain` — pure TS money/split/settle logic (`@split-ranch/domain`).
 - `packages/domain-vectors` — language-neutral JSON test vectors.
+- `packages/api-client` — `openapi.json` exported from the API + generated TS types (`@split-ranch/api-client`); never edit by hand.
 - `supabase/` — local Supabase CLI stack config (Postgres + Auth). `infra/` — Render blueprint and runbooks.
 
 ## Commands
@@ -25,6 +26,7 @@ pnpm mobile:dev                             # expo start --dev-client + keeps ad
 pnpm adb:reverse                            # one-shot adb reverse for every connected device
 pnpm domain:test                            # TS domain + parity vectors
 pnpm api:test                               # pytest
+pnpm api:openapi                            # export OpenAPI + regenerate packages/api-client (after any API schema/route change)
 ```
 
 API (run in `apps/api`; see its README for env vars):
@@ -38,7 +40,7 @@ uv run alembic upgrade head                 # also: downgrade -1, check
 
 Mobile / domain: `pnpm --filter @split-ranch/mobile typecheck|test|export:android|doctor`, `pnpm --filter @split-ranch/domain typecheck|test`. Single vitest file: `pnpm --filter @split-ranch/mobile exec vitest run src/features/quick-splits/quick-splits.test.ts`.
 
-CI (`.github/workflows/ci.yml`) runs domain typecheck/test, mobile typecheck/test, API ruff + format + mypy + pytest (against a Postgres service via `TEST_DATABASE_URL`), and a gitleaks scan.
+CI (`.github/workflows/ci.yml`) runs domain typecheck/test, mobile typecheck/test, API ruff + format + mypy + pytest (against a Postgres service via `TEST_DATABASE_URL`), an API-contract job (fails if `packages/api-client` is stale versus the exported OpenAPI), and a gitleaks scan.
 
 ## Architecture
 
@@ -50,7 +52,7 @@ CI (`.github/workflows/ci.yml`) runs domain typecheck/test, mobile typecheck/tes
 
 **Tests**: DB tests run each test in one rolled-back transaction. With `TEST_DATABASE_URL` set, the fixture **drops and recreates the `app` schema** in that DB — never point it at a real database. Without it, a throwaway Postgres is started via `pgserver`.
 
-**Mobile**: `app/` holds thin routes only; logic lives in `src/features/*` (quick-splits is fully offline and persisted in MMKV via Zustand; group screens use `features/groups/api.ts`; the active group id is persisted in `stores/preferences.ts` over `src/lib/api`). `src/components/ui` is owned React Native Reusables code (each file has a `// Source:` header noting local changes). `src/theme/tokens.ts` mirrors `global.css` and a test keeps them in sync. All `EXPO_PUBLIC_*` env vars are bundled — never secrets; missing ones disable features rather than crash.
+**Mobile**: `app/` holds thin routes only; logic lives in `src/features/*` (quick-splits is fully offline and persisted in MMKV via Zustand; group screens use `features/groups/api.ts`, typed calls through `api`/`unwrap` from `src/lib/api` (openapi-fetch; `features/groups/types.ts` only aliases the generated types); the active group id is persisted in `stores/preferences.ts` over `src/lib/api`). `src/components/ui` is owned React Native Reusables code (each file has a `// Source:` header noting local changes). `src/theme/tokens.ts` mirrors `global.css` and a test keeps them in sync. All `EXPO_PUBLIC_*` env vars are bundled — never secrets; missing ones disable features rather than crash.
 
 ## Conventions
 

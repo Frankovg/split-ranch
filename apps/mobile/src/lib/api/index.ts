@@ -1,1 +1,1 @@
-export { apiErrorCode, apiFetch, apiRequest, ApiError, ApiNotConfiguredError } from './client';
+export { api, apiErrorCode, ApiError, ApiNotConfiguredError, authFetch, unwrap } from './client';

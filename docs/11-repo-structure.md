@@ -14,7 +14,7 @@ split-ranch/
 ├── packages/
 │   ├── domain/                 # @split-ranch/domain — pure TS: money, split, settle (no RN imports)
 │   ├── domain-vectors/         # shared JSON test vectors + JSON Schemas
-│   ├── api-client/             # generated OpenAPI types + openapi-fetch wrapper
+│   ├── api-client/             # @split-ranch/api-client — openapi.json + generated schema.d.ts + createApiClient()
 │   └── config/                 # shared eslint/tsconfig/prettier presets
 ├── supabase/
 │   └── config.toml             # Supabase CLI local stack: auth providers, JWT settings, exposed schemas
@@ -58,7 +58,7 @@ Root scripts (`package.json`):
 | `pnpm api:migrate` | `alembic upgrade head` |
 | `pnpm api:seed` | demo data |
 | `pnpm mobile:dev` | `expo start --dev-client` (dev build installed on device/emulator) |
-| `pnpm api:openapi` | dump OpenAPI and regenerate `packages/api-client` |
+| `pnpm api:openapi` | dump OpenAPI (`apps/api/scripts/export_openapi.py`) and regenerate `packages/api-client` |
 | `pnpm test` | all test suites (domain TS + Py + parity) |
 | `pnpm lint` / `typecheck` | all workspaces |
 | `pnpm vectors:gen` | regenerate random parity vectors (seeded) |
