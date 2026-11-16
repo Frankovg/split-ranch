@@ -30,7 +30,7 @@ apps/mobile/
 │   ├── features/                     # auth/  groups/  quick-splits/  settings/  dev/
 │   ├── components/ui/                # React Native Reusables (copied, owned)
 │   ├── components/                   # app-level composites (MoneyText, MemberAvatarStack…)
-│   ├── lib/api/                      # generated OpenAPI types + fetch client (token from Supabase session)
+│   ├── lib/api/                      # openapi-fetch client over @split-ranch/api-client (token from Supabase session)
 │   ├── lib/supabase.ts               # Supabase client, auth only (no data queries)
 │   ├── lib/query/                    # QueryClient, persister, query keys
 │   ├── lib/money/                    # re-export of @split-ranch/domain + parse/format
@@ -65,7 +65,7 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Kind | Tool |
 |---|---|
 | Server state | **TanStack Query v5**: query keys `['group', gid, 'expenses', filters]` (everything of a group under `['group', gid]`, invalidated after any expense or payment change), etc. `staleTime` 30 s for lists, invalidation after mutations |
-| Persistence | `@tanstack/query-async-storage-persister` (backed by MMKV) so the last data is shown offline |
+| Persistence | `@tanstack/query-async-storage-persister` + `PersistQueryClientProvider`, backed by an encrypted MMKV instance (`split-ranch.query-cache`, same SecureStore key as the session) so the last data is shown offline. `maxAge` = `gcTime` = 24 h; bump `CACHE_BUSTER` (`src/lib/query/client.ts`) when response shapes or query keys change. Sign-out clears the cache and deletes the disk copy |
 | Session | **`supabase-js`** auth client: persists and auto-refreshes the session. Storage adapter = encrypted MMKV whose encryption key lives in `expo-secure-store` (SecureStore alone has a ~2 KB value limit, too small for a Supabase session) |
 | Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, active group id, Quick-splits drafts (persisted via MMKV) |
 | Forms | **React Hook Form + Zod** (`@hookform/resolvers/zod`). Zod schemas mirror the Pydantic ones (generated types for shape; Zod for UX validation, e.g. percentages must sum to 100 %) |
@@ -74,7 +74,7 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phones; Zod gives one schema for typing and validation and is what most RN form examples use. Alternative considered: TanStack Form (good, smaller ecosystem today).
 
 ### API client and session
-- `openapi-fetch` client with a middleware that reads the current access token from `supabase.auth.getSession()` (which refreshes it when close to expiry) and attaches it. On `401 token_expired` it calls `supabase.auth.refreshSession()` once and retries.
+- `openapi-fetch` client typed with the `paths` generated in `packages/api-client` (`pnpm api:openapi`). Auth is a custom `fetch` passed to the client (`authFetch` in `src/lib/api/client.ts`), not a middleware: it reads the current access token from `supabase.auth.getSession()` (which refreshes it when close to expiry) and attaches it. On `401` it calls `supabase.auth.refreshSession()` once and re-sends a copy of the request taken before the first send (a `Request` body can be read only once, and openapi-fetch middleware cannot re-send a request). `unwrap()` turns a non-2xx result into `ApiError` (problem+json body) so React Query sees a failure.
 - `supabase.auth.startAutoRefresh()` / `stopAutoRefresh()` bound to `AppState` (foreground/background), as Supabase recommends for React Native.
 - On `SIGNED_OUT` (or failed refresh) → clear query cache → `Stack.Protected` redirects to sign-in.
 - The Supabase client is used **only** for `auth.*`. Lint rule forbids `supabase.from(...)`/`rpc` imports in features: data goes through FastAPI.

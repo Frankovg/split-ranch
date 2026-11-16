@@ -1,14 +1,14 @@
+import { createApiClient } from '@split-ranch/api-client';
 import { env, isApiConfigured } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 
 /**
- * Minimal fetch client for the FastAPI backend. Attaches the Supabase access token
- * and, on 401, refreshes the session once and retries.
- * TODO: replace the untyped surface with packages/api-client (openapi-fetch +
- * generated types) once the API publishes its OpenAPI document.
+ * Typed client for the FastAPI backend (openapi-fetch over the types generated in
+ * packages/api-client). Auth lives in `authFetch`, passed to the client as its `fetch`:
+ * it attaches the Supabase access token and, on 401, refreshes the session once and
+ * re-sends a copy of the request (a Request body can only be read once, so the copy is
+ * taken before the first send).
  */
-
-const API_PREFIX = '/v1';
 
 export class ApiError extends Error {
   constructor(
@@ -47,45 +47,44 @@ async function refreshedAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-function withAuth(init: RequestInit, token: string | null): RequestInit {
-  const headers = new Headers(init.headers);
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (init.body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  headers.set('Accept', 'application/json');
-  return { ...init, headers };
+function withToken(request: Request, token: string | null): Request {
+  if (!token) return request;
+  const headers = new Headers(request.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return new Request(request, { headers });
 }
 
-async function parseBody(res: Response): Promise<unknown> {
-  const text = await res.text();
-  if (text === '') return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
-}
-
-/** Low-level request: returns the Response after the one-time 401 refresh+retry. */
-export async function apiRequest(
-  path: string,
-  init: RequestInit = {},
-  fetchImpl: typeof fetch = fetch,
-): Promise<Response> {
+/** `fetch` for the API client: token on every request, one refresh+retry on 401. */
+export async function authFetch(request: Request, fetchImpl: typeof fetch = fetch): Promise<Response> {
   if (!isApiConfigured) throw new ApiNotConfiguredError();
-  // EXPO_PUBLIC_API_URL is the host only; the API version prefix belongs to the client.
-  const url = `${env.apiUrl}${API_PREFIX}${path.startsWith('/') ? path : `/${path}`}`;
-  const res = await fetchImpl(url, withAuth(init, await currentAccessToken()));
+  const retry = request.clone();
+  const res = await fetchImpl(withToken(request, await currentAccessToken()));
   if (res.status !== 401) return res;
 
   const token = await refreshedAccessToken();
   if (!token) return res;
-  return fetchImpl(url, withAuth(init, token));
+  return fetchImpl(withToken(retry, token));
 }
 
-/** JSON request helper: throws ApiError for non-2xx responses. */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await apiRequest(path, init);
-  const body = await parseBody(res);
-  if (!res.ok) throw new ApiError(res.status, body);
-  return body as T;
+/** Paths already include the `/v1` prefix, so the base URL is the API host only. */
+export const api = createApiClient({
+  baseUrl: env.apiUrl,
+  fetch: (request) => authFetch(request),
+  headers: { Accept: 'application/json' },
+});
+
+interface FetchResult<T> {
+  data?: T;
+  error?: unknown;
+  response: Response;
+}
+
+/**
+ * Awaits an `api.GET/POST/...` call and returns its data, throwing ApiError (with the
+ * problem+json body) for non-2xx responses so React Query sees a failed query/mutation.
+ */
+export async function unwrap<T>(call: Promise<FetchResult<T>>): Promise<T> {
+  const { data, error, response } = await call;
+  if (!response.ok) throw new ApiError(response.status, error ?? null);
+  return data as T;
 }

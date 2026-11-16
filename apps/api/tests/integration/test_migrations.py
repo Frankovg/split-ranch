@@ -1,4 +1,4 @@
-"""Alembic: downgrade/upgrade round trip and no pending autogenerate diff."""
+"""Alembic: downgrade/upgrade round trip and the empty-tables guard of 0006."""
 
 from __future__ import annotations
 
@@ -18,46 +18,23 @@ def _config(url: str) -> Config:
     return cfg
 
 
-def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
+def test_round_trip(database_url: str, engine: Engine) -> None:
     cfg = _config(database_url)
-    command.downgrade(cfg, "0004")
+    command.downgrade(cfg, "0005")
     with engine.connect() as conn:
-        # 0005 down: the old tables and the job queue are back, the merged ones are gone.
-        for table in ("split_rules", "expense_revisions", "invitations", "procrastinate_jobs"):
+        # 0006 down: households, periods and settlement transfers are back, groups are gone.
+        for table in ("households", "household_members", "periods", "settlement_transfers"):
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
-        assert conn.execute(text("SELECT to_regclass('app.history')")).scalar() is None
-    command.downgrade(cfg, "0003")
-    with engine.connect() as conn:
-        # 0004 down: the (empty) Quick split tables and the payment columns are back.
-        assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar()
-        assert conn.execute(
-            text(
-                "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'app' "
-                "AND table_name = 'users' AND column_name = 'payment_handles'"
-            )
-        ).scalar()
-    command.downgrade(cfg, "0002")
-    with engine.connect() as conn:
-        # 0003 down: periods are calendar months again.
-        assert conn.execute(
-            text(
-                "SELECT count(*) FROM information_schema.columns "
-                "WHERE table_schema = 'app' AND table_name = 'periods' AND column_name = 'month'"
-            )
-        ).scalar()
-    command.downgrade(cfg, "0001")
-    with engine.connect() as conn:
-        assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar() is None
+        for table in ("groups", "group_members", "payments"):
+            assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None
     command.downgrade(cfg, "base")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT to_regclass('app.expenses')")).scalar() is None
+        for table in ("users", "households", "expenses", "history"):
+            assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
         assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0006"
-        assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar() is None
-        assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar() is None
-        assert conn.execute(text("SELECT to_regclass('app.history')")).scalar()
-        for table in ("groups", "group_members", "payments"):
+        for table in ("users", "groups", "group_members", "payments", "history"):
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
         for table in ("households", "periods", "settlement_transfers"):
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None

@@ -2,7 +2,7 @@ import '../global.css';
 import '@/i18n';
 
 import { PortalHost } from '@rn-primitives/portal';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { SplashScreen, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -12,7 +12,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { AuthListener } from '@/features/auth/AuthListener';
 import { LanguageSync } from '@/i18n/LanguageSync';
-import { queryClient } from '@/lib/query/client';
+import { CACHE_BUSTER, CACHE_MAX_AGE, queryClient } from '@/lib/query/client';
+import { queryPersister } from '@/lib/query/persister';
 import { useAppStateFocus } from '@/lib/query/refresh';
 import { useSessionStore } from '@/stores/session';
 import { NAV_THEME } from '@/theme/navigation';
@@ -35,7 +36,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: queryPersister,
+            maxAge: CACHE_MAX_AGE,
+            buster: CACHE_BUSTER,
+          }}
+        >
           <ThemeProvider value={NAV_THEME[scheme]}>
             <ThemeSync />
             <LanguageSync />
@@ -68,7 +76,7 @@ export default function RootLayout() {
             <Toaster position='bottom-center' />
             <PortalHost />
           </ThemeProvider>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

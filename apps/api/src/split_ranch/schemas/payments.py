@@ -1,10 +1,14 @@
 """Running balance, payment suggestions and payments."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
 from split_ranch.schemas.common import AmountCents, Id, ReadModel, StrictModel
+
+# Mirrors models.payments.PAYMENT_STATUSES (the DB check constraint).
+PaymentStatus = Literal["sent", "confirmed", "disputed", "cancelled"]
 
 
 class BalanceRead(ReadModel):
@@ -52,7 +56,7 @@ class PaymentRead(ReadModel):
     from_member_id: Id
     to_member_id: Id
     amount_cents: int
-    status: str
+    status: PaymentStatus
     note: str | None
     created_by_user_id: Id
     confirmed_at: datetime | None

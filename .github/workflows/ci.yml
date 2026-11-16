@@ -69,6 +69,34 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest -q
 
+  api-contract:
+    name: API contract (OpenAPI + generated TS client up to date)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Export OpenAPI and fail if the committed schema is stale
+        working-directory: apps/api
+        run: |
+          uv run python scripts/export_openapi.py
+          git diff --exit-code -- ../../packages/api-client/openapi.json || {
+            echo "packages/api-client/openapi.json is stale: run 'pnpm api:openapi' and commit the result."
+            exit 1
+          }
+      - run: pnpm --filter @split-ranch/api-client check
+      - run: pnpm --filter @split-ranch/api-client typecheck
+
   secrets-scan:
     name: Secret scan
     runs-on: ubuntu-latest

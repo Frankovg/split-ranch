@@ -11,6 +11,7 @@
     "adb:reverse": "node scripts/adb-reverse.mjs",
     "api:test": "cd apps/api && uv run pytest",
     "api:dev": "cd apps/api && uv run uvicorn split_ranch.main:app --reload --port 8000",
+    "api:openapi": "cd apps/api && uv run python scripts/export_openapi.py && cd ../.. && pnpm --filter @split-ranch/api-client generate",
     "db:up": "supabase start",
     "db:down": "supabase stop"
   },

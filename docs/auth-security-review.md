@@ -40,7 +40,8 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
    - `verify()` rechaza tokens sin `kid` o con un `kid` de más de 128 caracteres antes de consultar las claves.
 
    Tests en [test_jwks_refetch.py](../apps/api/tests/unit/test_jwks_refetch.py), con un `PyJWKClient` real: límite de recargas, rotación de clave, revocación al caducar la caché y `kid` inválido.
-2. **El nonce de Google no se aplica.** En [google.ts](../apps/mobile/src/features/auth/google.ts) la librería antigua no permite meter el nonce en el ID token, así que Supabase no puede comprobarlo. Un ID token de Google interceptado o filtrado podría reutilizarse mientras no caduque. Ya está anotado como TODO (T-0.4, migrar a Credential Manager); conviene hacerlo antes de lanzar.
+
+2. **El nonce de Google no se aplica.** En [google.ts](../apps/mobile/src/features/auth/google.ts) la librería antigua no permite meter el nonce en el ID token, así que Supabase no puede comprobarlo. Un ID token de Google interceptado o filtrado podría reutilizarse mientras no caduque. Conviene hacerlo antes de lanzar.
 
    **✅ Corregido (2026-11-12, login probado en el emulador Android con el dev-client):** se migró a `react-native-nitro-google-signin` (MIT, Credential Manager), que mete `SHA256(nonce)` en el ID token. Cambios:
    - En cada intento se llama a `configure({ nonce })`, y Supabase recibe siempre el nonce original.
@@ -48,6 +49,7 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
    - Los intentos de login se serializan.
 
    Tests en [google.test.ts](../apps/mobile/src/features/auth/google.test.ts). Queda pendiente: probar en un teléfono físico y con un build de EAS (con su SHA-1 registrado).
+
 3. **No hay rate limiting.** La documentación lo pide para auth y para las invitaciones. El código de invitación tiene 40 bits y dura 7 días, lo que hace inviable adivinarlo por fuerza bruta, pero `GET /invitations/{code}` devuelve el nombre del grupo y el número de miembros sin ningún límite de peticiones.
 
 ## 🟡 Lo que falta

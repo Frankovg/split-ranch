@@ -81,8 +81,7 @@ Example (`allocate.json`):
 
 | Workflow | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | PR, push to main | path-filtered: **domain** (TS + Py + parity vectors), **api** (ruff, mypy, pytest with Postgres service, migrations check, OpenAPI diff), **mobile** (tsc, eslint, jest), gitleaks |
-| `openapi.yml` | API change | regenerate TS client; fail if committed client is stale |
+| `ci.yml` | PR, push to main | path-filtered: **domain** (TS + Py + parity vectors), **api** (ruff, mypy, pytest with Postgres service, migrations check, OpenAPI diff), **mobile** (tsc, eslint, vitest), **api-contract** (export OpenAPI and fail if `packages/api-client/openapi.json` or the generated `schema.d.ts` is stale), gitleaks |
 | `db-backup.yml` | weekly cron (Mondays) + manual | `supabase db dump` (roles, schema, data) → gpg-encrypted artifact, 60-day retention |
 | `mobile-preview.yml` | manual | `eas build --profile preview` (APK, installed directly) |
 | `e2e.yml` | before release | Maestro on a local emulator (Maestro Cloud is paid) |
@@ -93,6 +92,6 @@ The API deploys automatically from `main` once `ci.yml` passes (Render `autoDepl
 ## Definition of done (any task)
 - Tests for new behaviour (property tests for anything touching money).
 - Types and lint clean.
-- OpenAPI/TS client updated if the API changed.
+- OpenAPI/TS client updated if the API changed (`pnpm api:openapi`, commit `packages/api-client`).
 - Docs in `/docs` updated when a rule changes.
 - Accessibility check for new UI (labels, touch targets, font scale 200 %).

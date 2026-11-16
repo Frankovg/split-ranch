@@ -1,0 +1,4958 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Split Ranch",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/healthz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Healthz",
+        "operationId": "healthz_v1_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Healthz V1 Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/readyz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Readyz",
+        "operationId": "readyz_v1_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Config",
+        "operationId": "config_v1_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Config V1 Config Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Get Me",
+        "operationId": "get_me_v1_me_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Update Me",
+        "operationId": "update_me_v1_me_patch",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Create Group",
+        "operationId": "create_group_v1_groups_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Groups",
+        "description": "The caller's groups (active memberships), oldest first.",
+        "operationId": "list_groups_v1_groups_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GroupRead"
+                  },
+                  "title": "Response List Groups V1 Groups Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Get Group",
+        "operationId": "get_group_v1_groups__group_id__get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Update Group",
+        "operationId": "update_group_v1_groups__group_id__patch",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Delete Group",
+        "description": "Admin only; every balance must be zero (`409 group_has_open_balances`).",
+        "operationId": "delete_group_v1_groups__group_id__delete",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupDeleteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/invitations": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Get Invitation",
+        "description": "The group's join code: the current one while valid, else a new one.",
+        "operationId": "get_invitation_v1_groups__group_id__invitations_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Revoke Invitation",
+        "operationId": "revoke_invitation_v1_groups__group_id__invitations_delete",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/invitations/{code}": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Preview Invitation",
+        "operationId": "preview_invitation_v1_invitations__code__get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/invitations/{code}/accept": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Accept Invitation",
+        "operationId": "accept_invitation_v1_invitations__code__accept_post",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/members/me/leave": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Leave Group",
+        "description": "Needs a zero balance (`409 member_has_open_balance`).",
+        "operationId": "leave_group_v1_groups__group_id__members_me_leave_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/members/{member_id}": {
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Remove Member",
+        "description": "Admin only; the member's balance must be zero.",
+        "operationId": "remove_member_v1_groups__group_id__members__member_id__delete",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Member Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/categories": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Categories",
+        "operationId": "list_categories_v1_groups__group_id__categories_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Archived"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryRead"
+                  },
+                  "title": "Response List Categories V1 Groups  Group Id  Categories Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Create Category",
+        "operationId": "create_category_v1_groups__group_id__categories_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/categories/{category_id}": {
+      "patch": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Update Category",
+        "operationId": "update_category_v1_groups__group_id__categories__category_id__patch",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Archive Category",
+        "operationId": "archive_category_v1_groups__group_id__categories__category_id__delete",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/split-rules": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Split Rules",
+        "operationId": "list_split_rules_v1_groups__group_id__split_rules_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitRulesRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/split-rules/default": {
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Set Default Rule",
+        "operationId": "set_default_rule_v1_groups__group_id__split_rules_default_put",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EqualSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WeightsSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PercentagesSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExactSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SingleSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonalSplit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "split_type",
+                  "mapping": {
+                    "equal": "#/components/schemas/EqualSplit",
+                    "weights": "#/components/schemas/WeightsSplit",
+                    "percentages": "#/components/schemas/PercentagesSplit",
+                    "exact": "#/components/schemas/ExactSplit",
+                    "single": "#/components/schemas/SingleSplit",
+                    "personal": "#/components/schemas/PersonalSplit"
+                  }
+                },
+                "title": "Spec"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/EqualSplit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WeightsSplit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PercentagesSplit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ExactSplit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SingleSplit"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PersonalSplit"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "split_type",
+                    "mapping": {
+                      "equal": "#/components/schemas/EqualSplit",
+                      "weights": "#/components/schemas/WeightsSplit",
+                      "percentages": "#/components/schemas/PercentagesSplit",
+                      "exact": "#/components/schemas/ExactSplit",
+                      "single": "#/components/schemas/SingleSplit",
+                      "personal": "#/components/schemas/PersonalSplit"
+                    }
+                  },
+                  "title": "Response Set Default Rule V1 Groups  Group Id  Split Rules Default Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/categories/{category_id}/split-rule": {
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Set Category Rule",
+        "operationId": "set_category_rule_v1_groups__group_id__categories__category_id__split_rule_put",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EqualSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WeightsSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PercentagesSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExactSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SingleSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonalSplit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "split_type",
+                  "mapping": {
+                    "equal": "#/components/schemas/EqualSplit",
+                    "weights": "#/components/schemas/WeightsSplit",
+                    "percentages": "#/components/schemas/PercentagesSplit",
+                    "exact": "#/components/schemas/ExactSplit",
+                    "single": "#/components/schemas/SingleSplit",
+                    "personal": "#/components/schemas/PersonalSplit"
+                  }
+                },
+                "title": "Spec"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryRuleRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Delete Category Rule",
+        "operationId": "delete_category_rule_v1_groups__group_id__categories__category_id__split_rule_delete",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/expenses": {
+      "get": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "List Expenses",
+        "operationId": "list_expenses_v1_groups__group_id__expenses_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "payer_member_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Member Id"
+            }
+          },
+          {
+            "name": "created_by_user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created By User Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ExpenseRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Create Expense",
+        "operationId": "create_expense_v1_groups__group_id__expenses_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/summary": {
+      "get": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Get Summary",
+        "operationId": "get_summary_v1_groups__group_id__summary_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "payer_member_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Member Id"
+            }
+          },
+          {
+            "name": "created_by_user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created By User Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/expenses/preview": {
+      "post": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Preview Expense",
+        "operationId": "preview_expense_v1_groups__group_id__expenses_preview_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpensePreviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitPreviewRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/expenses/{expense_id}": {
+      "get": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Get Expense",
+        "operationId": "get_expense_v1_groups__group_id__expenses__expense_id__get",
+        "parameters": [
+          {
+            "name": "expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Expense Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Update Expense",
+        "operationId": "update_expense_v1_groups__group_id__expenses__expense_id__patch",
+        "parameters": [
+          {
+            "name": "expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Expense Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "Delete Expense",
+        "operationId": "delete_expense_v1_groups__group_id__expenses__expense_id__delete",
+        "parameters": [
+          {
+            "name": "expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Expense Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ExpenseDeleteIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/expenses/{expense_id}/revisions": {
+      "get": {
+        "tags": [
+          "expenses"
+        ],
+        "summary": "List Revisions",
+        "operationId": "list_revisions_v1_groups__group_id__expenses__expense_id__revisions_get",
+        "parameters": [
+          {
+            "name": "expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Expense Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionRead"
+                  },
+                  "title": "Response List Revisions V1 Groups  Group Id  Expenses  Expense Id  Revisions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/balance": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Get Balance",
+        "operationId": "get_balance_v1_groups__group_id__balance_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupBalanceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/payments": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "List Payments",
+        "operationId": "list_payments_v1_groups__group_id__payments_get",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "sent",
+                      "confirmed",
+                      "disputed",
+                      "cancelled"
+                    ],
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PaymentRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Record Payment",
+        "description": "The payer records `sent`; the receiver records `confirmed` (cash received).",
+        "operationId": "record_payment_v1_groups__group_id__payments_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/payments/{payment_id}": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Get Payment",
+        "operationId": "get_payment_v1_groups__group_id__payments__payment_id__get",
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Payment Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/payments/{payment_id}/confirm": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Confirm Payment",
+        "description": "Receiver only.",
+        "operationId": "confirm_payment_v1_groups__group_id__payments__payment_id__confirm_post",
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Payment Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PaymentNote"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/payments/{payment_id}/dispute": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Dispute Payment",
+        "description": "Receiver only; a note is required.",
+        "operationId": "dispute_payment_v1_groups__group_id__payments__payment_id__dispute_post",
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Payment Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentDispute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups/{group_id}/payments/{payment_id}/cancel": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Cancel Payment",
+        "description": "Payer only, while the payment is sent or disputed.",
+        "operationId": "cancel_payment_v1_groups__group_id__payments__payment_id__cancel_post",
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Payment Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PaymentNote"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BalanceRead": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "paid_cents": {
+            "type": "integer",
+            "title": "Paid Cents"
+          },
+          "owed_cents": {
+            "type": "integer",
+            "title": "Owed Cents"
+          },
+          "net_cents": {
+            "type": "integer",
+            "title": "Net Cents"
+          },
+          "pending_out_cents": {
+            "type": "integer",
+            "title": "Pending Out Cents",
+            "default": 0
+          },
+          "pending_in_cents": {
+            "type": "integer",
+            "title": "Pending In Cents",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id",
+          "paid_cents",
+          "owed_cents",
+          "net_cents",
+          "pending_out_cents",
+          "pending_in_cents"
+        ],
+        "title": "BalanceRead"
+      },
+      "BasisPointsShare": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "basis_points": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Basis Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "member_id",
+          "basis_points"
+        ],
+        "title": "BasisPointsShare"
+      },
+      "CategoryCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "sort_key": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CategoryCreate"
+      },
+      "CategoryRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "sort_key": {
+            "type": "integer",
+            "title": "Sort Key"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "icon",
+          "color",
+          "is_default",
+          "sort_key",
+          "archived_at"
+        ],
+        "title": "CategoryRead"
+      },
+      "CategoryRuleRead": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Category Id"
+          },
+          "split": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EqualSplit"
+              },
+              {
+                "$ref": "#/components/schemas/WeightsSplit"
+              },
+              {
+                "$ref": "#/components/schemas/PercentagesSplit"
+              },
+              {
+                "$ref": "#/components/schemas/ExactSplit"
+              },
+              {
+                "$ref": "#/components/schemas/SingleSplit"
+              },
+              {
+                "$ref": "#/components/schemas/PersonalSplit"
+              }
+            ],
+            "title": "Split",
+            "discriminator": {
+              "propertyName": "split_type",
+              "mapping": {
+                "equal": "#/components/schemas/EqualSplit",
+                "exact": "#/components/schemas/ExactSplit",
+                "percentages": "#/components/schemas/PercentagesSplit",
+                "personal": "#/components/schemas/PersonalSplit",
+                "single": "#/components/schemas/SingleSplit",
+                "weights": "#/components/schemas/WeightsSplit"
+              }
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "split"
+        ],
+        "title": "CategoryRuleRead"
+      },
+      "CategoryTotalRead": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "total_cents": {
+            "type": "integer",
+            "title": "Total Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "total_cents"
+        ],
+        "title": "CategoryTotalRead"
+      },
+      "CategoryUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "sort_key": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CategoryUpdate"
+      },
+      "EqualSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "equal",
+            "title": "Split Type"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MemberRef"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type"
+        ],
+        "title": "EqualSplit"
+      },
+      "ExactShare": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 0.0,
+            "title": "Amount Cents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "member_id",
+          "amount_cents"
+        ],
+        "title": "ExactShare"
+      },
+      "ExactSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "exact",
+            "title": "Split Type"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ExactShare"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type",
+          "shares"
+        ],
+        "title": "ExactSplit"
+      },
+      "ExpenseCreate": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Amount Cents"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 140,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "payer_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Payer Member Id"
+          },
+          "expense_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expense Date"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EqualSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WeightsSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PercentagesSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExactSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SingleSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonalSplit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "split_type",
+                  "mapping": {
+                    "equal": "#/components/schemas/EqualSplit",
+                    "exact": "#/components/schemas/ExactSplit",
+                    "percentages": "#/components/schemas/PercentagesSplit",
+                    "personal": "#/components/schemas/PersonalSplit",
+                    "single": "#/components/schemas/SingleSplit",
+                    "weights": "#/components/schemas/WeightsSplit"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "participants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participants"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "ai_text",
+              "ai_voice",
+              "recurring"
+            ],
+            "title": "Source",
+            "default": "manual"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "amount_cents",
+          "description",
+          "payer_member_id",
+          "expense_date"
+        ],
+        "title": "ExpenseCreate"
+      },
+      "ExpenseDeleteIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280,
+                "minLength": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExpenseDeleteIn"
+      },
+      "ExpensePreviewIn": {
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Amount Cents"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "payer_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Payer Member Id"
+          },
+          "expense_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expense Date"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EqualSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WeightsSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PercentagesSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExactSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SingleSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonalSplit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "split_type",
+                  "mapping": {
+                    "equal": "#/components/schemas/EqualSplit",
+                    "exact": "#/components/schemas/ExactSplit",
+                    "percentages": "#/components/schemas/PercentagesSplit",
+                    "personal": "#/components/schemas/PersonalSplit",
+                    "single": "#/components/schemas/SingleSplit",
+                    "weights": "#/components/schemas/WeightsSplit"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "participants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participants"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "amount_cents",
+          "payer_member_id",
+          "expense_date"
+        ],
+        "title": "ExpensePreviewIn"
+      },
+      "ExpenseRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Group Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "payer_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Payer Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "expense_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Expense Date"
+          },
+          "split_type": {
+            "type": "string",
+            "title": "Split Type"
+          },
+          "split_origin": {
+            "type": "string",
+            "title": "Split Origin"
+          },
+          "participant_mode": {
+            "type": "string",
+            "title": "Participant Mode"
+          },
+          "rule_fallback": {
+            "type": "boolean",
+            "title": "Rule Fallback"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ShareRead"
+            },
+            "type": "array",
+            "title": "Shares"
+          },
+          "created_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By User Id"
+          },
+          "updated_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "group_id",
+          "version",
+          "category_id",
+          "payer_member_id",
+          "amount_cents",
+          "description",
+          "notes",
+          "expense_date",
+          "split_type",
+          "split_origin",
+          "participant_mode",
+          "rule_fallback",
+          "source",
+          "shares",
+          "created_by_user_id",
+          "updated_by_user_id",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "can_edit"
+        ],
+        "title": "ExpenseRead"
+      },
+      "ExpenseUpdate": {
+        "properties": {
+          "amount_cents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Cents"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 140,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "payer_member_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payer Member Id"
+          },
+          "expense_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Date"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EqualSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WeightsSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PercentagesSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExactSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SingleSplit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PersonalSplit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "split_type",
+                  "mapping": {
+                    "equal": "#/components/schemas/EqualSplit",
+                    "exact": "#/components/schemas/ExactSplit",
+                    "percentages": "#/components/schemas/PercentagesSplit",
+                    "personal": "#/components/schemas/PersonalSplit",
+                    "single": "#/components/schemas/SingleSplit",
+                    "weights": "#/components/schemas/WeightsSplit"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "participants": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 50,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participants"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExpenseUpdate",
+        "description": "Only the fields sent change. Sending `split` or `participants` re-splits the expense\nwith today's rules and members; any other edit keeps its participants and inputs."
+      },
+      "GroupBalanceRead": {
+        "properties": {
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceRead"
+            },
+            "type": "array",
+            "title": "Balances"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionRead"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balances",
+          "suggestions"
+        ],
+        "title": "GroupBalanceRead"
+      },
+      "GroupCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Timezone",
+            "default": "Europe/Madrid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GroupCreate"
+      },
+      "GroupDeleteIn": {
+        "properties": {
+          "confirm_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Confirm Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "confirm_name"
+        ],
+        "title": "GroupDeleteIn"
+      },
+      "GroupRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberRead"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "my_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "My Member Id"
+          },
+          "my_role": {
+            "type": "string",
+            "title": "My Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "created_at",
+          "members",
+          "my_member_id",
+          "my_role"
+        ],
+        "title": "GroupRead"
+      },
+      "GroupUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GroupUpdate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InvitationPreview": {
+        "properties": {
+          "group_name": {
+            "type": "string",
+            "title": "Group Name"
+          },
+          "member_count": {
+            "type": "integer",
+            "title": "Member Count"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_name",
+          "member_count",
+          "expires_at"
+        ],
+        "title": "InvitationPreview"
+      },
+      "InvitationRead": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "title": "InvitationRead",
+        "description": "The group's join code (one per group, valid 7 days), typed by hand by the invitee."
+      },
+      "MeRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "locale": {
+            "type": "string",
+            "title": "Locale"
+          },
+          "memberships": {
+            "items": {
+              "$ref": "#/components/schemas/MembershipRead"
+            },
+            "type": "array",
+            "title": "Memberships"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "avatar_url",
+          "locale",
+          "memberships"
+        ],
+        "title": "MeRead"
+      },
+      "MeUpdate": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MeUpdate"
+      },
+      "MemberRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "sort_key": {
+            "type": "integer",
+            "title": "Sort Key"
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Joined At"
+          },
+          "left_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "display_name",
+          "role",
+          "status",
+          "sort_key",
+          "joined_at",
+          "left_at"
+        ],
+        "title": "MemberRead"
+      },
+      "MemberRef": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "member_id"
+        ],
+        "title": "MemberRef"
+      },
+      "MembershipRead": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Group Id"
+          },
+          "group_name": {
+            "type": "string",
+            "title": "Group Name"
+          },
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "group_name",
+          "member_id",
+          "role",
+          "status"
+        ],
+        "title": "MembershipRead"
+      },
+      "Page_ExpenseRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExpenseRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[ExpenseRead]"
+      },
+      "Page_PaymentRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "Page[PaymentRead]"
+      },
+      "PayerTotalRead": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "total_cents": {
+            "type": "integer",
+            "title": "Total Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id",
+          "total_cents"
+        ],
+        "title": "PayerTotalRead"
+      },
+      "PaymentCreate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "from_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Member Id"
+          },
+          "to_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Amount Cents"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "from_member_id",
+          "to_member_id",
+          "amount_cents"
+        ],
+        "title": "PaymentCreate"
+      },
+      "PaymentDispute": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 280,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "PaymentDispute"
+      },
+      "PaymentNote": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 280
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PaymentNote"
+      },
+      "PaymentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Group Id"
+          },
+          "from_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Member Id"
+          },
+          "to_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "confirmed",
+              "disputed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By User Id"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "confirmed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By User Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "group_id",
+          "from_member_id",
+          "to_member_id",
+          "amount_cents",
+          "status",
+          "note",
+          "created_by_user_id",
+          "confirmed_at",
+          "confirmed_by_user_id",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PaymentRead"
+      },
+      "PercentagesSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "percentages",
+            "title": "Split Type"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/BasisPointsShare"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type",
+          "shares"
+        ],
+        "title": "PercentagesSplit"
+      },
+      "PersonalSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "personal",
+            "title": "Split Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type"
+        ],
+        "title": "PersonalSplit"
+      },
+      "RevisionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "action",
+          "actor_user_id",
+          "reason",
+          "before",
+          "after",
+          "created_at"
+        ],
+        "title": "RevisionRead"
+      },
+      "ShareRead": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "basis_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Points"
+          },
+          "exact_cents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exact Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member_id",
+          "amount_cents",
+          "weight",
+          "basis_points",
+          "exact_cents"
+        ],
+        "title": "ShareRead"
+      },
+      "SingleSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "single",
+            "title": "Split Type"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/MemberRef"
+            },
+            "type": "array",
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type",
+          "shares"
+        ],
+        "title": "SingleSplit"
+      },
+      "SplitPreviewRead": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "title": "Split Type"
+          },
+          "split_origin": {
+            "type": "string",
+            "title": "Split Origin"
+          },
+          "participant_mode": {
+            "type": "string",
+            "title": "Participant Mode"
+          },
+          "rule_fallback": {
+            "type": "boolean",
+            "title": "Rule Fallback"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ShareRead"
+            },
+            "type": "array",
+            "title": "Shares"
+          }
+        },
+        "type": "object",
+        "required": [
+          "split_type",
+          "split_origin",
+          "participant_mode",
+          "rule_fallback",
+          "shares"
+        ],
+        "title": "SplitPreviewRead"
+      },
+      "SplitRulesRead": {
+        "properties": {
+          "default": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EqualSplit"
+              },
+              {
+                "$ref": "#/components/schemas/WeightsSplit"
+              },
+              {
+                "$ref": "#/components/schemas/PercentagesSplit"
+              },
+              {
+                "$ref": "#/components/schemas/ExactSplit"
+              },
+              {
+                "$ref": "#/components/schemas/SingleSplit"
+              },
+              {
+                "$ref": "#/components/schemas/PersonalSplit"
+              }
+            ],
+            "title": "Default",
+            "discriminator": {
+              "propertyName": "split_type",
+              "mapping": {
+                "equal": "#/components/schemas/EqualSplit",
+                "exact": "#/components/schemas/ExactSplit",
+                "percentages": "#/components/schemas/PercentagesSplit",
+                "personal": "#/components/schemas/PersonalSplit",
+                "single": "#/components/schemas/SingleSplit",
+                "weights": "#/components/schemas/WeightsSplit"
+              }
+            }
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryRuleRead"
+            },
+            "type": "array",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "default",
+          "categories"
+        ],
+        "title": "SplitRulesRead"
+      },
+      "SuggestionRead": {
+        "properties": {
+          "from_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "From Member Id"
+          },
+          "to_member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "To Member Id"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "title": "Amount Cents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_member_id",
+          "to_member_id",
+          "amount_cents"
+        ],
+        "title": "SuggestionRead"
+      },
+      "SummaryRead": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "total_cents": {
+            "type": "integer",
+            "title": "Total Cents"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotalRead"
+            },
+            "type": "array",
+            "title": "By Category"
+          },
+          "by_payer": {
+            "items": {
+              "$ref": "#/components/schemas/PayerTotalRead"
+            },
+            "type": "array",
+            "title": "By Payer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "total_cents",
+          "by_category",
+          "by_payer"
+        ],
+        "title": "SummaryRead",
+        "description": "Totals of the live, shared (non-personal) expenses matching the list filters."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WeightShare": {
+        "properties": {
+          "member_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Member Id"
+          },
+          "weight": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Weight"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "member_id",
+          "weight"
+        ],
+        "title": "WeightShare"
+      },
+      "WeightsSplit": {
+        "properties": {
+          "split_type": {
+            "type": "string",
+            "const": "weights",
+            "title": "Split Type"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/WeightShare"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "split_type",
+          "shares"
+        ],
+        "title": "WeightsSplit"
+      }
+    }
+  }
+}

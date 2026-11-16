@@ -44,15 +44,15 @@ All are public (`EXPO_PUBLIC_*` is inlined into the bundle — never secrets) an
 - `src/features/quick-splits/` — `model.ts` (pure updates), `compute.ts` (store → `resolveShares` → `computeBalances` → `settle` from `@split-ranch/domain`), `share-text.ts` (WhatsApp text), screens and components.
 - `src/components/ui/` — React Native Reusables components added with the CLI (owned code; each file has a `// Source:` header listing local changes, mainly 48 dp touch targets).
 - `src/components/` — `MoneyText`, `MoneyInput`, `EmptyState`, `FormField`, `Screen`, `BackendPlaceholder`.
-- `src/lib/` — `money` (re-exports the domain + display helpers), `supabase.ts`, `api/`, `query/`, `storage.ts` (MMKV; session in an AES-256 encrypted MMKV whose key lives in SecureStore).
+- `src/lib/` — `money` (re-exports the domain + display helpers), `supabase.ts`, `api/`, `query/`, `storage.ts` (MMKV; session and persisted query cache in AES-256 encrypted MMKV instances whose key lives in SecureStore).
 - `src/stores/` — Zustand: session (mirrored from `onAuthStateChange`), preferences (theme/language, persisted), quick splits (persisted).
 - `src/theme/` — tokens mirror of `global.css` (kept in sync by a test), React Navigation theme, theme sync.
 - `src/i18n/` — i18next + expo-localization, Spanish default, English second; keys are type-checked.
 
 ## What is real vs placeholder
 
-- **Real:** Quick splits (offline, signed out, both modes, result card, share text, manual "has paid" status), theme switch, language switch, design-system base and dev gallery, auth wiring (needs env + Google Cloud/Supabase setup to actually sign in), API fetch wrapper.
-- **Placeholder:** Inicio and Gastos show an empty state saying they need the backend (no fake data). Not built yet: expense form/detail, periods, members, categories, onboarding, `join/[code]`, push, persisted query cache, OpenAPI-generated client, Sentry.
+- **Real:** Quick splits (offline, signed out, both modes, result card, share text, manual "has paid" status), theme switch, language switch, design-system base and dev gallery, auth wiring (needs env + Google Cloud/Supabase setup to actually sign in), typed API client (openapi-fetch over the types generated in `packages/api-client`).
+- **Placeholder:** Inicio and Gastos show an empty state saying they need the backend (no fake data). Not built yet: expense form/detail, periods, members, categories, onboarding, `join/[code]`, push, persisted query cache, Sentry.
 - **Google sign-in:** `react-native-nitro-google-signin` (Credential Manager on Android). Every attempt embeds the SHA-256 of a fresh nonce in the Google ID token and sends the raw nonce to Supabase, which verifies it; tokens without the expected nonce are rejected before reaching Supabase. See `src/features/auth/google.ts`. A native rebuild of the dev client is required after changing this library. `DEVELOPER_ERROR`, or a `cancelled` result right after picking an account in a release build, usually means the signing key's SHA-1 is missing from the Android OAuth client (logcat shows `UNREGISTERED_ON_API_CONSOLE`; the app then behaves as if the picker was cancelled). Local debug builds are signed with Expo's `android/app/debug.keystore`.
 - **Windows native build:** the Nitro modules' C++ build creates paths over 260 characters, which the ninja 1.10.2 bundled with the SDK's CMake 3.22.1 cannot handle (`ninja: error: mkdir(...): No such file or directory`). Replace `Sdk/cmake/3.22.1/bin/ninja.exe` with ninja ≥ 1.12 (Windows long paths must be enabled).
 - **Payments:** no links to payment platforms; people pay outside the app.
