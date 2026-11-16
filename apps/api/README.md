@@ -51,15 +51,12 @@ uv run alembic downgrade -1
 uv run alembic check                 # no pending autogenerate diff
 ```
 
-* `0001` creates every MVP table in `app` with CHECK constraints, composite (tenant-safe) foreign keys,
-  deferred share-sum constraint triggers, append-only triggers and **RLS enabled with no policies**.
-  If a `split_api` role exists, grants are applied; creating that role (it needs a password) is an
-  infra task.
-* `0002` applied a job-queue schema (SQL in `migrations/sql`) that `0005` removed; `0003` made
-  periods manual; `0004` dropped server-side Quick splits and payment links.
-* `0005` simplifies the schema to 9 tables: split rules as JSON, one `history` table, no settlement
-  snapshots, one invite code per household, no idempotency/Sheets/push tables and no job queue
-  (see `docs/02-data-model.md`). It migrates existing data both ways.
+* `0005` is the baseline (the older chain was squashed): it creates the tables in `app` with CHECK
+  constraints, composite (tenant-safe) foreign keys, deferred share-sum constraint triggers, the
+  append-only `history` trigger and **RLS enabled with no policies**. If a `split_api` role exists,
+  grants are applied; creating that role (it needs a password) is an infra task.
+* `0006` turns households into groups and drops periods and settlement transfers
+  (see `docs/egm/design_draft.md`). It refuses to run on tables that hold rows.
 
 Migrations run against the database in `DATABASE_URL_SESSION`; in development that is the cloud
 Supabase project, so run them deliberately.
