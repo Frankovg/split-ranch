@@ -90,15 +90,11 @@ def test_update_with_if_match(client: TestClient, house: House) -> None:
     )
     assert r.status_code == 412
     assert r.json()["current"]["version"] == 1 and r.headers["ETag"] == '"1"'
-    # Members cannot edit others' expenses; admins can.
-    r = client.patch(
-        url, json={"amount_cents": 1200}, headers=house.h("Ana", **{"If-Match": '"1"'})
-    )
-    assert r.status_code == 403
+    # Any member edits any expense (Ana is neither the author nor the admin).
     updated = client.patch(
         url,
         json={"amount_cents": 1200, "description": "Fruta"},
-        headers=house.h("Juli", **{"If-Match": '"1"'}),
+        headers=house.h("Ana", **{"If-Match": '"1"'}),
     )
     assert updated.status_code == 200 and updated.headers["ETag"] == '"2"'
     body = updated.json()
@@ -109,13 +105,26 @@ def test_update_with_if_match(client: TestClient, house: House) -> None:
     assert revs[1]["before"]["amount_cents"] == 1000 and revs[1]["after"]["amount_cents"] == 1200
     assert revs[1]["after"]["shares"][0]["amount_cents"] == 400
 
-    # A new date does not move the expense to another period.
+    assert revs[1]["actor_user_id"] == str(house.users["Ana"].id)
+
+    # Only `split`/`participants` re-split: a new category keeps the stored shares (Q1, Q2).
     moved = ok(
         client.patch(
-            url, json={"expense_date": "2026-04-01"}, headers=house.h("Juli", **{"If-Match": '"2"'})
+            url,
+            json={"expense_date": "2026-04-01", "category_id": house.categories["Ocio"]},
+            headers=house.h("Juli", **{"If-Match": '"2"'}),
         )
     )
-    assert moved["expense_date"] == "2026-04-01" and moved["period"]["seq"] == 1
+    assert moved["expense_date"] == "2026-04-01" and "period" not in moved
+    assert [s["amount_cents"] for s in moved["shares"]] == [400, 400, 400]
+    resplit = ok(
+        client.patch(
+            url,
+            json={"participants": [house.members["Juli"], house.members["Ana"]]},
+            headers=house.h("Juli", **{"If-Match": '"3"'}),
+        )
+    )
+    assert [s["amount_cents"] for s in resplit["shares"]] == [600, 600]
 
 
 def test_override_kept_on_amount_change(client: TestClient, house: House) -> None:
@@ -170,15 +179,16 @@ def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
             description=f"Gasto {day}",
             category="Ocio" if day == 3 else None,
         )
-    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
-    ok(client.post(house.url("/periods"), headers=house.h("Juli")), 201)
     add_expense(
         client, house, "Juli", amount=999, payer="Juli", date="2026-04-01", description="Abril"
     )
     seen: list[str] = []
     cursor = None
     while True:
-        q = "/expenses?limit=3&period=1" + (f"&cursor={cursor}" if cursor else "")
+        # "Last month" is a date range (inclusive).
+        q = "/expenses?limit=3&from=2026-03-01&to=2026-03-31" + (
+            f"&cursor={cursor}" if cursor else ""
+        )
         page = ok(client.get(house.url(q), headers=house.h("Ana")))
         seen += [i["description"] for i in page["items"]]
         cursor = page["next_cursor"]
@@ -205,6 +215,15 @@ def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
     )
     assert len(ok(client.get(house.url("/expenses?q=abr"), headers=house.h("Ana")))["items"]) == 1
     assert client.get(house.url("/expenses?cursor=%%%"), headers=house.h("Ana")).status_code == 422
+    r = client.get(house.url("/expenses?from=2026-04-01&to=2026-03-01"), headers=house.h("Ana"))
+    assert r.status_code == 422
+    mine = ok(
+        client.get(
+            house.url(f"/expenses?created_by_user_id={house.users['Juli'].id}"),
+            headers=house.h("Ana"),
+        )
+    )
+    assert len(mine["items"]) == 8
 
 
 def test_payer_and_members_validation(
@@ -236,28 +255,84 @@ def test_payer_and_members_validation(
     assert r.status_code == 422 and r.json()["code"] == "split_mismatch"
 
 
-def test_new_expense_in_closed_period(client: TestClient, house: House) -> None:
-    add_expense(client, house, "Juli", amount=900, payer="Juli", date="2026-03-03")
-    ok(client.post(house.url("/periods/1/close"), headers=house.h("Juli")))
-    r = client.post(house.url("/expenses"), json=_body(house), headers=house.h("Franco"))
-    assert r.status_code == 409 and r.json()["code"] == "no_open_period"
-    r = client.post(
-        house.url("/expenses"), json=_body(house, period_seq=1), headers=house.h("Franco")
+def test_period_fields_are_gone(client: TestClient, house: House) -> None:
+    for extra in ({"period_seq": 1}, {"reason": "Se me olvidó"}):
+        r = client.post(house.url("/expenses"), json=_body(house, **extra), headers=house.h("Juli"))
+        assert r.status_code == 422, extra
+    assert client.get(house.url("/periods"), headers=house.h("Juli")).status_code == 404
+
+
+def test_summary_uses_the_list_filters(client: TestClient, house: House) -> None:
+    add_expense(
+        client, house, "Juli", amount=3000, payer="Juli", date="2026-03-02", category="Ocio"
     )
-    assert r.status_code == 409 and r.json()["code"] == "reason_required"
+    add_expense(client, house, "Juli", amount=1000, payer="Franco", date="2026-03-20")
+    add_expense(
+        client,
+        house,
+        "Ana",
+        amount=500,
+        payer="Ana",
+        date="2026-03-21",
+        split={"split_type": "personal"},
+    )
+    add_expense(client, house, "Juli", amount=700, payer="Juli", date="2026-04-01")
+    march = ok(
+        client.get(house.url("/summary?from=2026-03-01&to=2026-03-31"), headers=house.h("Ana"))
+    )
+    # The personal expense is not shared spending.
+    assert march["count"] == 2 and march["total_cents"] == 4000
+    assert march["by_category"] == [
+        {"category_id": house.categories["Ocio"], "total_cents": 3000},
+        {"category_id": None, "total_cents": 1000},
+    ]
+    assert march["by_payer"] == [
+        {"member_id": house.members["Juli"], "total_cents": 3000},
+        {"member_id": house.members["Franco"], "total_cents": 1000},
+    ]
+    franco = ok(
+        client.get(
+            house.url(f"/summary?payer_member_id={house.members['Franco']}"),
+            headers=house.h("Ana"),
+        )
+    )
+    assert franco["total_cents"] == 1000
+
+
+def test_edit_involving_member_who_left_is_refused(client: TestClient, house: House) -> None:
+    e = add_expense(
+        client,
+        house,
+        "Juli",
+        amount=1000,
+        payer="Juli",
+        date="2026-03-03",
+        participants=[house.members["Juli"], house.members["Franco"]],
+    )
+    # Settle Franco and let him go: his zero balance must never change again (D2).
     ok(
         client.post(
-            house.url("/expenses"),
-            json=_body(house, period_seq=1, reason="Se me olvidó"),
-            headers=house.h("Franco"),
+            house.url("/payments"),
+            json={
+                "id": str(uuid7()),
+                "from_member_id": house.members["Franco"],
+                "to_member_id": house.members["Juli"],
+                "amount_cents": 500,
+            },
+            headers=house.h("Juli"),
         ),
         201,
     )
-    # The settlement was recomputed: only the new pending transfers are live, and they
-    # cover exactly what the balance says is owed.
-    settlement = ok(client.get(house.url("/periods/1/settlement"), headers=house.h("Juli")))
-    assert settlement.keys() == {"period", "transfers"}
-    assert all(t["status"] == "pending" for t in settlement["transfers"])
-    bal = ok(client.get(house.url("/periods/1/balance"), headers=house.h("Juli")))
-    owed = -sum(b["net_cents"] for b in bal["balances"] if b["net_cents"] < 0)
-    assert sum(t["amount_cents"] for t in settlement["transfers"]) == owed
+    ok(client.post(house.url("/members/me/leave"), headers=house.h("Franco")), 204)
+    r = client.patch(
+        house.url(f"/expenses/{e['id']}"),
+        json={"amount_cents": 2000},
+        headers=house.h("Juli", **{"If-Match": '"1"'}),
+    )
+    assert r.status_code == 409 and r.json()["code"] == "member_left"
+    r = client.post(
+        house.url("/expenses"),
+        json=_body(house, payer_member_id=house.members["Franco"]),
+        headers=house.h("Juli"),
+    )
+    assert r.status_code == 422 and r.json()["code"] == "invalid_payer"

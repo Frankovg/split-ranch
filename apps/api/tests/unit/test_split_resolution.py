@@ -27,7 +27,7 @@ def _resolve(**kw: object):  # type: ignore[no-untyped-def]
         "participants": None,
         "category_rule": None,
         "default_rule": RuleData("equal"),
-        "period_members": MEMBERS,
+        "members": MEMBERS,
         "canonical_order": MEMBERS,
     }
     args.update(kw)
@@ -37,7 +37,7 @@ def _resolve(**kw: object):  # type: ignore[no-untyped-def]
 def test_default_equal_all() -> None:
     r = _resolve()
     assert (r.split_origin, r.participant_mode, r.rule_fallback) == (
-        "household_default",
+        "group_default",
         "all",
         False,
     )
@@ -46,7 +46,7 @@ def test_default_equal_all() -> None:
 
 def test_no_rules_falls_to_equal() -> None:
     r = _resolve(default_rule=None)
-    assert r.split_origin == "household_default" and r.split_type == "equal"
+    assert r.split_origin == "group_default" and r.split_type == "equal"
 
 
 def test_category_beats_default() -> None:
@@ -65,13 +65,13 @@ def test_category_beats_default() -> None:
 
 def test_percentages_with_absent_member_become_weights() -> None:
     rule = RuleData("percentages", [RuleRow(J, basis_points=6000), RuleRow(F, basis_points=4000)])
-    r = _resolve(amount_cents=1000, category_rule=rule, period_members=[J, A])
+    r = _resolve(amount_cents=1000, category_rule=rule, members=[J, A])
     assert r.split_type == "weights" and [s.member_id for s in r.shares] == [J]
 
 
 def test_single_absent_member_falls_back() -> None:
     r = _resolve(category_rule=RuleData("single", [RuleRow(uuid.UUID(int=9))]))
-    assert r.rule_fallback is True and r.split_origin == "household_default"
+    assert r.rule_fallback is True and r.split_origin == "group_default"
 
 
 def test_override_and_subset() -> None:

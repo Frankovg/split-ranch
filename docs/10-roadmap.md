@@ -11,10 +11,10 @@ gantt
   P1 Money domain (TS+Py)        :p1, after p0, 11d
   section Parallel tracks
   P2 Quick splits (client-only)  :p2, after p1, 14d
-  P3 Auth, households, categories:p3, after p1, 14d
-  section Household core
+  P3 Auth, groups, categories:p3, after p1, 14d
+  section Group core
   P4 Expenses, rules, balance    :p4, after p3, 21d
-  P5 Close, settlement, history  :p5, after p4, 18d
+  P5 Groups, balance, payments  :p5, after p4, 18d
   P6 Google Sheets               :p6, after p5, 11d
   P7 MVP hardening & release     :p7, after p6, 14d
 ```
@@ -40,7 +40,7 @@ Risks: version incompatibilities (mitigated by spikes and pinning).
 |---|---|
 | T-1.1 `allocate` in Python and TS | All vectors in `allocate.json` pass in both; property tests green |
 | T-1.2 `resolve_shares` (all split types, subsets, fallback) | Vectors + properties; examples from [03](03-business-rules.md) reproduced exactly |
-| T-1.3 `settle` (greedy, deterministic) | Vectors + properties; household and quick-split examples reproduced |
+| T-1.3 `settle` (greedy, deterministic) | Vectors + properties; group and quick-split examples reproduced |
 | T-1.4 Money parse/format helpers (es-ES) | `"1.234,56"`, `"12,5"`, `"12.50"` parsed; invalid inputs rejected |
 | T-1.5 Random vector generator + nightly parity job | CI fails on any divergence |
 
@@ -58,54 +58,57 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | ~~T-2.6 Save/sync to account~~ | **Dropped 2026-11-10**: Quick splits stay on the phone only |
 | T-2.7 Manual payment status ("Debe / Ha pagado"; "Debo / Ya lo pagué" for "Soy yo") | Button toggles the status; edits never change it; share text shows ✓ |
 
-## P3 — Auth, households, categories (2 w)
+## P3 — Auth, groups, categories (2 w)
 
 | Task | AC |
 |---|---|
 | T-3.1 `get_actor` dependency (JWKS cache, claim checks) + `ensure_user` + `GET/PATCH /me` | Unit tests with locally signed ES256 test tokens: valid, expired, wrong `iss`/`aud`, `anon` role, `HS256`; first call creates `app.users` |
 | T-3.2 Supabase config as code (`supabase/config.toml` for local; documented dashboard settings for the cloud project: only Google provider, anonymous sign-ins off, token lifetime) | Fresh local stack reproduces the config; checklist ticked for the cloud project |
 | T-3.3 App auth flow (sign-in screen, `signInWithGoogle` → Supabase, encrypted MMKV session storage, AppState auto-refresh, Stack.Protected) | Kill app → reopen stays signed in; sign-out → back to sign-in; expired token transparently refreshed |
-| T-3.4 Households + members + roles + default categories | Create household → admin; 12 default categories copied |
-| T-3.5 Invitations (code + App Link, start_period) | Second device joins via WhatsApp link; expired/exhausted handled |
-| T-3.6 Tenant-isolation test harness | Every household route returns 404 for outsiders |
+| T-3.4 Groups + members + roles + default categories | Create group → admin; 12 default categories copied |
+| T-3.5 Invitations (code typed by hand; App Links later) | Second device joins with the code; expired handled |
+| T-3.6 Tenant-isolation test harness | Every group route returns 404 for outsiders |
 | T-3.7 Categories CRUD + archive (admin) | Archived categories hidden from pickers but kept on old expenses |
 
 ## P4 — Expenses, rules, live balance (3 w)
 
 | Task | AC |
 |---|---|
-| T-4.1 Periods (numbered, started and closed by hand; one open at a time) | New expenses land in the open period whatever their date; none open → `409 no_open_period` |
-| T-4.2 Split rules: household default + category rules (API + admin UI) | 60/40 rule must sum 100 %; live validation |
+| ~~T-4.1 Periods~~ | Dropped 2026-11-16 (no periods) |
+| T-4.2 Split rules: group default + category rules (API + admin UI) | 60/40 rule must sum 100 %; live validation |
 | T-4.3 `create_expense` use case + revisions + idempotency | Shares persisted; revision v1; replay with same key returns same response |
-| T-4.4 Update/delete in open period with If-Match | Stale version → 412 with current data; UI shows conflict sheet |
+| T-4.4 Update/delete with If-Match (any member) | Stale version → 412 with current data; UI shows conflict sheet |
 | T-4.5 Expense form (amount keypad, category chips, payer, date, split section with live preview using the TS domain) | Preview equals server shares in 100 % of vector cases |
 | T-4.6 Expense list (FlashList, filters, cursor pagination) + detail + history | 1 000 expenses scroll smoothly on a mid-range device |
-| T-4.7 Live balance endpoint + home card | Σ nets = 0; matches the household example |
+| T-4.7 Live balance endpoint + home card | Σ nets = 0; matches the group example |
 | T-4.8 Personal expenses (split type) | Excluded from balance and totals |
 | T-4.9 Offline create queue (MVP offline) | Airplane mode → create → reconnect → exactly one expense |
 
-## P5 — Period close, settlement, history (2.5 w)
+## P5 — Groups without periods, balance and payments (replaces "Period close, settlement")
 
-| Task | AC |
-|---|---|
-| T-5.1 `close_period` + snapshot + transfers (admin early close) | Snapshot seq 1, pending transfers equal greedy result |
-| ~~T-5.2 Auto-close periodic job~~ (dropped 2026-11-09: members close periods by hand) → T-5.2 Start next period | Any member starts it after the latest one closed; two at once → one wins |
-| T-5.3 Transfers: sent / confirm / dispute + period → settled | State machine tests; only creditor confirms |
-| T-5.4 Edit after close (reason, new snapshot, cancel pending) | Diff old vs new nets shown; Σ nets 0 |
-| T-5.5 Lock on first sent/confirmed + adjustments (reversal + correction) | Correction example from [03](03-business-rules.md) produces +20/−10/−10 in April |
-| T-5.6 Reopen (admin, only unlocked) | Locked → 409 |
-| T-5.7 Membership changes (join current/next, leave at period end) | Join with `current` re-resolves only `participant_mode='all'` expenses |
-| T-5.8 Period screen UI (timeline, balances, transfers, snapshot diff) | Usable at font scale 200 % |
+Decided 2026-11-16; design and review in [egm/design_draft.md](egm/design_draft.md) and [egm/consolidated_review_report.md](egm/consolidated_review_report.md). The period tasks of P4/P5 (T-4.1, T-5.1 – T-5.8) are **dropped**: built, then removed by migration 0006.
 
-## P6 — Google Sheets (1.5 w)
+| Task | AC | Status |
+|---|---|---|
+| T-5.10 Migration 0006: groups, members with `joined_at`/`left_at`, one admin, `payments`; drop periods, transfers, adjustments | Round trip + `alembic check` green; refuses non-empty tables | Done |
+| T-5.11 Running balance + suggestions (`compute_group_balance`, payments as ledger rows, suggestions after sent payments) | docs/03 example: nets +656,66 / −293,33 / −363,33; Σ nets 0 | Done |
+| T-5.12 Payments: record (debtor → sent, creditor → confirmed), confirm / dispute / cancel, If-Match, history, idempotent id | State machine tests; only the receiver confirms | Done |
+| T-5.13 Flat permissions: any member edits expenses, categories, rules, group, invitations; admin removes members and deletes the group | Permission tests | Done |
+| T-5.14 Leave / remove only at zero balance; admin hand-over; last member deletes the group; rejoin | `409 member_has_open_balance`; tests | Done |
+| T-5.15 Expense edit rule (only `split`/`participants` re-split; amount re-allocates over stored participants; `member_left`) | CUJ 6 example: +20,00 / −10,00 / −10,00 | Done |
+| T-5.16 Date filters + `/summary` (same filters) | Last month = inclusive date range in the group time zone | Done |
+| T-5.17 Mobile: group list/switcher, home balance, settle up, expense list by day with month chips and totals, edit/delete expense, group settings | Typecheck + unit tests; manual CUJ 1 → 7 on two phones | Done (manual check pending) |
+| T-5.18 Mobile: date picker, weights/percentages/exact split editor, categories & rules screens | Preview equals server shares | Not started |
+
+## P6 — Google Sheets (1.5 w) — pending redesign: one tab per calendar month instead of per period ([06](06-google-sheets.md))
 
 | Task | AC |
 |---|---|
 | T-6.1 Service account + user-owned spreadsheet shared with it as Editor (runbook in `infra/README.md`) | Service account can write a cell in the spreadsheet |
-| T-6.2 `ensure_household_spreadsheet` (verify access, write `Léeme`) | Missing share → clear error state, no crash |
+| T-6.2 `ensure_group_spreadsheet` (verify access, write `Léeme`) | Missing share → clear error state, no crash |
 | T-6.3 Pure renderer for the 4 tabs + content hash | Snapshot tests |
-| T-6.4 `sync_period_tab` with backoff and error states | Simulated 429 → retries and succeeds; unchanged hash → no API calls |
-| T-6.5 Triggers: period close and edit after close only (background task after the commit) | Edit after close updates only that period's tabs; the open period is never written |
+| T-6.4 `sync_month_tab` with backoff and error states | Simulated 429 → retries and succeeds; unchanged hash → no API calls |
+| T-6.5 Triggers: on demand and when a month is over (background task after the commit) | Edits to an exported month resync only that tab |
 | T-6.6 Sheets status in app settings | Shows last sync / error |
 
 ## P7 — MVP hardening and release (2 w)
@@ -114,20 +117,20 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 |---|---|
 | T-7.1 Privacy policy, account deletion (in-app + web URL), data export | Play Console data-safety form completed |
 | T-7.2 Sentry release tracking (API + mobile source maps) | Errors show readable stacks |
-| T-7.3 Maestro E2E: sign-in (test account), create household, add expenses, close, settle | Green in CI |
+| T-7.3 Maestro E2E: sign-in (test account), create group, add expenses, record and confirm a payment | Green in CI |
 | T-7.4 Prod environment (free tiers; restore drill of the GitHub Actions backup into the local stack) | Restore tested |
-| T-7.5 APK installed directly on both phones (no Play Store) | 1 full period cycle (start, expenses, close, settle) run with real data |
+| T-7.5 APK installed directly on both phones (no Play Store) | A month of real expenses, settled up with payments |
 | T-7.6 Accessibility & i18n pass (es/en) | Checklist in [13](13-design-system.md) passes |
 
 ## Post-MVP — ordered by value / effort
 
 | # | Feature | Value | Effort | Notes / dependencies |
 |---|---|---|---|---|
-| 1 | **Push notifications** (new/edited expense, close reminder, transfer sent/pending) | High | S (1 w) | Needed by several features below |
-| 2 | **Recurring expenses** with own split rules | High | M (1.5 w) | Daily job creates expenses on `day_of_month`, `source='recurring'`; skip if already created (unique `(recurring_id, period)`) |
+| 1 | **Push notifications** (new/edited expense, payment sent/pending) | High | S (1 w) | Needed by several features below |
+| 2 | **Recurring expenses** with own split rules | High | M (1.5 w) | Daily job creates expenses on `day_of_month`, `source='recurring'`; skip if already created (unique `(recurring_id, month)`) |
 | 3 | ~~Payment button~~ | — | — | **Dropped 2026-11-10**: the app never links to payment platforms |
 | 4 | **Private expenses visibility** (fully hidden from others) | Medium | S (0.5 w) | Split type already exists |
-| 5 | **Multi-household UI** (switcher) | Medium | S (0.5–1 w) | Data model ready |
+| 5 | **Multi-group UI** (switcher) | Medium | S (0.5–1 w) | Data model ready |
 | 6 | **Budgets** per category + alerts | Medium | M (1.5 w) | Needs push |
 | 7 | **Charts, month-over-month, CSV/PDF export** | Medium | M (1.5 w) | victory-native; PDF server-side (WeasyPrint) or `expo-print` |
 | 8 | **Quick-split result as image** | Low | S (0.5 w) | Shared from the phone; no server link |
@@ -146,7 +149,7 @@ P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, remi
 |---|---|---|---|
 | UI library churn (NativeWind v5 RC, SDK 58 new) | Medium | Medium | Spike T-0.3, pin versions, Reusables supports NativeWind and Uniwind |
 | Google Sign-In library/licensing | Medium | Medium | Spike T-0.4, abstraction layer |
-| Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, closed periods only, hashes |
+| Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, monthly tabs, hashes |
 | Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | No background work (nothing to lose on a spin-down), weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
 | Rules complexity confuses users | Medium | High | Show "why this split" (`split_origin`) everywhere; sensible defaults |
 | Edits after close / adjustments misunderstood | Medium | Medium | Diff UI, clear copy, E2E tests |

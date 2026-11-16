@@ -72,7 +72,7 @@ def test_history_append_only(db_session: Session, expense: tuple[str, str, str])
     sp.rollback()
 
 
-def test_schema_has_nine_tables(db_session: Session) -> None:
+def test_schema_has_eight_tables(db_session: Session) -> None:
     tables = (
         db_session.execute(
             text(
@@ -87,11 +87,10 @@ def test_schema_has_nine_tables(db_session: Session) -> None:
         "categories",
         "expense_shares",
         "expenses",
+        "group_members",
+        "groups",
         "history",
-        "household_members",
-        "households",
-        "periods",
-        "settlement_transfers",
+        "payments",
         "users",
     ]
 
@@ -108,3 +107,32 @@ def test_rls_enabled_everywhere(db_session: Session) -> None:
         .all()
     )
     assert missing == []
+
+
+def test_one_active_admin_per_group(db_session: Session) -> None:
+    """The partial unique index rejects a second active admin in the same group."""
+    from split_ranch.core import clock
+    from split_ranch.core.ids import uuid7
+    from split_ranch.models import Group, GroupMember, User
+
+    users = [User(id=uuid7(), email=f"a{i}@example.com") for i in range(2)]
+    db_session.add_all(users)
+    db_session.flush()
+    group = Group(name="Casa", created_by=users[0].id)
+    db_session.add(group)
+    db_session.flush()
+    sp = db_session.begin_nested()
+    for i, u in enumerate(users):
+        db_session.add(
+            GroupMember(
+                group_id=group.id,
+                user_id=u.id,
+                role="admin",
+                status="active",
+                sort_key=i,
+                joined_at=clock.now(),
+            )
+        )
+    with pytest.raises(DBAPIError, match="uq_group_members_one_admin"):
+        db_session.flush()
+    sp.rollback()

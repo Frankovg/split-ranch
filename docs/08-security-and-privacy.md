@@ -9,25 +9,29 @@
 - **Keys**: the publishable (anon) key is public by design and grants nothing on our data (private `app` schema + RLS with no policies). The secret/service-role key is reserved for account deletion on the server and never leaves the server.
 
 ## Authorisation (multi-tenant)
-1. Every household route resolves `Membership(user_id from JWT, household_id from path)`; missing → `404`.
+1. Every group route resolves `Membership(user_id from JWT, group_id from path)`; missing → `404`.
 2. Role checks in use cases (`require_admin(actor)`), not in routers.
-3. Repositories require `household_id` as a mandatory argument; there is no "get expense by id" without household scope.
-4. Composite foreign keys make cross-household references impossible at the DB level (see [02](02-data-model.md)).
-5. Tests: an automated **tenant-isolation test suite** iterates every household route with a user from another household and asserts 404 (generated from the OpenAPI route list, so new routes are covered automatically).
+3. Repositories require `group_id` as a mandatory argument; there is no "get expense by id" without group scope.
+4. Composite foreign keys make cross-group references impossible at the DB level (see [02](02-data-model.md)).
+5. Tests: an automated **tenant-isolation test suite** iterates every group route with a user from another group and asserts 404 (generated from the OpenAPI route list, so new routes are covered automatically).
 6. **Supabase Data API exposure**: the `app` schema is not listed in the exposed schemas, and every `app` table has RLS enabled with no policies. A CI/staging check calls the Data API with the publishable key and asserts it cannot reach any `app` table.
-7. Later (defence in depth): real RLS policies with `SET LOCAL app.household_id` for the `split_api` role.
+7. Later (defence in depth): real RLS policies with `SET LOCAL app.group_id` for the `split_api` role.
 
-Permission matrix (MVP):
+Permission matrix (groups without periods, 2026-11-16):
 
 | Action | Member | Admin |
 |---|---|---|
-| Create expense | ✓ | ✓ |
-| Edit/delete own expense | ✓ | ✓ |
-| Edit/delete others' expenses | — | ✓ |
-| Manage categories, rules, invitations, roles, settings | — | ✓ |
-| Close early / reopen period | — | ✓ |
-| Mark transfer sent | debtor | debtor |
-| Confirm/dispute transfer | creditor | creditor; admin only if creditor left (with note) |
+| Create, edit and delete any expense | ✓ | ✓ |
+| Manage categories, split rules, group name and time zone | ✓ | ✓ |
+| Get / revoke the invite code | ✓ | ✓ |
+| Record a payment | as its payer (`sent`) or receiver (`confirmed`) | same |
+| Confirm / dispute a payment | its receiver | its receiver |
+| Cancel a payment | its payer | its payer |
+| Leave the group (zero balance) | ✓ | ✓ (the role passes to the next member) |
+| Remove a member (zero balance) | — | ✓ |
+| Delete the group (every balance zero) | — | ✓ |
+
+Members who left get 404 on every group route, like outsiders. Flat edit rights are a trust decision: `history` keeps the author and before/after state of every change.
 
 ## Input validation
 - Pydantic v2 strict models, `extra="forbid"`, length limits on all strings, enums for every state, money as int with bounds (≤ 1 000 000 € per expense).
@@ -55,22 +59,22 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 **Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
 
-**Personal data processed:** name, email, avatar URL (Google), household membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
+**Personal data processed:** name, email, avatar URL (Google), group membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
 
 **Lawful bases:** contract (providing the service to members); legitimate interest (security logs, fraud/abuse prevention); consent (push notifications, optional analytics). Non-user names in Quick splits: legitimate interest of the user, minimised (first names only, encouraged), never used for anything else.
 
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).
-- Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the household admin's personal Google Drive (no data-region guarantee; disclosed).
-- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared households (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and finally deletes the Supabase auth user (which removes sessions and identities).
-- Sharing to Google Sheets: explained at household creation; per-user opt-out of being shared.
+- Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the group admin's personal Google Drive (no data-region guarantee; disclosed).
+- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared groups (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and finally deletes the Supabase auth user (which removes sessions and identities).
+- Sharing to Google Sheets: explained at group creation; per-user opt-out of being shared.
 
 **Retention (defaults):**
 
 | Data | Retention |
 |---|---|
-| Household expenses, history, transfers | While the household exists; deleted 30 days after household deletion |
-| Left members' read access | Until household deletion |
+| Group expenses, history, payments | While the group exists; deleted 30 days after group deletion |
+| Left members' read access | None: members who left get 404 (their balance was zero) |
 | Sessions / refresh tokens | Managed by Supabase Auth; removed on sign-out or account deletion |
 | Supabase auth/API logs | Per Supabase plan retention (Free plan: short, about a day) |
 | DB backups (GitHub Actions artifacts, gpg-encrypted) | 60 days |

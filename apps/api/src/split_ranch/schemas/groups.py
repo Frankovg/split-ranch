@@ -1,4 +1,4 @@
-"""Users, households, members, invitation code and categories."""
+"""Users, groups, members, invitation code and categories."""
 
 from datetime import datetime
 from typing import Literal
@@ -14,8 +14,8 @@ Role = Literal["admin", "member"]
 
 
 class MembershipRead(ReadModel):
-    household_id: Id
-    household_name: str
+    group_id: Id
+    group_name: str
     member_id: Id
     role: str
     status: str
@@ -38,15 +38,15 @@ class MeUpdate(StrictModel):
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
 
 
-# ------------------------------------------------------------- households
+# ------------------------------------------------------------- groups
 
 
-class HouseholdCreate(StrictModel):
+class GroupCreate(StrictModel):
     name: str = Field(min_length=1, max_length=80)
     timezone: str = Field(default="Europe/Madrid", max_length=64)
 
 
-class HouseholdUpdate(StrictModel):
+class GroupUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     timezone: str | None = Field(default=None, max_length=64)
 
@@ -58,11 +58,11 @@ class MemberRead(ReadModel):
     role: str
     status: str
     sort_key: int
-    joined_period_seq: int
-    left_period_seq: int | None
+    joined_at: datetime
+    left_at: datetime | None
 
 
-class HouseholdRead(ReadModel):
+class GroupRead(ReadModel):
     id: Id
     name: str
     timezone: str
@@ -72,23 +72,23 @@ class HouseholdRead(ReadModel):
     my_role: str
 
 
-class MemberRoleUpdate(StrictModel):
-    role: Role
+class GroupDeleteIn(StrictModel):
+    # The admin types the group's name to confirm.
+    confirm_name: str = Field(min_length=1, max_length=80)
 
 
 # ------------------------------------------------------------ invitations
 
 
 class InvitationRead(ReadModel):
-    """The household's join code (one per household, valid 7 days)."""
+    """The group's join code (one per group, valid 7 days), typed by hand by the invitee."""
 
     code: str
-    url: str
     expires_at: datetime
 
 
 class InvitationPreview(ReadModel):
-    household_name: str
+    group_name: str
     member_count: int
     expires_at: datetime
 

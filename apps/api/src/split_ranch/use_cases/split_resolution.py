@@ -68,13 +68,13 @@ def _sorted(ids: Sequence[UUID], canonical: Sequence[UUID]) -> list[UUID]:
 def _check_members(ids: Sequence[UUID], allowed: set[UUID]) -> None:
     for m in ids:
         if m not in allowed:
-            raise DomainError("invalid_split", f"member {m} does not take part in this period")
+            raise DomainError("invalid_split", f"member {m} is not an active member of this group")
 
 
 def _plan_from_override(
     spec: SplitSpec,
     participants: Sequence[UUID] | None,
-    period_members: Sequence[UUID],
+    members: Sequence[UUID],
     allowed: set[UUID],
     canonical: Sequence[UUID],
 ) -> _Plan:
@@ -94,7 +94,7 @@ def _plan_from_override(
             ids = list(participants)
             mode = "subset"
         else:
-            ids = list(period_members)
+            ids = list(members)
             mode = "all"
         _check_members(ids, allowed)
         return _Plan("equal", [SplitParticipant(str(m)) for m in _sorted(ids, canonical)], mode)
@@ -156,20 +156,18 @@ def _plan_subset_from_rule(
     return _Plan("equal", [SplitParticipant(str(m)) for m in ordered], "subset")
 
 
-def _plan_from_rule(
-    rule: RuleData, amount_cents: int, period_members: Sequence[UUID]
-) -> _Plan | None:
-    """Apply a stored rule to the period members; None means "not applicable" (fallback)."""
-    present = set(period_members)
+def _plan_from_rule(rule: RuleData, amount_cents: int, members: Sequence[UUID]) -> _Plan | None:
+    """Apply a stored rule to the active members; None means "not applicable" (fallback)."""
+    present = set(members)
     rows = [r for r in rule.rows if r.member_id in present]
-    index = {m: i for i, m in enumerate(period_members)}
+    index = {m: i for i, m in enumerate(members)}
     rows.sort(key=lambda r: index[r.member_id])
     st = rule.split_type
     if st == "personal":
         return _Plan("personal", [], "subset")
     if st == "equal":
         if not rule.rows:
-            return _Plan("equal", [SplitParticipant(str(m)) for m in period_members], "all")
+            return _Plan("equal", [SplitParticipant(str(m)) for m in members], "all")
         if not rows:
             return None
         return _Plan("equal", [SplitParticipant(str(r.member_id)) for r in rows], "subset")
@@ -237,19 +235,19 @@ def resolve_expense_split(
     participants: Sequence[UUID] | None,
     category_rule: RuleData | None,
     default_rule: RuleData | None,
-    period_members: Sequence[UUID],
+    members: Sequence[UUID],
     canonical_order: Sequence[UUID],
     allowed_members: set[UUID] | None = None,
 ) -> Resolution:
     """Resolve the split of one expense following the precedence chain.
 
-    `period_members` are in canonical order; `allowed_members` widens who may appear in an
-    explicit override (used by adjustments that reproduce an older period's split).
+    `members` are in canonical order; `allowed_members` widens who may appear in an
+    explicit override (used by edits that keep the stored participants).
     """
-    allowed = set(period_members) | (allowed_members or set())
+    allowed = set(members) | (allowed_members or set())
 
     if override is not None:
-        plan = _plan_from_override(override, participants, period_members, allowed, canonical_order)
+        plan = _plan_from_override(override, participants, members, allowed, canonical_order)
         return Resolution(
             plan.split_type,
             "override",
@@ -271,10 +269,10 @@ def resolve_expense_split(
 
     fallback = False
     # Recurring rules come with recurring expenses (post-MVP).
-    for origin, rule in (("category", category_rule), ("household_default", default_rule)):
+    for origin, rule in (("category", category_rule), ("group_default", default_rule)):
         if rule is None:
             continue
-        rule_plan = _plan_from_rule(rule, amount_cents, period_members)
+        rule_plan = _plan_from_rule(rule, amount_cents, members)
         if rule_plan is None:
             fallback = True
             continue
@@ -286,12 +284,12 @@ def resolve_expense_split(
             _execute(rule_plan, amount_cents, payer_member_id),
         )
 
-    if not period_members:
-        raise DomainError("invalid_split", "the period has no members")
-    plan = _Plan("equal", [SplitParticipant(str(m)) for m in period_members], "all")
+    if not members:
+        raise DomainError("invalid_split", "the group has no active members")
+    plan = _Plan("equal", [SplitParticipant(str(m)) for m in members], "all")
     return Resolution(
         "equal",
-        "household_default",
+        "group_default",
         "all",
         fallback,
         _execute(plan, amount_cents, payer_member_id),
@@ -308,7 +306,7 @@ def spec_member_ids(spec: SplitSpec) -> list[UUID]:
 
 
 def rule_from_spec(spec: SplitSpec) -> RuleData:
-    """A stored household/category rule (SplitSpec JSON) as resolution input."""
+    """A stored group/category rule (SplitSpec JSON) as resolution input."""
     if isinstance(spec, PersonalSplit):
         return RuleData("personal")
     if isinstance(spec, WeightsSplit):

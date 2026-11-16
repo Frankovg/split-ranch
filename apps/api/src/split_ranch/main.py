@@ -11,7 +11,7 @@ import structlog
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import Engine
 
-from split_ranch.api.routers import expenses, households, me, periods, system
+from split_ranch.api.routers import expenses, groups, me, payments, system
 from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.errors import install_error_handlers
 from split_ranch.core.logging import configure_logging
@@ -81,9 +81,9 @@ def create_app(
     for router in (
         system.router,
         me.router,
-        households.router,
+        groups.router,
         expenses.router,
-        periods.router,
+        payments.router,
     ):
         app.include_router(router, prefix=API_PREFIX)
     return app

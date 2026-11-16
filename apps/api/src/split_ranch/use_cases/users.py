@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from split_ranch.core.actor import Actor
 from split_ranch.core.errors import NotFound
 from split_ranch.core.security import TokenClaims
-from split_ranch.models import Household, HouseholdMember, User
-from split_ranch.schemas.households import MembershipRead, MeRead, MeUpdate, UserRead
+from split_ranch.models import Group, GroupMember, User
+from split_ranch.schemas.groups import MembershipRead, MeRead, MeUpdate, UserRead
 
 
 class _EnsureUserCache:
@@ -84,18 +84,22 @@ def _user(session: Session, user_id: UUID) -> User:
 def get_me(session: Session, actor: Actor) -> MeRead:
     user = _user(session, actor.user_id)
     rows = session.execute(
-        select(HouseholdMember, Household.name)
-        .join(Household, Household.id == HouseholdMember.household_id)
-        .where(HouseholdMember.user_id == actor.user_id, Household.deleted_at.is_(None))
-        .order_by(HouseholdMember.created_at)
+        select(GroupMember, Group.name)
+        .join(Group, Group.id == GroupMember.group_id)
+        .where(
+            GroupMember.user_id == actor.user_id,
+            GroupMember.status == "active",
+            Group.deleted_at.is_(None),
+        )
+        .order_by(GroupMember.created_at)
     ).all()
     base = UserRead.model_validate(user)
     return MeRead(
         **base.model_dump(),
         memberships=[
             MembershipRead(
-                household_id=m.household_id,
-                household_name=name,
+                group_id=m.group_id,
+                group_name=name,
                 member_id=m.id,
                 role=m.role,
                 status=m.status,

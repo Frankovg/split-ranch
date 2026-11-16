@@ -36,11 +36,11 @@ export function useAppStateFocus() {
 }
 
 /**
- * Refetches the household's stale, active queries when the screen regains focus
+ * Refetches the group's stale, active queries when the screen regains focus
  * (tabs stay mounted, so switching tabs alone never refetches). Skips the first focus,
  * which coincides with mount.
  */
-export function useRefreshOnFocus(householdId: string | undefined) {
+export function useRefreshOnFocus(groupId: string | undefined) {
   const queryClient = useQueryClient();
   const firstTimeRef = useRef(true);
 
@@ -50,12 +50,12 @@ export function useRefreshOnFocus(householdId: string | undefined) {
         firstTimeRef.current = false;
         return;
       }
-      if (!householdId) return;
+      if (!groupId) return;
       void queryClient.refetchQueries({
-        queryKey: queryKeys.household(householdId),
+        queryKey: queryKeys.group(groupId),
         stale: true,
         type: 'active',
       });
-    }, [queryClient, householdId]),
+    }, [queryClient, groupId]),
   );
 }

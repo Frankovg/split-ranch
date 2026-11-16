@@ -11,7 +11,6 @@ Id = Annotated[UUID, Field(strict=False)]
 Day = Annotated[date, Field(strict=False)]
 AmountCents = Annotated[int, Field(ge=1, le=100_000_000)]
 Reason = Annotated[str, Field(min_length=5, max_length=280)]
-PeriodSeq = Annotated[int, Field(ge=1, le=1_000_000)]
 
 
 class StrictModel(BaseModel):

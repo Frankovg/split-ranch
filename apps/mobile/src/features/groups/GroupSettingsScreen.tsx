@@ -1,0 +1,177 @@
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { Share2, UserMinus } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
+import { Alert, Share, View } from 'react-native';
+import { toast } from 'sonner-native';
+import { Screen } from '@/components/Screen';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Text } from '@/components/ui/text';
+import { apiErrorCode } from '@/lib/api';
+import {
+  useActiveMembership,
+  useCreateInvitation,
+  useDeleteGroup,
+  useGroup,
+  useLeaveGroup,
+  useRemoveMember,
+  useRenameGroup,
+} from './api';
+import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
+import { GroupsScreen } from './GroupsScreen';
+import type { Group } from './types';
+
+/** Name, members and invite code (any member); remove members and delete (admin only). */
+export function GroupSettingsScreen() {
+  const { t } = useTranslation();
+  const me = useActiveMembership();
+  const group = useGroup(me.data?.group_id);
+  if (me.isPending) return <LoadingScreen />;
+  if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
+  if (!me.data) return <GroupsScreen embedded />;
+  if (group.isPending) return <LoadingScreen />;
+  if (group.isError) return <ErrorScreen t={t} onRetry={() => void group.refetch()} />;
+  return <Settings group={group.data} />;
+}
+
+function Settings({ group }: { group: Group }) {
+  const { t } = useTranslation();
+  const isAdmin = group.my_role === 'admin';
+  const [name, setName] = useState(group.name);
+  const [confirmName, setConfirmName] = useState('');
+  const rename = useRenameGroup(group.id);
+  const invite = useCreateInvitation(group.id);
+  const leave = useLeaveGroup(group.id);
+  const removeMember = useRemoveMember(group.id);
+  const deleteGroup = useDeleteGroup(group.id);
+
+  const balanceError = (error: unknown) =>
+    toast.error(
+      apiErrorCode(error) === 'member_has_open_balance' || apiErrorCode(error) === 'group_has_open_balances'
+        ? t('group.settleFirst')
+        : t('common.error'),
+    );
+
+  const onInvite = () =>
+    invite.mutate(undefined, {
+      onSuccess: async (inv) => {
+        try {
+          await Share.share({ message: t('group.inviteMessage', { name: group.name, code: inv.code }) });
+        } catch (error) {
+          console.warn('Share failed', error);
+        }
+      },
+      onError: () => toast.error(t('group.inviteFailed')),
+    });
+
+  const onLeave = () =>
+    Alert.alert(t('group.leaveTitle', { name: group.name }), t('group.leaveBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('group.leave'),
+        style: 'destructive',
+        onPress: () => leave.mutate(undefined, { onSuccess: () => router.back(), onError: balanceError }),
+      },
+    ]);
+
+  const onRemove = (memberId: string) =>
+    Alert.alert(t('group.removeTitle', { name: memberName(group, memberId, t) }), t('group.removeBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('group.remove'),
+        style: 'destructive',
+        onPress: () => removeMember.mutate(memberId, { onError: balanceError }),
+      },
+    ]);
+
+  return (
+    <Screen>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('group.name')}</CardTitle>
+        </CardHeader>
+        <CardContent className='gap-3'>
+          <Input aria-label={t('group.name')} value={name} onChangeText={setName} maxLength={80} />
+          <Button
+            variant='outline'
+            disabled={rename.isPending || name.trim() === '' || name.trim() === group.name}
+            onPress={() =>
+              rename.mutate(name.trim(), {
+                onSuccess: () => toast.success(t('group.renamed')),
+                onError: () => toast.error(t('common.error')),
+              })
+            }>
+            <Text>{t('common.save')}</Text>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className='flex-row items-center justify-between'>
+          <CardTitle>{t('home.members')}</CardTitle>
+          <Button variant='ghost' size='sm' disabled={invite.isPending} onPress={onInvite}>
+            <Icon as={Share2} size={18} />
+            <Text>{t('group.invite')}</Text>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {activeMembers(group).map((m) => (
+            <View key={m.id} className='flex-row items-center justify-between py-1'>
+              <View>
+                <Text>{memberName(group, m.id, t)}</Text>
+                {m.role === 'admin' ? (
+                  <Text className='text-sm text-muted-foreground'>{t('group.admin')}</Text>
+                ) : null}
+              </View>
+              {isAdmin && m.id !== group.my_member_id ? (
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  accessibilityLabel={t('group.removeTitle', { name: memberName(group, m.id, t) })}
+                  onPress={() => onRemove(m.id)}>
+                  <Icon as={UserMinus} size={18} />
+                </Button>
+              ) : null}
+            </View>
+          ))}
+          <Text className='pt-2 text-sm text-muted-foreground'>{t('group.inviteHint')}</Text>
+        </CardContent>
+      </Card>
+
+      <Button variant='outline' disabled={leave.isPending} onPress={onLeave}>
+        <Text>{t('group.leave')}</Text>
+      </Button>
+
+      {isAdmin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('group.deleteTitle')}</CardTitle>
+            <CardDescription>{t('group.deleteBody', { name: group.name })}</CardDescription>
+          </CardHeader>
+          <CardContent className='gap-3'>
+            <Label nativeID='confirm-name'>{t('group.deleteConfirm')}</Label>
+            <Input aria-labelledby='confirm-name' value={confirmName} onChangeText={setConfirmName} />
+            <Button
+              variant='destructive'
+              disabled={deleteGroup.isPending || confirmName.trim() !== group.name}
+              onPress={() =>
+                deleteGroup.mutate(confirmName.trim(), {
+                  onSuccess: () => {
+                    toast.success(t('group.deleted'));
+                    router.back();
+                  },
+                  onError: balanceError,
+                })
+              }>
+              <Text>{t('group.delete')}</Text>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+    </Screen>
+  );
+}

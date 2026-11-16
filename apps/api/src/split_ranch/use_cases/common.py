@@ -7,20 +7,20 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from split_ranch.core.actor import HouseholdActor
+from split_ranch.core.actor import GroupActor
 from split_ranch.core.errors import Forbidden, PreconditionFailed, PreconditionRequired
 from split_ranch.models import History
 
 
-def require_admin(actor: HouseholdActor) -> None:
+def require_admin(actor: GroupActor) -> None:
     if not actor.is_admin:
-        raise Forbidden("Only household admins can do this")
+        raise Forbidden("Only the group admin can do this")
 
 
-def require_active(actor: HouseholdActor) -> None:
-    """Members who already left keep read access only."""
+def require_active(actor: GroupActor) -> None:
+    """Members who left are not members any more (the API answers 404 to them)."""
     if actor.status == "left":
-        raise Forbidden("Former members have read-only access")
+        raise Forbidden("Former members cannot change this group")
 
 
 def check_version(
@@ -46,7 +46,7 @@ def check_version(
 def audit(
     session: Session,
     *,
-    household_id: UUID,
+    group_id: UUID,
     entity: str,
     entity_id: UUID,
     actor_user_id: UUID | None,
@@ -54,10 +54,10 @@ def audit(
     diff: dict[str, Any],
     reason: str | None = None,
 ) -> None:
-    """Record a household event (period, member, category, rule...) in `history`."""
+    """Record a group event (group, member, category, rule, payment...) in `history`."""
     session.add(
         History(
-            household_id=household_id,
+            group_id=group_id,
             entity=entity,
             entity_id=entity_id,
             actor_user_id=actor_user_id,

@@ -20,7 +20,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Machine-readable `code` of an API problem+json error (e.g. "period_locked"), if any. */
+/** Machine-readable `code` of an API problem+json error (e.g. "member_has_open_balance"), if any. */
 export function apiErrorCode(error: unknown): string | undefined {
   if (!(error instanceof ApiError) || typeof error.body !== 'object' || error.body === null) return undefined;
   const code = (error.body as { code?: unknown }).code;

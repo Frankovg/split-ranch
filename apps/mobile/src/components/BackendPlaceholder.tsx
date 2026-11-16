@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 
 /**
- * Honest placeholder for household screens: they need the FastAPI backend,
+ * Honest placeholder for group screens: they need the FastAPI backend,
  * which this build does not talk to yet. Never shows fake data.
  */
 export function BackendPlaceholder() {

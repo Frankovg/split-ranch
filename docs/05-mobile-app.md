@@ -11,35 +11,30 @@
 ```
 apps/mobile/
 ├── app/                              # Expo Router routes only (thin)
-│   ├── _layout.tsx                   # providers: Query, Theme, Toast, Sentry, i18n
-│   ├── (auth)/sign-in.tsx
-│   ├── (app)/_layout.tsx             # Stack.Protected guard={isSignedIn}
+│   ├── _layout.tsx                   # providers: Query, Theme, Toast, i18n
+│   ├── (auth)/sign-in.tsx  (auth)/quick-splits.tsx
+│   ├── (app)/_layout.tsx             # stack of the signed-in area
 │   ├── (app)/(tabs)/_layout.tsx      # tabs: Inicio · Gastos · Cuentas rápidas · Ajustes
-│   ├── (app)/(tabs)/index.tsx        # household home: balance, period card, recent
-│   ├── (app)/(tabs)/expenses.tsx
+│   ├── (app)/(tabs)/index.tsx        # active group: balance, suggestions, members, recent
+│   ├── (app)/(tabs)/expenses.tsx     # grouped by day, month filter, totals
 │   ├── (app)/(tabs)/quick/index.tsx
 │   ├── (app)/(tabs)/settings.tsx
 │   ├── (app)/expense/new.tsx         # presented as modal
-│   ├── (app)/expense/[id].tsx
-│   ├── (app)/expense/[id]/history.tsx
-│   ├── (app)/period/[seq].tsx        # summary, close, settlement, transfers, start next
-│   ├── (app)/household/members.tsx
-│   ├── (app)/household/categories.tsx
-│   ├── (app)/household/rules.tsx
-│   ├── (app)/onboarding/create-or-join.tsx
-│   ├── join/[code].tsx               # deep link target (works signed out → redirects after sign-in)
+│   ├── (app)/expense/[id].tsx        # edit / delete (any member)
+│   ├── (app)/groups/index.tsx        # my groups (switch), create, join with code
+│   ├── (app)/group/settings.tsx      # name, members, invite, leave, remove + delete (admin)
+│   ├── (app)/group/settle.tsx        # suggestions, record payment, confirm / dispute / cancel
 │   ├── quick/[id].tsx                # Quick split editor (also reachable signed out)
 │   └── dev/gallery.tsx               # component gallery, dev builds only
 ├── src/
-│   ├── features/                     # feature modules: api hooks, components, schemas
-│   │   ├── auth/  households/  expenses/  periods/  settlement/  quick-splits/  categories/
+│   ├── features/                     # auth/  groups/  quick-splits/  settings/  dev/
 │   ├── components/ui/                # React Native Reusables (copied, owned)
 │   ├── components/                   # app-level composites (MoneyText, MemberAvatarStack…)
 │   ├── lib/api/                      # generated OpenAPI types + fetch client (token from Supabase session)
 │   ├── lib/supabase.ts               # Supabase client, auth only (no data queries)
 │   ├── lib/query/                    # QueryClient, persister, query keys
 │   ├── lib/money/                    # re-export of @split-ranch/domain + parse/format
-│   ├── stores/                       # Zustand: session, active household, quick-split drafts
+│   ├── stores/                       # Zustand: session, preferences (theme, language, active group), quick splits
 │   ├── i18n/                         # es, en
 │   ├── platform/                     # android-specific code (payment intents, widget later)
 │   └── theme/                        # tokens bridge (see 13-design-system)
@@ -55,25 +50,24 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Screen | Content |
 |---|---|
 | Sign-in | Google button (Credential Manager), Quick splits link, privacy policy link |
-| Onboarding | Create household (name) or join with code / pasted link |
-| Home | Current period card (total, my net, days to close), "who owes whom" preview, recent expenses, FAB "+ Gasto" |
-| New/edit expense | Amount keypad first (big numeric input), description, category chips, payer (default me), date, split section collapsed showing the resolved rule ("Igual entre 3 · por defecto"), expandable to change type/participants with live preview of shares |
-| Expenses list | FlashList grouped by day, filters (period, category, payer), search |
-| Expense detail | Shares, origin of rule, history link, edit/delete (reason sheet when needed, adjustment explanation when locked) |
-| Period | Status timeline, totals by category, balances, transfers with I've paid / Received actions |
-| Members & invitations | Share the household's invite code (WhatsApp), roles, leave |
-| Categories & rules | Default rule editor (equal / weights / percentages with live 100% check), per-category rules |
+| Groups | My groups (tap to make one active; persisted in `stores/preferences.ts`), create a group, join with the 8-letter code typed by hand. Shown instead of Home when the user has no group |
+| Home | Active group name (opens Groups) and settings; my running balance, "pending confirmation", my suggested payments, Settle up; members with their nets; recent expenses; "+ Gasto" |
+| New/edit expense | Amount, description, payer, category chips, "split between" (equal) members. Edit sends only the changed fields (`If-Match`); shows who added and who last edited it; delete with confirmation. Planned: date picker, weights/percentages/exact with live preview |
+| Expenses list | `SectionList` grouped by `expense_date` (day headers), chips This month / Last month / All, summary card (total, top categories, per payer). Planned: category/payer/text filters, custom range |
+| Settle up | Suggestions (greedy, after payments already sent) with "I've paid" / "I received it" and a note; payment list with Received / Not received (note) / Cancel |
+| Group settings | Rename, members (admin badge), invite (share the code), leave; admin: remove member, delete group (type the name) |
+| Categories & rules | Planned: default rule editor (equal / weights / percentages with live 100% check), per-category rules. Any member may edit them |
 | Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips (tap to rename, mark "Soy yo" or remove), result card with a manual "Debe / Ha pagado" button per debtor, Share |
-| Settings | Profile, theme (system/light/dark), language, notifications, delete account |
+| Settings | Theme (system/light/dark), language, sign out. Planned: profile, notifications, delete account |
 
 ## State and data
 
 | Kind | Tool |
 |---|---|
-| Server state | **TanStack Query v5**: query keys `['household', hid, 'expenses', filters]`, etc. `staleTime` 30 s for lists, invalidation after mutations, optimistic updates for create/edit expense |
+| Server state | **TanStack Query v5**: query keys `['group', gid, 'expenses', filters]` (everything of a group under `['group', gid]`, invalidated after any expense or payment change), etc. `staleTime` 30 s for lists, invalidation after mutations |
 | Persistence | `@tanstack/query-async-storage-persister` (backed by MMKV) so the last data is shown offline |
 | Session | **`supabase-js`** auth client: persists and auto-refreshes the session. Storage adapter = encrypted MMKV whose encryption key lives in `expo-secure-store` (SecureStore alone has a ~2 KB value limit, too small for a Supabase session) |
-| Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, active household id, Quick-splits drafts (persisted via MMKV) |
+| Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, active group id, Quick-splits drafts (persisted via MMKV) |
 | Forms | **React Hook Form + Zod** (`@hookform/resolvers/zod`). Zod schemas mirror the Pydantic ones (generated types for shape; Zod for UX validation, e.g. percentages must sum to 100 %) |
 | Money/splits | `@split-ranch/domain` for previews and the whole Quick-splits computation |
 
@@ -100,7 +94,7 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 - `expo-notifications` + Expo Push Service; FCM v1 credentials uploaded to EAS. Requires a development build and a real device for testing.
 - Register after sign-in and when permission is granted (Android 13+ runtime permission: ask in context, e.g. after creating the first expense, not at launch).
 - Channels: `expenses`, `settlement`, `reminders` (users can mute per channel in Android settings).
-- Notification payload carries `{type, household_id, path}`; tapping navigates with Expo Router.
+- Notification payload carries `{type, group_id, path}`; tapping navigates with Expo Router.
 
 ## Offline
 
@@ -113,9 +107,9 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 **Post-MVP (full offline), strategy:**
 - Outbox of mutations (create/update/delete) with `base_version`.
 - On replay: server applies optimistic locking. `412` → the app fetches the current version and shows a merge sheet (field-level: theirs vs mine; amount/split conflicts must be chosen explicitly). Deletes win over edits from the other side only with confirmation.
-- State-dependent failures (`409 reason_required`, `period_locked`) → the app asks for the reason or offers to create an adjustment.
-- Delta pull: `GET /households/{hid}/changes?since=<cursor>` returning changed/deleted ids per entity (uses `updated_at` + monotonic `change_seq`).
-- Rejected alternatives: CRDTs / PowerSync / WatermelonDB — powerful but disproportionate for small households where conflicts are rare and must be resolved by humans anyway (money).
+- State-dependent failures (`409 member_left`, `412`) → the app reloads the expense and shows the latest version.
+- Delta pull: `GET /groups/{gid}/changes?since=<cursor>` returning changed/deleted ids per entity (uses `updated_at` + monotonic `change_seq`).
+- Rejected alternatives: CRDTs / PowerSync / WatermelonDB — powerful but disproportionate for small groups where conflicts are rare and must be resolved by humans anyway (money).
 
 ## Deep links
 - Scheme `splitranch://` and Android App Links on `https://<domain>/join/{code}` and `/q/{token}` (assetlinks.json served by the API host).
