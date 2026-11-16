@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { queryClient } from '@/lib/query/client';
+import { queryPersister } from '@/lib/query/persister';
 import { bindAuthAutoRefresh, supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
 
@@ -29,7 +30,13 @@ export function AuthListener() {
       });
 
     const { data } = client.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') queryClient.clear();
+      if (event === 'SIGNED_OUT') {
+        queryClient.clear();
+        // Delete the disk copy now instead of waiting for the throttled save.
+        void Promise.resolve(queryPersister.removeClient()).catch((error: unknown) =>
+          console.warn('Failed to remove the persisted query cache', error),
+        );
+      }
       setSession(session);
     });
     const unbindRefresh = bindAuthAutoRefresh();

@@ -31,10 +31,25 @@ export function createDebouncedMMKVStorage<S>(delayMs = 300): PersistStorage<S> 
 }
 
 const SESSION_KEY_NAME = 'split-ranch.session-mmkv-key';
+let encryptionKey: Promise<string> | null = null;
 let secureInstance: Promise<MMKV> | null = null;
+let queryCacheInstance: Promise<MMKV> | null = null;
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** AES-256 key shared by the encrypted MMKV instances; it lives in expo-secure-store. */
+function getEncryptionKey(): Promise<string> {
+  encryptionKey ??= (async () => {
+    let key = await SecureStore.getItemAsync(SESSION_KEY_NAME);
+    if (!key) {
+      key = toHex(await Crypto.getRandomBytesAsync(16)); // 32 hex chars = AES-256 key length
+      await SecureStore.setItemAsync(SESSION_KEY_NAME, key);
+    }
+    return key;
+  })();
+  return encryptionKey;
 }
 
 /**
@@ -42,13 +57,19 @@ function toHex(bytes: Uint8Array): string {
  * expo-secure-store (Android Keystore); SecureStore alone is too small for a session.
  */
 export function getSecureStorage(): Promise<MMKV> {
-  secureInstance ??= (async () => {
-    let key = await SecureStore.getItemAsync(SESSION_KEY_NAME);
-    if (!key) {
-      key = toHex(await Crypto.getRandomBytesAsync(16)); // 32 hex chars = AES-256 key length
-      await SecureStore.setItemAsync(SESSION_KEY_NAME, key);
-    }
-    return createMMKV({ id: 'split-ranch.session', encryptionKey: key, encryptionType: 'AES-256' });
-  })();
+  secureInstance ??= getEncryptionKey().then((key) =>
+    createMMKV({ id: 'split-ranch.session', encryptionKey: key, encryptionType: 'AES-256' }),
+  );
   return secureInstance;
+}
+
+/**
+ * Encrypted MMKV for the persisted React Query cache (group balances and expenses).
+ * A separate instance so it can be wiped without touching the session.
+ */
+export function getQueryCacheStorage(): Promise<MMKV> {
+  queryCacheInstance ??= getEncryptionKey().then((key) =>
+    createMMKV({ id: 'split-ranch.query-cache', encryptionKey: key, encryptionType: 'AES-256' }),
+  );
+  return queryCacheInstance;
 }

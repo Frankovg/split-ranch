@@ -44,7 +44,7 @@ All are public (`EXPO_PUBLIC_*` is inlined into the bundle — never secrets) an
 - `src/features/quick-splits/` — `model.ts` (pure updates), `compute.ts` (store → `resolveShares` → `computeBalances` → `settle` from `@split-ranch/domain`), `share-text.ts` (WhatsApp text), screens and components.
 - `src/components/ui/` — React Native Reusables components added with the CLI (owned code; each file has a `// Source:` header listing local changes, mainly 48 dp touch targets).
 - `src/components/` — `MoneyText`, `MoneyInput`, `EmptyState`, `FormField`, `Screen`, `BackendPlaceholder`.
-- `src/lib/` — `money` (re-exports the domain + display helpers), `supabase.ts`, `api/`, `query/`, `storage.ts` (MMKV; session in an AES-256 encrypted MMKV whose key lives in SecureStore).
+- `src/lib/` — `money` (re-exports the domain + display helpers), `supabase.ts`, `api/`, `query/`, `storage.ts` (MMKV; session and persisted query cache in AES-256 encrypted MMKV instances whose key lives in SecureStore).
 - `src/stores/` — Zustand: session (mirrored from `onAuthStateChange`), preferences (theme/language, persisted), quick splits (persisted).
 - `src/theme/` — tokens mirror of `global.css` (kept in sync by a test), React Navigation theme, theme sync.
 - `src/i18n/` — i18next + expo-localization, Spanish default, English second; keys are type-checked.
