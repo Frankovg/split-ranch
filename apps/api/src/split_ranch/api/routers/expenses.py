@@ -1,16 +1,16 @@
-"""Expenses."""
+"""Expenses and the spending summary."""
 
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Query, Response
+from fastapi import APIRouter, Body, Depends, Query, Response
 from fastapi.responses import JSONResponse
 
-from split_ranch.api.deps import HouseholdActorDep, IfMatchDep, SessionDep, etag
+from split_ranch.api.deps import GroupActorDep, IfMatchDep, SessionDep, etag
+from split_ranch.repositories.expenses import ExpenseFilters
 from split_ranch.schemas.common import Page
 from split_ranch.schemas.expenses import (
-    AdjustmentCreate,
-    AdjustmentRead,
     ExpenseCreate,
     ExpenseDeleteIn,
     ExpensePreviewIn,
@@ -18,66 +18,80 @@ from split_ranch.schemas.expenses import (
     ExpenseUpdate,
     RevisionRead,
     SplitPreviewRead,
+    SummaryRead,
 )
 from split_ranch.use_cases import expenses
 
-router = APIRouter(prefix="/households/{household_id}/expenses", tags=["expenses"])
+router = APIRouter(prefix="/groups/{group_id}", tags=["expenses"])
 
 
-@router.get("")
-def list_expenses(
-    actor: HouseholdActorDep,
-    session: SessionDep,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    cursor: str | None = None,
-    # A period number or "current" (the latest period).
-    period: Annotated[str | None, Query(pattern=r"^(current|[1-9][0-9]{0,6})$")] = None,
+def expense_filters(
+    # `from` is a Python keyword: the parameter is aliased.
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
     category_id: UUID | None = None,
     payer_member_id: UUID | None = None,
+    created_by_user_id: UUID | None = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
-) -> Page[ExpenseRead]:
-    items, next_cursor = expenses.list_expenses(
-        session,
-        actor,
-        limit=limit,
-        cursor=cursor,
-        period=None if period is None else "current" if period == "current" else int(period),
+) -> ExpenseFilters:
+    """Filters shared by the list and the summary; dates are inclusive."""
+    return ExpenseFilters(
+        date_from=date_from,
+        date_to=date_to,
         category_id=category_id,
         payer_member_id=payer_member_id,
+        created_by_user_id=created_by_user_id,
         q=q,
     )
+
+
+FiltersDep = Annotated[ExpenseFilters, Depends(expense_filters)]
+
+
+@router.get("/expenses")
+def list_expenses(
+    actor: GroupActorDep,
+    session: SessionDep,
+    filters: FiltersDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    cursor: str | None = None,
+) -> Page[ExpenseRead]:
+    items, next_cursor = expenses.list_expenses(session, actor, filters, limit=limit, cursor=cursor)
     return Page[ExpenseRead](items=items, next_cursor=next_cursor)
 
 
-@router.post("", status_code=201, response_model=ExpenseRead)
-def create_expense(
-    data: ExpenseCreate, actor: HouseholdActorDep, session: SessionDep
-) -> JSONResponse:
+@router.get("/summary")
+def get_summary(actor: GroupActorDep, session: SessionDep, filters: FiltersDep) -> SummaryRead:
+    return expenses.get_summary(session, actor, filters)
+
+
+@router.post("/expenses", status_code=201, response_model=ExpenseRead)
+def create_expense(data: ExpenseCreate, actor: GroupActorDep, session: SessionDep) -> JSONResponse:
     result = expenses.create_expense(session, actor, data)
     return JSONResponse(result.body, status_code=result.status, headers=etag(result.version))
 
 
-@router.post("/preview")
+@router.post("/expenses/preview")
 def preview_expense(
-    data: ExpensePreviewIn, actor: HouseholdActorDep, session: SessionDep
+    data: ExpensePreviewIn, actor: GroupActorDep, session: SessionDep
 ) -> SplitPreviewRead:
     return expenses.preview_split(session, actor, data)
 
 
-@router.get("/{expense_id}")
+@router.get("/expenses/{expense_id}")
 def get_expense(
-    expense_id: UUID, actor: HouseholdActorDep, session: SessionDep, response: Response
+    expense_id: UUID, actor: GroupActorDep, session: SessionDep, response: Response
 ) -> ExpenseRead:
     result = expenses.get_expense(session, actor, expense_id)
     response.headers.update(etag(result.version))
     return result
 
 
-@router.patch("/{expense_id}")
+@router.patch("/expenses/{expense_id}")
 def update_expense(
     expense_id: UUID,
     data: ExpenseUpdate,
-    actor: HouseholdActorDep,
+    actor: GroupActorDep,
     session: SessionDep,
     if_match: IfMatchDep,
     response: Response,
@@ -87,10 +101,10 @@ def update_expense(
     return result
 
 
-@router.delete("/{expense_id}", status_code=204)
+@router.delete("/expenses/{expense_id}", status_code=204)
 def delete_expense(
     expense_id: UUID,
-    actor: HouseholdActorDep,
+    actor: GroupActorDep,
     session: SessionDep,
     if_match: IfMatchDep,
     data: Annotated[ExpenseDeleteIn | None, Body()] = None,
@@ -99,15 +113,8 @@ def delete_expense(
     return Response(status_code=204)
 
 
-@router.post("/{expense_id}/adjustments", status_code=201)
-def create_adjustment(
-    expense_id: UUID, data: AdjustmentCreate, actor: HouseholdActorDep, session: SessionDep
-) -> AdjustmentRead:
-    return expenses.create_adjustment(session, actor, expense_id, data)
-
-
-@router.get("/{expense_id}/revisions")
+@router.get("/expenses/{expense_id}/revisions")
 def list_revisions(
-    expense_id: UUID, actor: HouseholdActorDep, session: SessionDep
+    expense_id: UUID, actor: GroupActorDep, session: SessionDep
 ) -> list[RevisionRead]:
     return expenses.list_revisions(session, actor, expense_id)

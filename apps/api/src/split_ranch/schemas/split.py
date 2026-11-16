@@ -1,6 +1,6 @@
 """Split specification: discriminated union on `split_type`.
 
-Shared by household rules, expense overrides and (future) AI tools.
+Shared by group rules, expense overrides and (future) AI tools.
 """
 
 from typing import Annotated, Any, Literal
@@ -37,7 +37,7 @@ def _unique(ids: list[object]) -> None:
 
 class EqualSplit(StrictModel):
     split_type: Literal["equal"]
-    # None or empty = every member of the period.
+    # None or empty = every active member of the group.
     shares: list[MemberRef] | None = Field(default=None, max_length=50)
 
     @model_validator(mode="after")
@@ -115,7 +115,7 @@ _SPEC_ADAPTER: TypeAdapter[SplitSpec] = TypeAdapter(SplitSpec)
 
 
 def spec_to_json(spec: SplitSpec) -> dict[str, Any]:
-    """The JSON stored in `households.split_rule` / `categories.split_rule`."""
+    """The JSON stored in `groups.split_rule` / `categories.split_rule`."""
     data: dict[str, Any] = spec.model_dump(mode="json", exclude_none=True)
     return data
 

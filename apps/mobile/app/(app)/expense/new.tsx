@@ -1,3 +1,5 @@
-import { NewExpenseScreen } from '@/features/household/NewExpenseScreen';
+import { NewExpenseScreen } from '@/features/groups/NewExpenseScreen';
 
-export default NewExpenseScreen;
+export default function NewExpenseRoute() {
+  return <NewExpenseScreen />;
+}

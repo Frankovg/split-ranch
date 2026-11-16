@@ -10,11 +10,11 @@ class Actor:
 
 
 @dataclass(frozen=True)
-class HouseholdActor:
-    """An actor with a verified membership in `household_id` (loaded from the DB)."""
+class GroupActor:
+    """An actor with a verified membership in `group_id` (loaded from the DB)."""
 
     user_id: UUID
-    household_id: UUID
+    group_id: UUID
     member_id: UUID
     role: str
     status: str

@@ -50,7 +50,7 @@ def test_me_creates_user(client: TestClient, make_user: Callable[[str], TestUser
 
 def test_validation_error_shape(client: TestClient, make_user: Callable[[str], TestUser]) -> None:
     u = make_user("Ana")
-    r = client.post("/v1/households", json={"name": "Casa", "extra": 1}, headers=u.headers)
+    r = client.post("/v1/groups", json={"name": "Casa", "extra": 1}, headers=u.headers)
     assert r.status_code == 422
     body = r.json()
     assert body["code"] == "validation_error"

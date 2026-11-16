@@ -1,4 +1,4 @@
-"""Append-only history of every change (expenses and household events)."""
+"""Append-only history of every change (expenses and group events)."""
 
 from datetime import datetime
 from typing import Any
@@ -12,10 +12,10 @@ from split_ranch.models.base import Base, created_at_col, uuid_pk
 
 
 class History(Base):
-    """One row per change. A trigger rejects UPDATEs; rows go only with their household.
+    """One row per change. A trigger rejects UPDATEs; rows go only with their group.
 
     Expense rows carry the expense `version` and full `before`/`after` states (the
-    expense's revision history). Other entities (period, household, member, category,
+    expense's revision history). Other entities (group, member, category, payment,
     split rule) store what changed in `after`.
     """
 
@@ -32,9 +32,7 @@ class History(Base):
     )
 
     id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column(
-        ForeignKey("households.id", ondelete="CASCADE"), index=True
-    )
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
     entity: Mapped[str] = mapped_column(String(40))
     entity_id: Mapped[UUID] = mapped_column()
     version: Mapped[int | None] = mapped_column(Integer)

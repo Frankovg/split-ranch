@@ -35,7 +35,7 @@
 - every transfer amount > 0; no member both pays and receives.
 - deterministic for the same ordered input; permutation of input order with the same canonical order key → same output.
 
-Period/ledger invariants (integration, Hypothesis stateful testing): random sequences of create/edit/delete/close/edit-after-close/adjust → `Σ nets == 0` at every step; balance of a locked period never changes; adjustments make `period(M) + period(M+1)` equal to "as if edited in place".
+Ledger invariants (integration; Hypothesis stateful testing planned): random sequences of create/edit/delete expenses and record/confirm/dispute/cancel payments → `Σ nets == 0` at every step; only confirmed payments move nets; suggestions settle the confirmed-plus-sent ledger exactly.
 
 ## TS ↔ Python parity with shared vectors
 

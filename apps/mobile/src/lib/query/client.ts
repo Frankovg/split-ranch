@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/api';
 
 /**
  * Shared QueryClient. TODO: add @tanstack/query-async-storage-persister backed by
- * MMKV once household queries exist (docs/05 "State and data").
+ * MMKV (docs/05 "State and data").
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,17 +15,17 @@ export const queryClient = new QueryClient({
   },
 });
 
-/** Query key factory (docs/05). */
+/** Query key factory (docs/05). Everything of a group lives under ['group', id]. */
 export const queryKeys = {
   me: () => ['me'] as const,
-  households: () => ['households'] as const,
-  household: (householdId: string) => ['household', householdId] as const,
-  categories: (householdId: string) => ['household', householdId, 'categories'] as const,
-  balance: (householdId: string, period: string) =>
-    ['household', householdId, 'balance', period] as const,
-  periods: (householdId: string) => ['household', householdId, 'periods'] as const,
-  settlement: (householdId: string, period: string) =>
-    ['household', householdId, 'settlement', period] as const,
-  expenses: (householdId: string, filters: Record<string, unknown> = {}) =>
-    ['household', householdId, 'expenses', filters] as const,
+  groups: () => ['groups'] as const,
+  group: (groupId: string) => ['group', groupId] as const,
+  categories: (groupId: string) => ['group', groupId, 'categories'] as const,
+  balance: (groupId: string) => ['group', groupId, 'balance'] as const,
+  payments: (groupId: string) => ['group', groupId, 'payments'] as const,
+  summary: (groupId: string, filters: Record<string, unknown> = {}) =>
+    ['group', groupId, 'summary', filters] as const,
+  expenses: (groupId: string, filters: Record<string, unknown> = {}) =>
+    ['group', groupId, 'expenses', filters] as const,
+  expense: (groupId: string, expenseId: string) => ['group', groupId, 'expense', expenseId] as const,
 };

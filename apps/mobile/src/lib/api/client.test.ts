@@ -10,7 +10,7 @@ const { apiErrorCode, ApiError, apiRequest } = await import('./client');
 
 describe('apiErrorCode', () => {
   it('reads the problem+json code and ignores anything else', () => {
-    expect(apiErrorCode(new ApiError(409, { code: 'period_locked' }))).toBe('period_locked');
+    expect(apiErrorCode(new ApiError(409, { code: 'member_has_open_balance' }))).toBe('member_has_open_balance');
     expect(apiErrorCode(new ApiError(500, 'oops'))).toBeUndefined();
     expect(apiErrorCode(new Error('network'))).toBeUndefined();
   });

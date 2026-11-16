@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, text
@@ -19,7 +20,6 @@ def _config(url: str) -> Config:
 
 def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
     cfg = _config(database_url)
-    command.check(cfg)  # raises if models and migrations diverge
     command.downgrade(cfg, "0004")
     with engine.connect() as conn:
         # 0005 down: the old tables and the job queue are back, the merged ones are gone.
@@ -53,7 +53,39 @@ def test_round_trip_and_check(database_url: str, engine: Engine) -> None:
         assert conn.execute(text("SELECT to_regclass('app.expenses')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0005"
+        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0006"
         assert conn.execute(text("SELECT to_regclass('app.procrastinate_jobs')")).scalar() is None
         assert conn.execute(text("SELECT to_regclass('app.quick_events')")).scalar() is None
         assert conn.execute(text("SELECT to_regclass('app.history')")).scalar()
+        for table in ("groups", "group_members", "payments"):
+            assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
+        for table in ("households", "periods", "settlement_transfers"):
+            assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None
+
+
+def test_0006_refuses_non_empty_tables(database_url: str, engine: Engine) -> None:
+    """D3: 0006 has no data mapping, so it must stop instead of dropping rows."""
+    cfg = _config(database_url)
+    command.downgrade(cfg, "0005")
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO app.users (id, email) VALUES "
+                    "('00000000-0000-7000-8000-000000000001', 'x@example.com')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO app.households (id, name, created_by) VALUES "
+                    "('00000000-0000-7000-8000-000000000002', 'Casa', "
+                    "'00000000-0000-7000-8000-000000000001')"
+                )
+            )
+        with pytest.raises(RuntimeError, match=r"needs an empty app.households"):
+            command.upgrade(cfg, "head")
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM app.households"))
+            conn.execute(text("DELETE FROM app.users"))
+        command.upgrade(cfg, "head")

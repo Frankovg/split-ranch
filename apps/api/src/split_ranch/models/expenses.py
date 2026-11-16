@@ -1,4 +1,4 @@
-"""Periods, expenses and shares."""
+"""Expenses and their materialised shares."""
 
 from datetime import date, datetime
 from uuid import UUID
@@ -21,89 +21,33 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from split_ranch.models.base import Base, created_at_col, in_check, updated_at_col, uuid_pk
-from split_ranch.models.households import SPLIT_TYPES
+from split_ranch.models.groups import SPLIT_TYPES
 
-PERIOD_STATUSES = ("open", "closed", "settled")
-SPLIT_ORIGINS = ("override", "category", "recurring", "household_default")
-EXPENSE_SOURCES = ("manual", "ai_text", "ai_voice", "recurring", "adjustment")
-
-
-class Period(Base):
-    __tablename__ = "periods"
-    __table_args__ = (
-        UniqueConstraint("household_id", "seq"),
-        UniqueConstraint("id", "household_id"),
-        CheckConstraint(in_check("status", PERIOD_STATUSES), name="status"),
-        CheckConstraint("seq >= 1", name="seq_positive"),
-        # Members close a period and start the next one by hand: at most one is open.
-        Index(
-            "uq_periods_one_open",
-            "household_id",
-            unique=True,
-            postgresql_where=text("status = 'open'"),
-        ),
-    )
-
-    id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"))
-    # 1, 2, 3... per household, in the order members started them.
-    seq: Mapped[int] = mapped_column(Integer)
-    status: Mapped[str] = mapped_column(String(16), server_default="open", default="open")
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    closed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
-    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reopened_count: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
-    version: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
-    created_at: Mapped[datetime] = created_at_col()
-    updated_at: Mapped[datetime] = updated_at_col()
+SPLIT_ORIGINS = ("override", "category", "recurring", "group_default")
+EXPENSE_SOURCES = ("manual", "ai_text", "ai_voice", "recurring")
 
 
 class Expense(Base):
     __tablename__ = "expenses"
     __table_args__ = (
-        UniqueConstraint("id", "household_id"),
-        ForeignKeyConstraint(["period_id", "household_id"], ["periods.id", "periods.household_id"]),
+        UniqueConstraint("id", "group_id"),
         ForeignKeyConstraint(
-            ["payer_member_id", "household_id"],
-            ["household_members.id", "household_members.household_id"],
+            ["payer_member_id", "group_id"],
+            ["group_members.id", "group_members.group_id"],
         ),
-        ForeignKeyConstraint(
-            ["category_id", "household_id"], ["categories.id", "categories.household_id"]
-        ),
-        ForeignKeyConstraint(
-            ["adjusts_expense_id", "household_id"], ["expenses.id", "expenses.household_id"]
-        ),
-        CheckConstraint(
-            "amount_cents <> 0 AND (amount_cents > 0 OR source = 'adjustment')"
-            " AND abs(amount_cents) <= 100000000",
-            name="amount",
-        ),
+        ForeignKeyConstraint(["category_id", "group_id"], ["categories.id", "categories.group_id"]),
+        CheckConstraint("amount_cents > 0 AND amount_cents <= 100000000", name="amount"),
         CheckConstraint("char_length(description) BETWEEN 1 AND 140", name="description_length"),
         CheckConstraint(in_check("split_type", SPLIT_TYPES), name="split_type"),
         CheckConstraint(in_check("split_origin", SPLIT_ORIGINS), name="split_origin"),
         CheckConstraint(in_check("participant_mode", ("all", "subset")), name="participant_mode"),
         CheckConstraint(in_check("source", EXPENSE_SOURCES), name="source"),
-        CheckConstraint(
-            "source <> 'adjustment' OR adjusts_expense_id IS NOT NULL", name="adjustment_link"
-        ),
-        Index(
-            "ix_expenses_household_period_live",
-            "household_id",
-            "period_id",
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
-        Index(
-            "ix_expenses_household_date_id",
-            "household_id",
-            text("expense_date DESC"),
-            text("id DESC"),
-        ),
+        # Keyset pagination and date-range filters (`expense_date` in the group time zone).
+        Index("ix_expenses_group_date_id", "group_id", text("expense_date DESC"), text("id DESC")),
     )
 
     id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"))
-    period_id: Mapped[UUID] = mapped_column()
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
     category_id: Mapped[UUID | None] = mapped_column()
     payer_member_id: Mapped[UUID] = mapped_column()
     # Euro cents; the app only handles EUR.
@@ -118,7 +62,6 @@ class Expense(Base):
         Boolean, server_default=text("false"), default=False
     )
     source: Mapped[str] = mapped_column(String(16), server_default="manual", default="manual")
-    adjusts_expense_id: Mapped[UUID | None] = mapped_column()
     created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     updated_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     version: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
@@ -134,22 +77,21 @@ class ExpenseShare(Base):
     __tablename__ = "expense_shares"
     __table_args__ = (
         ForeignKeyConstraint(
-            ["expense_id", "household_id"],
-            ["expenses.id", "expenses.household_id"],
+            ["expense_id", "group_id"],
+            ["expenses.id", "expenses.group_id"],
             ondelete="CASCADE",
         ),
         ForeignKeyConstraint(
-            ["member_id", "household_id"],
-            ["household_members.id", "household_members.household_id"],
+            ["member_id", "group_id"],
+            ["group_members.id", "group_members.group_id"],
         ),
-        Index("ix_expense_shares_member", "household_id", "member_id"),
+        Index("ix_expense_shares_member", "group_id", "member_id"),
     )
 
     expense_id: Mapped[UUID] = mapped_column(primary_key=True)
     member_id: Mapped[UUID] = mapped_column(primary_key=True)
-    household_id: Mapped[UUID] = mapped_column()
+    group_id: Mapped[UUID] = mapped_column()
     sort_key: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
-    # Sign must match the expense amount (negative only for adjustment reversals).
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     weight: Mapped[int | None] = mapped_column(Integer)
     basis_points: Mapped[int | None] = mapped_column(Integer)

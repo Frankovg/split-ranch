@@ -5,9 +5,9 @@ All amounts in this document are euros for readability; the system stores **inte
 ## 1. Money
 
 ### Representation
-- `amount_cents: int` (Python `int`, TS `number` guarded by `Number.isSafeInteger`; max ±9·10¹⁵ cents is far beyond any household).
+- `amount_cents: int` (Python `int`, TS `number` guarded by `Number.isSafeInteger`; max ±9·10¹⁵ cents is far beyond any group).
 - Never floats. Parsing user input: string `"12,50"` → `1250` via a strict parser (comma or dot decimal separator, max 2 decimals). Formatting with `Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })` on the client and `babel.numbers` (or a tiny formatter) on the server for Sheets.
-- `currency` is carried everywhere but validated as `EUR`.
+- The app only handles EUR: there is no currency field.
 
 ### Library research and decision
 
@@ -41,7 +41,7 @@ allocate(total: int, ratios: list[int]) -> list[int]
 
 Properties: `sum(result) == total`; each result is `floor` or `ceil` of the exact share; zero ratios get 0; output depends only on `(total, ratios, order of inputs)`.
 
-The **order of inputs** is always the canonical member order: `household_members.sort_key ASC, id ASC` (Quick splits: participant creation order). The domain functions receive already-ordered lists, so the tie-break is "earlier member wins".
+The **order of inputs** is always the canonical member order: `group_members.sort_key ASC, id ASC` (Quick splits: participant creation order). The domain functions receive already-ordered lists, so the tie-break is "earlier member wins".
 
 Python (illustrative):
 
@@ -99,17 +99,17 @@ resolve_rule(expense):
   1. expense.override present          → use it                (split_origin = 'override')
   2. expense.recurring_expense rule     → use it                (split_origin = 'recurring')
   3. category rule present              → use it                (split_origin = 'category')
-  4. household default rule             → use it                (split_origin = 'household_default')
-  5. no default configured              → equal among period members
+  4. group default rule             → use it                (split_origin = 'group_default')
+  5. no default configured              → equal among active members
 ```
 
-**Participant subset.** For `equal` and `weights`, the user may restrict participants when creating the expense. A restricted subset **is an override** (origin 1) even if the type is the same as the rule's. For a category/household weights rule with a subset, weights of the excluded members are dropped and the rest are used as-is (re-normalisation is implicit in `allocate`). A percentages rule with a subset is converted to weights (`bps` as weights) for the same reason.
+**Participant subset.** For `equal` and `weights`, the user may restrict participants when creating the expense. A restricted subset **is an override** (origin 1) even if the type is the same as the rule's. For a category/group weights rule with a subset, weights of the excluded members are dropped and the rest are used as-is (re-normalisation is implicit in `allocate`). A percentages rule with a subset is converted to weights (`bps` as weights) for the same reason.
 
-**Rule validity.** A rule that references members not in the period (left, or not yet joined) drops them. If the remaining participants are empty, or a `single` rule points to an absent member, the engine falls back to the next level and flags the expense (`rule_fallback = true`) so admins see a warning.
+**Rule validity.** A rule that references members who left the group drops them. If the remaining participants are empty, or a `single` rule points to an absent member, the engine falls back to the next level and flags the expense (`rule_fallback = true`) so members see a warning.
 
-### Worked example — household
+### Worked example — group
 
-Household: Juli, Franco, Ana (canonical order). Default rule: equal. Category rules: *Alquiler* 40/30/30 %, *Internet* single → Franco.
+Group: Juli, Franco, Ana (canonical order). Default rule: equal. Category rules: *Alquiler* 40/30/30 %, *Internet* single → Franco.
 
 | # | Expense | Payer | Rule applied | Juli | Franco | Ana |
 |---|---|---|---|---|---|---|
@@ -137,20 +137,29 @@ Transfers (greedy, see §3): **Ana → Juli 363.33**, **Franco → Juli 293.33**
 | 1.01 | 1,3 | 0.25, 0.76 | largest remainder beats order |
 | 0.02 | 1,1,1 | 0.01, 0.01, 0.00 | fewer cents than people |
 | 10.03 | 0,50,50 | 0.00, 5.02, 5.01 | zero ratio gets nothing |
-| −10.00 | 1,1,1 | −3.34, −3.33, −3.33 | sign symmetry (adjustments) |
+| −10.00 | 1,1,1 | −3.34, −3.33, −3.33 | sign symmetry (domain property; the app stores only positive amounts) |
 
 ### Edge cases
-- Amount 0 → rejected (`amount_cents > 0`), except adjustments which may be negative.
+- Amount 0 or negative → rejected (`amount_cents > 0`).
 - Exact split not summing to total → `422 split_mismatch` with the difference.
 - Payer not among participants → allowed (they paid on behalf of others).
 - Payer who has left → not allowed for new expenses; historical ones keep the member.
 - Very small amounts with many members → some members owe 0.00; still listed as participants.
 
-## 3. Settlement
+## 3. Balance and payments
 
-**Balance per member** in a period: `net = paid − owed`, considering only `confirmed`, non-deleted, non-personal expenses (adjustments included). Invariant: `Σ net = 0`.
+There are **no periods** (decided 2026-11-16, design [egm/design_draft.md](egm/design_draft.md)). Each group has one **running balance** per member, from the group's creation until now:
 
-**Minimal transfers (deterministic greedy):**
+```
+net(m) =   Σ amounts of live, non-personal expenses paid by m
+         − Σ m's shares in those expenses
+         + Σ confirmed payments from m
+         − Σ confirmed payments to m
+```
+
+Invariant: `Σ net = 0`. It is computed on every request (`use_cases/balance.py`): a confirmed payment of `x` from D to C enters the domain's `compute_balances` as an expense paid by D whose only share (`x`) is owed by C, so the TS and Python domain functions and their vectors stay unchanged. "How much did we spend last month" is not a balance question: it is a date filter on the expense list and `GET /summary`.
+
+**Suggested payments (deterministic greedy):** the same ledger **plus the payments already `sent`** goes through `settle`, so a payment waiting for confirmation hides the suggestion it answers and nobody is told to pay twice. Suggestions are never stored.
 
 ```
 settle(nets: ordered list of (member, cents)) -> list[(from, to, cents)]
@@ -163,98 +172,63 @@ settle(nets: ordered list of (member, cents)) -> list[(from, to, cents)]
   until none left
 ```
 
-Guarantees: at most `n − 1` transfers; cents conserved; deterministic. It is not always the global minimum (that problem is NP-hard: the optimum is `n − k`, where `k` is the maximum number of disjoint zero-sum groups).
+Guarantees: at most `n − 1` payments; cents conserved; deterministic. It is not always the global minimum (that problem is NP-hard: the optimum is `n − k`, where `k` is the maximum number of disjoint zero-sum groups).
 
-Example where greedy is not optimal: nets A +4, B +3, C +3, D −6, E −4. Greedy → D→A 4, E→B 3, D→C 2, E→C 1 (4 transfers). Optimal → E→A 4, D→B 3, D→C 3 (3 transfers).
+Example where greedy is not optimal: nets A +4, B +3, C +3, D −6, E −4. Greedy → D→A 4, E→B 3, D→C 2, E→C 1 (4 payments). Optimal → E→A 4, D→B 3, D→C 3 (3 payments). An exact solver (bitmask DP, groups ≤ 12) can replace greedy later; nothing is stored, so switching changes no data.
 
-**Recommendation:** ship greedy in MVP. Optional improvement (households ≤ 12 members): bitmask DP to find the maximum partition into zero-sum groups (O(2ⁿ·n)), then greedy inside each group. If adopted later, existing snapshots keep their transfers; only new calculations change.
-
-### Transfer confirmation flow
+### Payment flow
 
 ```mermaid
 stateDiagram-v2
-  [*] --> pending
-  pending --> sent: debtor taps "I've paid"
-  pending --> confirmed: creditor taps "Received" (e.g. cash)
-  sent --> confirmed: creditor confirms
-  sent --> disputed: creditor taps "Not received" (+note)
-  disputed --> sent: debtor re-sends
+  [*] --> sent: debtor records "I've paid"
+  [*] --> confirmed: creditor records "I received it" (e.g. cash)
+  sent --> confirmed: creditor taps "Received"
+  sent --> disputed: creditor taps "Not received" (+ note)
   disputed --> confirmed: creditor confirms
-  pending --> cancelled: settlement recomputed or period reopened (only before any transfer is sent/confirmed)
+  sent --> cancelled: debtor cancels
+  disputed --> cancelled: debtor cancels
 ```
 
-- Push to the creditor on `sent`; reminder to the debtor every 3 days while `pending` (post-MVP push).
-- If the creditor has left the household, an admin may confirm with a mandatory note.
-- When every live (non-cancelled) transfer of the period is `confirmed` (or there were none), the period becomes `settled`.
+- Only the payment's debtor or creditor can record it; only the creditor confirms or disputes; only the debtor cancels. Both must be active members.
+- Only `confirmed` payments count in the balance. A confirmed payment is never changed: a mistake is fixed with a payment in the opposite direction.
+- Payments are idempotent by their client-generated id and use `If-Match`; every transition writes `history`.
 
-## 4. Period lifecycle
+## 4. Editing expenses
 
-```mermaid
-stateDiagram-v2
-  [*] --> open: household created (period 1) / a member starts the next period
-  open --> closed: a member closes it
-  closed --> open: admin reopens (latest period only, no transfer sent/confirmed)
-  closed --> settled: all transfers confirmed / no transfers
-  settled --> [*]
-```
+**Any active member can create, edit and delete any expense at any time** (`If-Match` against concurrent edits). There are no reasons, locks or adjustment rows: editing an old expense changes today's balance by the difference, and `history` keeps the before/after state and the author. The expense shows who added it and who last edited it.
 
-- **No automatic close** (decided 2026-11-09; the earlier month-end auto-close with grace days was removed). Periods are not calendar months: they are numbered per household (1, 2, 3…) and last until a member closes them.
-- A new household starts with period 1 open. **At most one period is open** at a time (enforced by a partial unique index).
-- **Any active member** can close the open period. Closing computes the balances and creates the minimal `pending` transfers.
-- **Any active member** starts the next period (`POST /periods`) once the latest one is closed; settling the previous period can go on in parallel. Until then, new expenses are refused with `409 no_open_period`.
-- New expenses go to the open period whatever their `expense_date`; the date is informational and editing it never moves an expense to another period.
-- A period with no expenses closes directly to `settled`.
-- Only the **latest** period can be reopened (`409 period_not_latest` otherwise), by an admin, while unlocked.
+What an edit re-splits:
 
-### Editing rules
+| Edit | Shares |
+|---|---|
+| `split` or `participants` sent | Resolved again with today's rules and active members |
+| Amount changed (or the payer of a `personal` expense) | Re-allocated over the **stored** participants and inputs (an equal split stays among the same people; weights keep their weights; an `exact` split must be sent again or the edit is `422 split_mismatch`) |
+| Anything else (description, date, category, notes, payer) | Unchanged |
 
-| Period state | Who can edit | Requirements | Effect |
-|---|---|---|---|
-| `open` | author or admin | `If-Match` version | Revision; live balance updates |
-| `closed`, **no transfer sent/confirmed** | author or admin | `If-Match` + **reason** (5–280 chars) | History row; previous pending transfers → `cancelled`; new transfers computed; push to members whose net changed; Sheets tab resync |
-| `closed` with any transfer `sent`/`confirmed` ("locked"), or `settled` | author or admin | reason | **No in-place edit.** An **adjustment** is created in the current open period (see below) |
+A rule change (group default or category rule) never re-splits existing expenses: it applies to expenses created or explicitly re-split afterwards.
 
-New expense in a closed, unlocked period (API: explicit `period_seq`): allowed with reason, same effect as an edit after close. For a locked/settled period, create it in the open period with a note instead.
+An expense whose payer or participants include a member who **left** cannot be edited or deleted (`409 member_left`): their balance was zero when they left and must stay that way.
 
-### Adjustments
+### Worked example — fixing an old expense
 
-A correction to expense *X* of a locked period creates, in the current open period, two linked rows (both `source='adjustment'`, `adjusts_expense_id = X`):
+In March, Franco paid *Supermercado* 100.00 split equally (33.34/33.33/33.33), and Franco has since paid Juli what he owed. It was really 130.00. Any member edits the amount: the shares become 43.34/43.33/43.33 among the same three people, and the balances move by the difference: Franco +20.00 (paid 30.00 more, owes 10.00 more), Juli −10.00, Ana −10.00. Σ = 0.
 
-1. **Reversal**: amount `−X.amount`, same payer, shares = exact negation of X's stored shares (no re-allocation, so it cancels X to the cent).
-2. **Correction**: the corrected expense (re-resolved with the rules that applied to X, unless the user overrides). Omitted when the correction is a deletion.
-
-Example: in locked March, Franco paid *Supermercado* 100.00 split equally (33.34/33.33/33.33). It was really 130.00. In April:
-- Reversal −100.00 paid by Franco: Juli −33.34, Franco −33.33, Ana −33.33.
-- Correction 130.00 paid by Franco: 43.34 / 43.33 / 43.33.
-- April net effect: Franco +30.00 paid, owes +10.00 → +20.00; Juli −10.00; Ana −10.00. Σ = 0. ✓
-
-The UI groups both rows as one "Correction of March: Supermercado (+30.00)".
-
-### Critical review of the edit model
-1. **Partial payment trap** (brief: "closed without payments → recompute"). If one transfer was already paid and an edit recomputes, cancelling/regenerating transfers would erase money that actually moved. → We lock the period at the **first `sent` or `confirmed` transfer**, not only when all are paid.
-2. **Better long-term model** (recommended internally even with the product rule above): treat confirmed transfers as ledger entries of the period. Then `residual = recompute(expenses) − confirmed transfers` is always well-defined, and a future "allow edits until fully settled" policy needs no schema change. The `settlement_transfers` table already supports this.
-3. **Reopen** is only allowed while unlocked; otherwise the history and Sheets would contradict real payments.
-4. **Concurrency**: two admins editing the same expense → `412` with the current version; closing while someone edits → `close_period` takes `SELECT … FOR UPDATE` on the period row; an edit that loses the race receives `409 period_state_changed` and retries with the closed-period rules (reason required).
-5. **Close while offline edits are queued**: the server applies the rule of the period's state *at write time*; the app shows the "reason required" sheet when the replayed mutation fails with `409 reason_required`, and asks someone to start a new period on `409 no_open_period`.
-6. **Rule changes** never touch closed periods (see [02](02-data-model.md)).
-7. **Recalculated settlements**: balances are always recomputed from the expenses; superseded proposals stay as `cancelled` transfers and the change (with its reason) is in `history`.
-
-## 5. Membership changes
-
-Product decision: **whole-period membership.** A member participates in the default splits of every period they belong to (`joined_period_seq` ≤ period ≤ `left_period_seq`).
+## 5. Groups and membership
 
 | Event | Rule |
 |---|---|
-| Join (invitation accepted) | The member joins the open period; when no period is open, the next one started. When joining the open period, its expenses whose rule is "all period members" (`participant_mode='all'`) are **re-resolved** to include the new member (revision reason `member_joined`, members notified). Expenses with an explicit subset or exact amounts are untouched |
-| Leave / removed | Status `leaving`, `left_period_seq` = the latest period. The member stays in that period, can still log expenses and must settle it. After the period is `settled`, status becomes `left`; they lose access to new periods but keep read access to periods they took part in |
-| Leaving with debts in older periods | Allowed; transfers remain and keep notifying |
-| Account deletion (GDPR) | Member row anonymised ("Former member"), shares and transfers preserved for other members' records |
-
-See [12](12-open-questions.md) for the trade-offs of retroactive re-resolution.
+| Create a group | The creator is its **admin**. 12 default categories are copied; the default rule is equal. A user can create and belong to several groups |
+| Invite | **Any member** gets (or revokes) the group's 8-character code, valid 7 days, and shares it; the invitee types it in the app |
+| Join | The new member takes part in expenses created from now on. Existing expenses are never re-split. Rejoining reactivates the old member row |
+| Permissions | Every active member has the same rights (expenses, categories, rules, group name, invitations). Only the admin **removes members** and **deletes the group** |
+| Leave / removed | Only with a zero net and no `sent`/`disputed` payment involving the member (`409 member_has_open_balance`). The member becomes `left` and loses access (404 like an outsider); their (zero) balance and history stay |
+| Admin leaves | The admin role passes to the next active member in canonical order (`sort_key, id`). The last member leaving deletes the group |
+| Delete the group | Admin only, confirmed by typing the group name, and only when every net is zero and no payment is waiting (`409 group_has_open_balances`). Soft delete: it disappears for everyone |
+| Account deletion (GDPR, not built) | Member row anonymised ("Former member"); must apply the admin hand-over |
 
 ## 6. Quick splits
 
-Independent of households: no periods, no close, no adjustments, no Sheets. Same domain functions (`allocate`, `settle`). Computed on device, offline, without login. **Stored only on the user's phone**: never saved, synced or shared through the server (decided 2026-11-10). Everything stays editable at any time: event name, participant names, the total, weights, exclusions, payer, and every itemised expense.
+Independent of groups: no server, no payments, no Sheets. Same domain functions (`allocate`, `settle`). Computed on device, offline, without login. **Stored only on the user's phone**: never saved, synced or shared through the server (decided 2026-11-10). Everything stays editable at any time: event name, participant names, the total, weights, exclusions, payer, and every itemised expense.
 
 ### Mode 1 — split a total
 Input: total, participants (names), optional weights/exclusions, optional payer.
@@ -320,7 +294,7 @@ Quick splits are **not linked to any payment method** (no Bizum, PayPal.me or Re
 
 **Decided 2026-11-10:** the app does not link to any payment platform. There is no Pay button, no Bizum/PayPal.me/Revolut links or deep links, no bank-app list, and no payment handles (phone, usernames) in profiles. People pay each other however they like, outside the app.
 
-- Household: the debtor marks a transfer **sent** (optional note, e.g. "en efectivo"); the creditor **confirms** or **disputes** it. When every transfer is confirmed the period is settled.
+- Groups: the debtor records a payment as **sent** (optional note, e.g. "en efectivo"); the creditor **confirms** or **disputes** it (§3). A creditor can record cash received directly as confirmed.
 - Quick splits: a manual "Debe / Ha pagado" status per person (§6).
 
 Never claim a payment happened automatically: confirmation is always the creditor's.

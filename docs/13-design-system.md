@@ -131,7 +131,7 @@ Other tokens:
 - Contrast ≥ 4.5:1 for text, 3:1 for large text/UI — checked for both themes when tokens change.
 - Font scaling: no `allowFontScaling={false}`; layouts tested at 200 % (wrap instead of truncate amounts; `MoneyText` never truncates).
 - Amounts announced as currency (`accessibilityLabel="Debes doce euros con cincuenta"` built with `Intl` + i18n).
-- Focus order and TalkBack tested on the main flows (expense form, period, quick splits).
+- Focus order and TalkBack tested on the main flows (expense form, settle up, quick splits).
 - Reduced motion respected.
 
 ## 7. Keeping the UI consistent

@@ -1,4 +1,4 @@
-"""Households, members and categories. Split rules are JSON on households/categories."""
+"""Groups, members and categories. Split rules are JSON on groups/categories."""
 
 from datetime import datetime
 from typing import Any
@@ -28,8 +28,8 @@ SPLIT_TYPES = ("equal", "weights", "percentages", "exact", "single", "personal")
 DEFAULT_SPLIT_RULE: dict[str, Any] = {"split_type": "equal"}
 
 
-class Household(Base):
-    __tablename__ = "households"
+class Group(Base):
+    __tablename__ = "groups"
     __table_args__ = (
         CheckConstraint("char_length(name) BETWEEN 1 AND 80", name="name_length"),
         CheckConstraint(
@@ -43,13 +43,13 @@ class Household(Base):
         String(64), server_default="Europe/Madrid", default="Europe/Madrid"
     )
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
-    # The household's split rule when no category rule applies.
+    # The group's split rule when no category rule applies.
     split_rule: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         server_default=text("""'{"split_type": "equal"}'::jsonb"""),
         default=lambda: dict(DEFAULT_SPLIT_RULE),
     )
-    # One shareable join code per household (regenerated when it expires or is revoked).
+    # One shareable join code per group (regenerated when it expires or is revoked).
     invite_code: Mapped[str | None] = mapped_column(String(8), unique=True)
     invite_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_col()
@@ -57,37 +57,39 @@ class Household(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class HouseholdMember(Base):
+class GroupMember(Base):
     """Expenses reference `member_id`, not `user_id`, so history survives leaving."""
 
-    __tablename__ = "household_members"
+    __tablename__ = "group_members"
     __table_args__ = (
-        UniqueConstraint("household_id", "user_id"),
-        UniqueConstraint("id", "household_id"),
+        UniqueConstraint("group_id", "user_id"),
+        UniqueConstraint("id", "group_id"),
         CheckConstraint(in_check("role", ("admin", "member")), name="role"),
-        CheckConstraint(in_check("status", ("active", "leaving", "left")), name="status"),
-        CheckConstraint("joined_period_seq >= 1", name="joined_period_seq_positive"),
-        CheckConstraint(
-            "left_period_seq IS NULL OR left_period_seq >= joined_period_seq",
-            name="left_after_joined",
-        ),
+        CheckConstraint(in_check("status", ("active", "left")), name="status"),
+        CheckConstraint("left_at IS NULL OR left_at >= joined_at", name="left_after_joined"),
         Index(
-            "ix_household_members_active",
-            "household_id",
+            "ix_group_members_active",
+            "group_id",
             postgresql_where=text("status <> 'left'"),
+        ),
+        # Exactly one admin among the active members (the role passes on when they leave).
+        Index(
+            "uq_group_members_one_admin",
+            "group_id",
+            unique=True,
+            postgresql_where=text("role = 'admin' AND status = 'active'"),
         ),
     )
 
     id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"))
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     role: Mapped[str] = mapped_column(String(16), server_default="member", default="member")
     status: Mapped[str] = mapped_column(String(16), server_default="active", default="active")
     sort_key: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
-    # Period sequence numbers (`Period.seq`): the member takes part in every period from
-    # `joined_period_seq` to `left_period_seq`, both included (NULL = still a member).
-    joined_period_seq: Mapped[int] = mapped_column(Integer)
-    left_period_seq: Mapped[int | None] = mapped_column(Integer)
+    # When the member (last) joined and left; NULL `left_at` = still a member.
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
@@ -95,11 +97,11 @@ class HouseholdMember(Base):
 class Category(Base):
     __tablename__ = "categories"
     __table_args__ = (
-        UniqueConstraint("id", "household_id"),
+        UniqueConstraint("id", "group_id"),
         CheckConstraint("char_length(name) BETWEEN 1 AND 40", name="name_length"),
         Index(
-            "uq_categories_household_name",
-            "household_id",
+            "uq_categories_group_name",
+            "group_id",
             func.lower(text("name")),
             unique=True,
             postgresql_where=text("archived_at IS NULL"),
@@ -107,14 +109,14 @@ class Category(Base):
     )
 
     id: Mapped[UUID] = uuid_pk()
-    household_id: Mapped[UUID] = mapped_column(ForeignKey("households.id", ondelete="CASCADE"))
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(40))
     icon: Mapped[str | None] = mapped_column(String(40))
     color: Mapped[str | None] = mapped_column(String(16))
     is_default: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sort_key: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
-    # Overrides the household rule for this category's expenses (NULL = no override).
+    # Overrides the group rule for this category's expenses (NULL = no override).
     split_rule: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
@@ -124,6 +126,6 @@ __all__ = [
     "DEFAULT_SPLIT_RULE",
     "SPLIT_TYPES",
     "Category",
-    "Household",
-    "HouseholdMember",
+    "Group",
+    "GroupMember",
 ]

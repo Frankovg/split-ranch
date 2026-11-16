@@ -20,7 +20,7 @@ class House:
     categories: dict[str, str]  # name -> category_id
 
     def url(self, path: str = "") -> str:
-        return f"/v1/households/{self.id}{path}"
+        return f"/v1/groups/{self.id}{path}"
 
     def h(self, name: str, **extra: str) -> dict[str, str]:
         return {**self.users[name].headers, **extra}
@@ -38,15 +38,15 @@ def make_house(
 ) -> House:
     users = {n: make_user(n) for n in names}
     admin = users[names[0]]
-    house = ok(client.post("/v1/households", json={"name": "Casa"}, headers=admin.headers), 201)
+    house = ok(client.post("/v1/groups", json={"name": "Casa"}, headers=admin.headers), 201)
     hid = house["id"]
     for n in names[1:]:
-        inv = ok(client.post(f"/v1/households/{hid}/invitations", headers=admin.headers))
+        inv = ok(client.post(f"/v1/groups/{hid}/invitations", headers=admin.headers))
         ok(client.post(f"/v1/invitations/{inv['code']}/accept", headers=users[n].headers))
-    house = ok(client.get(f"/v1/households/{hid}", headers=admin.headers))
+    house = ok(client.get(f"/v1/groups/{hid}", headers=admin.headers))
     by_user = {u.id: n for n, u in users.items()}
     members = {by_user[uuid.UUID(m["user_id"])]: m["id"] for m in house["members"]}
-    cats = ok(client.get(f"/v1/households/{hid}/categories", headers=admin.headers))
+    cats = ok(client.get(f"/v1/groups/{hid}/categories", headers=admin.headers))
     return House(hid, users, members, {c["name"]: c["id"] for c in cats})
 
 
@@ -75,8 +75,31 @@ def add_expense(
     return ok(client.post(house.url("/expenses"), json=body, headers=house.h(who)), expect)
 
 
-def nets(client: TestClient, house: House, period: str, who: str | None = None) -> dict[str, int]:
+def nets(client: TestClient, house: House, who: str | None = None) -> dict[str, int]:
+    """Running (confirmed) balance per member name."""
     who = who or next(iter(house.users))
-    body = ok(client.get(house.url(f"/periods/{period}/balance"), headers=house.h(who)))
+    body = ok(client.get(house.url("/balance"), headers=house.h(who)))
     names = {v: k for k, v in house.members.items()}
     return {names[b["member_id"]]: b["net_cents"] for b in body["balances"]}
+
+
+def pay(
+    client: TestClient,
+    house: House,
+    who: str,
+    *,
+    payer: str,
+    to: str,
+    amount: int,
+    expect: int = 201,
+    **extra: Any,
+) -> Any:
+    """Record a payment from `payer` to `to` as `who` (a client-generated id)."""
+    body: dict[str, Any] = {
+        "id": str(uuid.uuid4()),
+        "from_member_id": house.members[payer],
+        "to_member_id": house.members[to],
+        "amount_cents": amount,
+        **extra,
+    }
+    return ok(client.post(house.url("/payments"), json=body, headers=house.h(who)), expect)

@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from split_ranch.api.deps import ActorDep, SessionDep
-from split_ranch.schemas.households import MeRead, MeUpdate
+from split_ranch.schemas.groups import MeRead, MeUpdate
 from split_ranch.use_cases import users
 
 router = APIRouter(prefix="/me", tags=["me"])

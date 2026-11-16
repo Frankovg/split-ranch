@@ -1,6 +1,6 @@
 # Split Ranch
 
-Mobile app (Android first) to manage a household's shared monthly expenses, plus an independent
+Mobile app (Android first) to share expenses in groups with one running balance, plus an independent
 "Quick splits" tool to split one-off bills with friends who don't use the app.
 
 This repository currently contains **planning documentation only**. Start at
@@ -11,7 +11,7 @@ This repository currently contains **planning documentation only**. Start at
 | [00](docs/00-executive-summary.md) | Executive summary, scope, key decisions, assumptions |
 | [01](docs/01-architecture.md) | Architecture, layers, flows |
 | [02](docs/02-data-model.md) | Data model, ERD, migrations, audit |
-| [03](docs/03-business-rules.md) | Split engine, money algorithm, settlement, period lifecycle |
+| [03](docs/03-business-rules.md) | Split engine, money algorithm, balance, payments, groups |
 | [04](docs/04-api.md) | REST API |
 | [05](docs/05-mobile-app.md) | Mobile app (Expo) |
 | [06](docs/06-google-sheets.md) | Google Sheets export |

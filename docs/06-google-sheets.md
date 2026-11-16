@@ -1,6 +1,6 @@
 # 06 — Google Sheets export
 
-> **Status: not built.** Nothing in the code or the database exists for it yet. When it is built, it adds only what it needs (see [Storage](#storage)).
+> **Status: not built, and pending redesign.** It was designed around closed periods; since 2026-11-16 there are no periods, so the export becomes one tab per calendar month (written on demand or when a month is over), still read-only. The layout below is the old period-based design. Nothing in the code or the database exists for it yet. When it is built, it adds only what it needs (see [Storage](#storage)).
 
 The database is the source of truth. The spreadsheet is a **read-only mirror** for humans.
 
@@ -10,22 +10,22 @@ Service accounts have **no Drive storage quota** of their own: creating spreadsh
 
 | Option | How | Pros | Cons |
 |---|---|---|---|
-| **A. User-owned spreadsheet shared with the service account (chosen)** | A household admin creates the spreadsheet in their own Drive and shares it with the service account's email as **Editor** (and with the other members as Viewer). The backend only gets the spreadsheet ID (`GOOGLE_SHEETS_SPREADSHEET_ID` while there is a single household) | Free; no Workspace; no end-user OAuth or tokens; data lives in the household's own Drive | The backend cannot create the file or manage sharing, so the admin does both by hand once; if the admin deletes the file or removes the share, sync fails until they fix it |
-| B. Shared Drive | Project owns a Google Workspace account (Business Starter ≈ €7/month) with a Shared Drive; the service account is *Content manager* and creates one file per household | Fully automatic creation and sharing; scales to many households | Paid subscription; external sharing must be allowed in the Workspace admin console |
+| **A. User-owned spreadsheet shared with the service account (chosen)** | A group admin creates the spreadsheet in their own Drive and shares it with the service account's email as **Editor** (and with the other members as Viewer). The backend only gets the spreadsheet ID (`GOOGLE_SHEETS_SPREADSHEET_ID` while there is a single group) | Free; no Workspace; no end-user OAuth or tokens; data lives in the group's own Drive | The backend cannot create the file or manage sharing, so the admin does both by hand once; if the admin deletes the file or removes the share, sync fails until they fix it |
+| B. Shared Drive | Project owns a Google Workspace account (Business Starter ≈ €7/month) with a Shared Drive; the service account is *Content manager* and creates one file per group | Fully automatic creation and sharing; scales to many groups | Paid subscription; external sharing must be allowed in the Workspace admin console |
 | C. Admin's own Drive via OAuth (`drive.file`) | Admin connects their Google account; backend stores an encrypted refresh token and creates the file for them | Free and automatic | Token lifecycle (revocation, admin leaves), extra consent screen, more code |
 
-**Decision (2026-11-09):** A. The app is for one household, and there is no budget for paid services. Keep the `integrations/google_sheets.py` interface (`ensure_spreadsheet`, `write_tab`) independent of ownership, so B or C can be added if more households ever join.
+**Decision (2026-11-09):** A. The app is for one group, and there is no budget for paid services. Keep the `integrations/google_sheets.py` interface (`ensure_spreadsheet`, `write_tab`) independent of ownership, so B or C can be added if more groups ever join.
 
 ## Quotas (Sheets API, current)
-- 300 read + 300 write requests/min **per project**; **60 read + 60 write requests/min per user per project**. A service account counts as **one user** → effective budget ≈ **60 writes/min** for all households.
+- 300 read + 300 write requests/min **per project**; **60 read + 60 write requests/min per user per project**. A service account counts as **one user** → effective budget ≈ **60 writes/min** for all groups.
 - A `spreadsheets.batchUpdate` with many sub-requests counts as **one** request.
 - `429` → exponential backoff; quotas refill every minute.
 
-Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting). We only sync closed periods, so a household makes a handful of requests per month. Backoff on 429 is enough; rate limiting is only needed if many households ever share one service account.
+Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + values batchUpdate + optional formatting). We only sync closed periods, so a group makes a handful of requests per month. Backoff on 429 is enough; rate limiting is only needed if many groups ever share one service account.
 
 ## Spreadsheet layout
 
-One spreadsheet per household: `Split Ranch — <Household name>`.
+One spreadsheet per group: `Split Ranch — <Group name>`.
 
 | Tab | Content |
 |---|---|
@@ -35,7 +35,7 @@ One spreadsheet per household: `Split Ranch — <Household name>`.
 | `2026-03 Por categoría` | Category × member matrix + totals; budget vs actual when budgets exist |
 | `2026-03 Liquidación` | Live transfers: from, to, amount, status, sent_at, confirmed_at |
 
-The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per period** (prefixed by the period number, e.g. `P3`; periods are started by hand, not calendar months) is the recommended layout. A single tab with four stacked blocks is the fallback if the household prefers fewer tabs (it only changes the renderer).
+The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per period** (prefixed by the period number, e.g. `P3`; periods are started by hand, not calendar months) is the recommended layout. A single tab with four stacked blocks is the fallback if the group prefers fewer tabs (it only changes the renderer).
 
 Personal expenses are excluded. Amounts are written as numbers with currency format (`#,##0.00 €`), never formulas that depend on other cells (the file must be reproducible from the DB alone).
 
@@ -54,7 +54,7 @@ Not synced: transfer status changes (the app shows their live status), member jo
 
 ## Storage
 
-- The spreadsheet id: a column on `households` (the backend never creates files, so duplicates cannot happen).
+- The spreadsheet id: a column on `groups` (the backend never creates files, so duplicates cannot happen).
 - A content hash per period (a column on `periods`, or a small table if per-tab state turns out to be needed).
 
 ## Idempotency

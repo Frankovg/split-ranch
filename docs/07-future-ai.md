@@ -10,7 +10,7 @@ Goal: a chat (text and voice) that records expenses for the user — "Ayer pagu�
 | Strict Pydantic schemas (`extra="forbid"`, discriminated split union) | Become the JSON Schemas of the tools; LLM output validated exactly like REST input |
 | `expenses.status = 'draft'` | "AI proposes, user confirms": tool creates a draft, user confirms in the UI |
 | `expenses.source` (`ai_text`, `ai_voice`) + `source_transcript` | Traceability, evaluation, and the ability to show "created from: …" |
-| Identity from JWT only | The model can never choose `user_id`/`household_id`; the tool runtime injects the `Actor` |
+| Identity from JWT only | The model can never choose `user_id`/`group_id`; the tool runtime injects the `Actor` |
 | `POST /expenses/preview` | Lets the assistant show the resolved split before saving |
 | Revisions table | Every AI-originated change is auditable and reversible |
 | Client-generated ids | Safe retries when the model repeats a tool call (creating the same expense id twice returns the stored one) |
@@ -28,8 +28,8 @@ sequenceDiagram
   U->>A: holds mic / types
   A->>STT: audio (or on-device STT)
   STT-->>A: transcript
-  A->>API: POST /assistant/messages {household_id, text, conversation_id}
-  API->>LLM: system prompt + household context (members, categories, today) + tools
+  A->>API: POST /assistant/messages {group_id, text, conversation_id}
+  API->>LLM: system prompt + group context (members, categories, today) + tools
   LLM->>API: tool_call create_expense_draft{...}
   API->>UC: create_expense(actor, ExpenseCreate(status=draft, source=ai_voice, transcript))
   UC-->>API: draft + resolved shares
@@ -51,10 +51,10 @@ sequenceDiagram
 | `get_balance(month?)` | `get_balance` | no |
 | `search_expenses(filters)` | `list_expenses` | no |
 
-Hard rules: the assistant **never confirms** expenses, edits confirmed expenses, closes periods or touches transfers. Those require the UI.
+Hard rules: the assistant **never confirms** expenses, edits confirmed expenses, deletes groups or records payments. Those require the UI.
 
 ## Limits and safety
-- Per-user quotas (e.g. 50 assistant messages/day, 10 min audio/day) stored in `ai_usage`; per-household monthly cost cap.
+- Per-user quotas (e.g. 50 assistant messages/day, 10 min audio/day) stored in `ai_usage`; per-group monthly cost cap.
 - Max tool calls per turn (e.g. 5); max drafts per message (e.g. 5).
 - Transcripts stored only with the expense (`source_transcript`), retention aligned with the expense; raw audio not stored by default.
 - Prompt-injection surface is small (user's own text), but expense descriptions from other members are treated as data in context.
