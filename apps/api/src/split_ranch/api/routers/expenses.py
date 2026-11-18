@@ -61,8 +61,14 @@ def list_expenses(
 
 
 @router.get("/summary")
-def get_summary(actor: GroupActorDep, session: SessionDep, filters: FiltersDep) -> SummaryRead:
-    return expenses.get_summary(session, actor, filters)
+def get_summary(
+    actor: GroupActorDep,
+    session: SessionDep,
+    filters: FiltersDep,
+    mine: bool = False,
+) -> SummaryRead:
+    """Totals per category / payer; `mine=true` sums only the caller's shares."""
+    return expenses.get_summary(session, actor, filters, mine=mine)
 
 
 @router.post("/expenses", status_code=201, response_model=ExpenseRead)

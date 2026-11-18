@@ -5,11 +5,13 @@ import { Pressable, View } from 'react-native';
 import { EmptyState } from '@/components/EmptyState';
 import { MoneyText } from '@/components/MoneyText';
 import { Screen } from '@/components/Screen';
+import { Icon } from '@/components/ui/icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { currentMoneyLocale } from '@/i18n';
+import { categoryIcon, categoryLabel } from './categories';
 import { timeLabel } from './dates';
-import type { Expense, Group, Member } from './types';
+import type { Category, Expense, Group, Member } from './types';
 
 /** Members that still take part in the group (not `left`). */
 export function activeMembers(group: Group): Member[] {
@@ -52,31 +54,37 @@ export function ErrorScreen({ t, onRetry }: { t: TFunction; onRetry: () => void 
   );
 }
 
-/** One expense: description, who paid, who added it and when, category; tap to edit. */
+/** One expense: category icon, description, who paid, who added it and when; tap to edit. */
 export function ExpenseRow({
   expense,
   group,
-  categoryName,
+  category,
   t,
 }: {
   expense: Expense;
   group: Group;
-  categoryName?: string;
+  /** The expense's category; undefined = "Other" (no category). */
+  category?: Category;
   t: TFunction;
 }) {
   const payer = memberName(group, expense.payer_member_id, t);
   const meta = [
     t('expenses.addedBy', { name: userName(group, expense.created_by_user_id, t) }),
     timeLabel(expense.created_at, currentMoneyLocale(), group.timezone),
-    categoryName,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  ].join(' · ');
   return (
     <Pressable
       accessibilityRole='button'
-      onPress={() => router.push({ pathname: '/expense/[id]', params: { id: expense.id } })}
+      onPress={() =>
+        router.push({ pathname: '/group/[groupId]/expense/[id]', params: { groupId: group.id, id: expense.id } })
+      }
       className='flex-row items-center gap-3 py-3 active:opacity-70'>
+      <View
+        accessible
+        accessibilityLabel={category ? categoryLabel(category, t) : t('categories.other')}
+        className='size-10 items-center justify-center rounded-full bg-primary/15'>
+        <Icon as={categoryIcon(category)} size={20} className='text-primary' />
+      </View>
       <View className='flex-1 gap-0.5'>
         <Text className='font-medium' numberOfLines={2}>
           {expense.description}

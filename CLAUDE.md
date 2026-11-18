@@ -52,7 +52,7 @@ CI (`.github/workflows/ci.yml`) runs domain typecheck/test, mobile typecheck/tes
 
 **Tests**: DB tests run each test in one rolled-back transaction. With `TEST_DATABASE_URL` set, the fixture **drops and recreates the `app` schema** in that DB — never point it at a real database. Without it, a throwaway Postgres is started via `pgserver`.
 
-**Mobile**: `app/` holds thin routes only; logic lives in `src/features/*` (quick-splits is fully offline and persisted in MMKV via Zustand; group screens use `features/groups/api.ts`, typed calls through `api`/`unwrap` from `src/lib/api` (openapi-fetch; `features/groups/types.ts` only aliases the generated types); the active group id is persisted in `stores/preferences.ts` over `src/lib/api`). `src/components/ui` is owned React Native Reusables code (each file has a `// Source:` header noting local changes). `src/theme/tokens.ts` mirrors `global.css` and a test keeps them in sync. All `EXPO_PUBLIC_*` env vars are bundled — never secrets; missing ones disable features rather than crash.
+**Mobile**: `app/` holds thin routes only; logic lives in `src/features/*` (quick-splits is fully offline and persisted in MMKV via Zustand; group screens use `features/groups/api.ts`, typed calls through `api`/`unwrap` from `src/lib/api` (openapi-fetch; `features/groups/types.ts` only aliases the generated types); the open group comes from the route `group/[groupId]` via `features/groups/route.ts`, nothing persisted). `src/components/ui` is owned React Native Reusables code (each file has a `// Source:` header noting local changes). `src/theme/tokens.ts` mirrors `global.css` and a test keeps them in sync. All `EXPO_PUBLIC_*` env vars are bundled — never secrets; missing ones disable features rather than crash.
 
 ## Conventions
 

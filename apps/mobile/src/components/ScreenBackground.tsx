@@ -1,30 +1,32 @@
-import { useId } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { tokenColor } from '@/theme/tokens';
+import { Image, StyleSheet, type ImageSourcePropType } from 'react-native';
 import { useAppColorScheme } from '@/theme/ThemeSync';
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+const BACKDROPS: Record<'light' | 'dark', ImageSourcePropType> = {
+  light: require('../../assets/backdrop-light.png') as ImageSourcePropType,
+  dark: require('../../assets/backdrop-dark.png') as ImageSourcePropType,
+};
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Brand backdrop: a diagonal gradient (surface → background → accent), the static
  * version of the portfolio's animated page background. Render it first inside a
  * container whose own background is the page background.
+ *
+ * It is a pre-rendered, dithered image (scripts/generate-backdrop.mjs) instead of a live
+ * gradient: the colours are only a few 8-bit levels apart and neither react-native-svg
+ * nor the native gradient dither on Android, so a live gradient shows hard bands.
+ * It is stretched to fill the screen.
  */
 export function ScreenBackground() {
   const scheme = useAppColorScheme();
-  // Unique per instance so gradients of stacked screens never resolve to each other.
-  const id = `screen-bg-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
-    <View pointerEvents='none' style={StyleSheet.absoluteFill}>
-      <Svg width='100%' height='100%'>
-        <Defs>
-          <LinearGradient id={id} x1='0' y1='0' x2='1' y2='1'>
-            <Stop offset='0' stopColor={tokenColor(scheme, 'card')} stopOpacity={scheme === 'dark' ? 1 : 0} />
-            <Stop offset='0.5' stopColor={tokenColor(scheme, 'background')} />
-            <Stop offset='1' stopColor={tokenColor(scheme, 'accent')} />
-          </LinearGradient>
-        </Defs>
-        <Rect width='100%' height='100%' fill={`url(#${id})`} />
-      </Svg>
-    </View>
+    <Image
+      source={BACKDROPS[scheme]}
+      resizeMode='stretch'
+      fadeDuration={0}
+      pointerEvents='none'
+      style={StyleSheet.absoluteFill}
+    />
   );
 }

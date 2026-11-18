@@ -1,3 +1,3 @@
-import { HomeScreen } from '@/features/groups/HomeScreen';
+import { GroupsScreen } from '@/features/groups/GroupsScreen';
 
-export default HomeScreen;
+export default GroupsScreen;

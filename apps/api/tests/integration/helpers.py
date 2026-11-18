@@ -100,6 +100,7 @@ def pay(
         "from_member_id": house.members[payer],
         "to_member_id": house.members[to],
         "amount_cents": amount,
+        "method": "bizum",
         **extra,
     }
     return ok(client.post(house.url("/payments"), json=body, headers=house.h(who)), expect)

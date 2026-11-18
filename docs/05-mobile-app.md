@@ -13,17 +13,21 @@ apps/mobile/
 ├── app/                              # Expo Router routes only (thin)
 │   ├── _layout.tsx                   # providers: Query, Theme, Toast, i18n
 │   ├── (auth)/sign-in.tsx  (auth)/quick-splits.tsx
-│   ├── (app)/_layout.tsx             # stack of the signed-in area
-│   ├── (app)/(tabs)/_layout.tsx      # tabs: Inicio · Gastos · Cuentas rápidas · Ajustes
-│   ├── (app)/(tabs)/index.tsx        # active group: balance, suggestions, members, recent
-│   ├── (app)/(tabs)/expenses.tsx     # grouped by day, month filter, totals
+│   ├── (app)/_layout.tsx             # stack of the signed-in area (group screens sit above the tabs)
+│   ├── (app)/(tabs)/_layout.tsx      # tabs: Ranchs · Cuentas rápidas · Ajustes (an AI chat tab later)
+│   ├── (app)/(tabs)/index.tsx        # Ranchs: one card per group, "+" → create / join
 │   ├── (app)/(tabs)/quick/index.tsx
 │   ├── (app)/(tabs)/settings.tsx
-│   ├── (app)/expense/new.tsx         # presented as modal
-│   ├── (app)/expense/[id].tsx        # edit / delete (any member)
-│   ├── (app)/groups/index.tsx        # my groups (switch), create, join with code
-│   ├── (app)/group/settings.tsx      # name, members, invite, leave, remove + delete (admin)
-│   ├── (app)/group/settle.tsx        # suggestions, record payment, confirm / dispute / cancel
+│   ├── (app)/groups/new.tsx          # create a group
+│   ├── (app)/groups/join.tsx         # join with the invitation code
+│   ├── (app)/group/[groupId].tsx     # group home: balance, suggestions, members, expenses; header: search · insights · ⋮
+│   ├── (app)/group/[groupId]/search.tsx    # text search over the group's expenses
+│   ├── (app)/group/[groupId]/insights.tsx  # read-only: date range, totals, charts (no adding)
+│   ├── (app)/group/[groupId]/settle.tsx    # suggestions, record payment, confirm / dispute / cancel
+│   ├── (app)/group/[groupId]/settings.tsx  # name, members, invite, leave, remove + delete (admin)
+│   ├── (app)/group/[groupId]/expense/new.tsx   # presented as modal
+│   ├── (app)/group/[groupId]/category/new.tsx  # new custom category, modal
+│   ├── (app)/group/[groupId]/expense/[id].tsx  # edit / delete (any member)
 │   ├── quick/[id].tsx                # Quick split editor (also reachable signed out)
 │   └── dev/gallery.tsx               # component gallery, dev builds only
 ├── src/
@@ -34,7 +38,7 @@ apps/mobile/
 │   ├── lib/supabase.ts               # Supabase client, auth only (no data queries)
 │   ├── lib/query/                    # QueryClient, persister, query keys
 │   ├── lib/money/                    # re-export of @split-ranch/domain + parse/format
-│   ├── stores/                       # Zustand: session, preferences (theme, language, active group), quick splits
+│   ├── stores/                       # Zustand: session, preferences (theme, language), quick splits
 │   ├── i18n/                         # es, en
 │   ├── platform/                     # android-specific code (payment intents, widget later)
 │   └── theme/                        # tokens bridge (see 13-design-system)
@@ -43,6 +47,8 @@ apps/mobile/
 
 Routes stay thin: a route file renders a feature screen component from `src/features/*`.
 
+**Navigation:** the app opens on Ranchs (the group list). A group is opened by pushing `group/[groupId]`; every group screen reads the id from the route (`features/groups/route.ts`), so there is no persisted "active group" and back always returns to the list. Group screens live on the `(app)` stack above the tabs, so the tab bar is hidden inside a group. Leaving or deleting a group dismisses back to the list.
+
 **Quick splits without login:** the root layout lets `(tabs)/quick` and `quick/[id]` render signed out. The sign-in screen has a secondary action "Usar Cuentas rápidas sin cuenta".
 
 ## Key screens
@@ -50,10 +56,11 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Screen | Content |
 |---|---|
 | Sign-in | Google button (Credential Manager), Quick splits link, privacy policy link |
-| Groups | My groups (tap to make one active; persisted in `stores/preferences.ts`), create a group, join with the 8-letter code typed by hand. Shown instead of Home when the user has no group |
-| Home | Active group name (opens Groups) and settings; my running balance, "pending confirmation", my suggested payments, Settle up; members with their nets; recent expenses; "+ Gasto" |
-| New/edit expense | Amount, description, payer, category chips, "split between" (equal) members. Edit sends only the changed fields (`If-Match`); shows who added and who last edited it; delete with confirmation. Planned: date picker, weights/percentages/exact with live preview |
-| Expenses list | `SectionList` grouped by `expense_date` (day headers), chips This month / Last month / All, summary card (total, top categories, per payer). Planned: category/payer/text filters, custom range |
+| Ranchs (home) | One card per group (name, member count, admin badge); tap opens the group. A centred "+" opens a sheet: create a group or join with the 8-letter code, each on its own screen; after either, the new group opens |
+| Group home | Header: group name, search, insights and a ⋮ menu (settle up, group settings). One card: my running balance, "pending confirmation", my suggested payments, every member's net, invite hint when alone, Settle up. Below it every expense, grouped by day (infinite scroll). A centred "+" adds an expense |
+| Search | Text search on the description (`q`), all dates, same rows as the expense list |
+| New/edit expense | Amount, description, category select with icons ("Other" = no category) plus a button to create a custom category (name + icon, kept in the group), payer select (default: you), date ("When", default: today in the group time zone). Split table: a "Split" checkbox (off = `personal`) and one checkbox per member; mode Equally / As parts (editable percentages with € preview) / As amount (editable amounts). Editing one value gives the remainder to the members not typed yet. An untouched table (everyone, equally) lets the group/category rule decide. Edit sends only the changed fields (`If-Match`); shows who added and who last edited it; delete with confirmation |
+| Insights | Read-only (no adding): range chips This month / Last month / All, category and payer filter chips, headline total + count, ranked bars by category and by payer (top 5 + "Other"; a split hides when filtered to one value or with a single row). Planned: custom range, spending over time (needs a per-period total in `/summary`) |
 | Settle up | Suggestions (greedy, after payments already sent) with "I've paid" / "I received it" and a note; payment list with Received / Not received (note) / Cancel |
 | Group settings | Rename, members (admin badge), invite (share the code), leave; admin: remove member, delete group (type the name) |
 | Categories & rules | Planned: default rule editor (equal / weights / percentages with live 100% check), per-category rules. Any member may edit them |
@@ -67,7 +74,7 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Server state | **TanStack Query v5**: query keys `['group', gid, 'expenses', filters]` (everything of a group under `['group', gid]`, invalidated after any expense or payment change), etc. `staleTime` 30 s for lists, invalidation after mutations |
 | Persistence | `@tanstack/query-async-storage-persister` + `PersistQueryClientProvider`, backed by an encrypted MMKV instance (`split-ranch.query-cache`, same SecureStore key as the session) so the last data is shown offline. `maxAge` = `gcTime` = 24 h; bump `CACHE_BUSTER` (`src/lib/query/client.ts`) when response shapes or query keys change. Sign-out clears the cache and deletes the disk copy |
 | Session | **`supabase-js`** auth client: persists and auto-refreshes the session. Storage adapter = encrypted MMKV whose encryption key lives in `expo-secure-store` (SecureStore alone has a ~2 KB value limit, too small for a Supabase session) |
-| Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, active group id, Quick-splits drafts (persisted via MMKV) |
+| Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, theme/language preferences, Quick-splits drafts (persisted via MMKV); the open group comes from the route |
 | Forms | **React Hook Form + Zod** (`@hookform/resolvers/zod`). Zod schemas mirror the Pydantic ones (generated types for shape; Zod for UX validation, e.g. percentages must sum to 100 %) |
 | Money/splits | `@split-ranch/domain` for previews and the whole Quick-splits computation |
 

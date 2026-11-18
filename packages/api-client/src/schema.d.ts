@@ -324,7 +324,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Summary */
+        /**
+         * Get Summary
+         * @description Totals per category / payer; `mine=true` sums only the caller's shares.
+         */
         get: operations["get_summary_v1_groups__group_id__summary_get"];
         put?: never;
         post?: never;
@@ -985,6 +988,11 @@ export interface components {
             to_member_id: string;
             /** Amount Cents */
             amount_cents: number;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "bizum" | "bank_transfer" | "cash" | "other";
             /** Note */
             note?: string | null;
         };
@@ -1027,6 +1035,8 @@ export interface components {
              * @enum {string}
              */
             status: "sent" | "confirmed" | "disputed" | "cancelled";
+            /** Method */
+            method: ("bizum" | "bank_transfer" | "cash" | "other") | null;
             /** Note */
             note: string | null;
             /**
@@ -1161,7 +1171,10 @@ export interface components {
         };
         /**
          * SummaryRead
-         * @description Totals of the live, shared (non-personal) expenses matching the list filters.
+         * @description Totals of the live expenses matching the list filters.
+         *
+         *     By default full amounts of shared (non-personal) expenses; with `mine=true` only the
+         *     caller's share of each expense they take part in, personal expenses included.
          */
         SummaryRead: {
             /** Count */
@@ -2122,6 +2135,7 @@ export interface operations {
     get_summary_v1_groups__group_id__summary_get: {
         parameters: {
             query?: {
+                mine?: boolean;
                 from?: string | null;
                 to?: string | null;
                 category_id?: string | null;

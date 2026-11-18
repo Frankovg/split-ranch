@@ -9,8 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScreenBackground } from '@/components/ScreenBackground';
 import { currentMoneyLocale } from '@/i18n';
 import { apiErrorCode } from '@/lib/api';
@@ -18,7 +20,6 @@ import { displayMoney } from '@/lib/money';
 import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
 import {
   type PaymentAction,
-  useActiveMembership,
   useBalance,
   useGroup,
   usePaymentAction,
@@ -26,8 +27,16 @@ import {
   useRecordPayment,
 } from './api';
 import { ErrorScreen, LoadingScreen, memberName } from './components';
-import { GroupsScreen } from './GroupsScreen';
-import type { Group, Payment, Suggestion } from './types';
+import { instantLabel } from './dates';
+import { useGroupId } from './route';
+import type { Group, Payment, PaymentMethod, Suggestion } from './types';
+
+// Order shown in the selector; mirrors the API's PaymentMethod.
+const PAYMENT_METHODS: readonly PaymentMethod[] = ['bizum', 'bank_transfer', 'cash', 'other'];
+
+function isPaymentMethod(value: string): value is PaymentMethod {
+  return (PAYMENT_METHODS as readonly string[]).includes(value);
+}
 
 /**
  * Settle up: suggested payments (greedy, after counting payments already sent), record one,
@@ -35,17 +44,13 @@ import type { Group, Payment, Suggestion } from './types';
  */
 export function SettleScreen() {
   const { t } = useTranslation();
-  const me = useActiveMembership();
-  const groupId = me.data?.group_id;
+  const groupId = useGroupId();
   const group = useGroup(groupId);
   const balance = useBalance(groupId);
   const payments = usePayments(groupId);
   useRefreshOnFocus(groupId);
   const { isRefetchingByUser, refetchByUser } = useRefreshByUser(balance.refetch, payments.refetch);
 
-  if (me.isPending) return <LoadingScreen />;
-  if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
-  if (!me.data) return <GroupsScreen embedded />;
   if (group.isPending || balance.isPending || payments.isPending) return <LoadingScreen />;
   if (group.isError || balance.isError || payments.isError) {
     return (
@@ -108,6 +113,7 @@ function SuggestionRow({ group, suggestion }: { group: Group; suggestion: Sugges
   const { t } = useTranslation();
   const locale = currentMoneyLocale();
   const record = useRecordPayment(group.id);
+  const [method, setMethod] = useState<PaymentMethod | undefined>();
   const [note, setNote] = useState('');
   // Stable per suggestion: a retry reuses the id, so the payment is never recorded twice.
   const [paymentId] = useState(() => Crypto.randomUUID());
@@ -124,26 +130,45 @@ function SuggestionRow({ group, suggestion }: { group: Group; suggestion: Sugges
       <Text className='font-medium'>{label}</Text>
       {iPay || iReceive ? (
         <>
-          <Input
-            aria-label={t('settle.note')}
-            placeholder={t('settle.notePlaceholder')}
-            value={note}
-            onChangeText={setNote}
-            maxLength={280}
-          />
+          <View className='gap-1.5'>
+            <Label>{t('settle.method')}</Label>
+            <ToggleGroup
+              type='single'
+              variant='outline'
+              value={method}
+              onValueChange={(v) => v && isPaymentMethod(v) && setMethod(v)}
+              className='flex-wrap justify-start gap-2'>
+              {PAYMENT_METHODS.map((m) => (
+                <ToggleGroupItem key={m} value={m} className='rounded-sm border-l'>
+                  <Text>{t(`settle.method_${m}`)}</Text>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </View>
+          <View className='gap-1.5'>
+            <Label>{t('settle.note')}</Label>
+            <Input
+              aria-label={t('settle.note')}
+              placeholder={t('settle.notePlaceholder')}
+              value={note}
+              onChangeText={setNote}
+              maxLength={280}
+            />
+          </View>
           <Button
-            disabled={record.isPending}
+            disabled={record.isPending || method === undefined}
             onPress={() =>
+              method &&
               record.mutate(
                 {
                   id: paymentId,
                   from_member_id: suggestion.from_member_id,
                   to_member_id: suggestion.to_member_id,
                   amount_cents: suggestion.amount_cents,
+                  method,
                   note: note.trim() || undefined,
                 },
                 {
-                  onSuccess: () => toast.success(t(iPay ? 'settle.recordedSent' : 'settle.recordedReceived')),
                   onError: () => toast.error(t('settle.actionFailed')),
                 },
               )
@@ -191,6 +216,10 @@ function PaymentRow({ group, payment }: { group: Group; payment: Payment }) {
         </Text>
         <MoneyText cents={payment.amount_cents} />
       </View>
+      <Text className='text-sm text-muted-foreground'>
+        {instantLabel(payment.created_at, currentMoneyLocale(), group.timezone)}
+        {payment.method ? ` · ${t(`settle.method_${payment.method}`)}` : ''}
+      </Text>
       <View className='flex-row items-center gap-2'>
         <Badge variant={payment.status === 'confirmed' ? 'default' : 'secondary'}>
           <Text>{t(`settle.status_${payment.status}`)}</Text>

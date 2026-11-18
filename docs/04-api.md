@@ -90,7 +90,7 @@ Pydantic models use a **discriminated union on `split_type`** (`EqualSplit`, `We
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/groups/{gid}/expenses` | filters + cursor; newest `expense_date` first (the app groups by day) |
-| GET | `/groups/{gid}/summary` | same filters → `{count, total_cents, by_category: [{category_id, total_cents}], by_payer: [{member_id, total_cents}]}` over live, non-personal expenses |
+| GET | `/groups/{gid}/summary` | same filters → `{count, total_cents, by_category: [{category_id, total_cents}], by_payer: [{member_id, total_cents}]}` over live, non-personal expenses; `mine=true` sums only the caller's shares instead (their personal expenses included) |
 | POST | `/groups/{gid}/expenses` | create; idempotent by `id`; payer must be an active member |
 | GET | `/groups/{gid}/expenses/{eid}` | includes shares, `split_origin`, `rule_fallback`, `created_by_user_id`, `updated_by_user_id`, `can_edit` |
 | PATCH | `/groups/{gid}/expenses/{eid}` | any member; `If-Match`; only `split`/`participants` re-split, an amount change re-allocates over the stored participants ([03 §4](03-business-rules.md#4-editing-expenses)); `409 member_left` if a former member is involved |
@@ -123,7 +123,7 @@ Create payload:
 |---|---|---|---|
 | GET | `/groups/{gid}/balance` | member | `{balances: [{member_id, paid_cents, owed_cents, net_cents, pending_out_cents, pending_in_cents}], suggestions: [{from_member_id, to_member_id, amount_cents}]}`. `net_cents` counts confirmed payments only; suggestions also count `sent` ones |
 | GET | `/groups/{gid}/payments` | member | newest first, cursor; `?status=sent&status=disputed` |
-| POST | `/groups/{gid}/payments` | the payer or the receiver | `{id, from_member_id, to_member_id, amount_cents, note?}` → `201`; the payer creates it `sent`, the receiver `confirmed` (cash). Another member → `403` |
+| POST | `/groups/{gid}/payments` | the payer or the receiver | `{id, from_member_id, to_member_id, amount_cents, method, note?}` (`method`: required, one of `bizum`, `bank_transfer`, `cash`, `other`) → `201`; the payer creates it `sent`, the receiver `confirmed` (cash). Another member → `403` |
 | GET | `/groups/{gid}/payments/{pid}` | member | with `ETag` |
 | POST | `/groups/{gid}/payments/{pid}/confirm` | receiver | `{note?}`; `sent`/`disputed` → `confirmed` |
 | POST | `/groups/{gid}/payments/{pid}/dispute` | receiver | `{note}` required; `sent` → `disputed` |

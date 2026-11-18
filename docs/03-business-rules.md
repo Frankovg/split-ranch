@@ -217,7 +217,7 @@ In March, Franco paid *Supermercado* 100.00 split equally (33.34/33.33/33.33), a
 
 | Event | Rule |
 |---|---|
-| Create a group | The creator is its **admin**. 12 default categories are copied; the default rule is equal. A user can create and belong to several groups |
+| Create a group | The creator is its **admin**. 9 default categories are copied (Entertainment, Groceries, Healthcare, Home, Insurance, Rent and Services, Restaurants and bars, Shopping, Transport; "Other" = no category; the app names them in its language and lists categories alphabetically); the default rule is equal. A user can create and belong to several groups |
 | Invite | **Any member** gets (or revokes) the group's 8-character code, valid 7 days, and shares it; the invitee types it in the app |
 | Join | The new member takes part in expenses created from now on. Existing expenses are never re-split. Rejoining reactivates the old member row |
 | Permissions | Every active member has the same rights (expenses, categories, rules, group name, invitations). Only the admin **removes members** and **deletes the group** |

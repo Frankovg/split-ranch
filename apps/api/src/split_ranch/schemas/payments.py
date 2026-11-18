@@ -9,6 +9,8 @@ from split_ranch.schemas.common import AmountCents, Id, ReadModel, StrictModel
 
 # Mirrors models.payments.PAYMENT_STATUSES (the DB check constraint).
 PaymentStatus = Literal["sent", "confirmed", "disputed", "cancelled"]
+# Mirrors models.payments.PAYMENT_METHODS.
+PaymentMethod = Literal["bizum", "bank_transfer", "cash", "other"]
 
 
 class BalanceRead(ReadModel):
@@ -39,6 +41,7 @@ class PaymentCreate(StrictModel):
     from_member_id: Id
     to_member_id: Id
     amount_cents: AmountCents
+    method: PaymentMethod
     note: str | None = Field(default=None, max_length=280)
 
 
@@ -57,6 +60,8 @@ class PaymentRead(ReadModel):
     to_member_id: Id
     amount_cents: int
     status: PaymentStatus
+    # None only on payments recorded before the method was required.
+    method: PaymentMethod | None
     note: str | None
     created_by_user_id: Id
     confirmed_at: datetime | None

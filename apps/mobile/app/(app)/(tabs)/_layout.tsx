@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router/js-tabs';
-import { Calculator, House, ReceiptText, Settings } from 'lucide-react-native';
+import { Calculator, Fence, Settings } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { tokenColor } from '@/theme/tokens';
 import { useAppColorScheme } from '@/theme/ThemeSync';
@@ -13,15 +13,14 @@ export default function TabsLayout() {
         tabBarActiveTintColor: tokenColor(scheme, 'primary'),
         tabBarInactiveTintColor: tokenColor(scheme, 'muted-foreground'),
       }}>
+      {/* Home: the user's groups ("ranchs"). Room for an AI chat tab later. */}
       <Tabs.Screen
         name='index'
-        options={{ title: t('tabs.home'), tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }}
-      />
-      <Tabs.Screen
-        name='expenses'
         options={{
-          title: t('tabs.expenses'),
-          tabBarIcon: ({ color, size }) => <ReceiptText color={color} size={size} />,
+          title: t('tabs.ranchs'),
+          // The screen draws its own top bar with the wordmark.
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <Fence color={color} size={size} />,
         }}
       />
       <Tabs.Screen

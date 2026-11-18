@@ -26,7 +26,7 @@ def test_non_member_gets_404_everywhere(
         "group_id": house.id,
         "expense_id": expense["id"],
         "member_id": house.members["Franco"],
-        "category_id": house.categories["Supermercado"],
+        "category_id": house.categories["Groceries"],
         "payment_id": payment["id"],
     }
     outsider = make_user("Mallory")

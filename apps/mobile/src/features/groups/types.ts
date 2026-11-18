@@ -5,6 +5,7 @@
  */
 import type {
   BalanceRead,
+  CategoryCreate,
   CategoryRead,
   ExpenseCreate,
   ExpenseRead,
@@ -31,6 +32,7 @@ export type Group = GroupRead;
 /** The group's join code: one per group, valid 7 days, typed by hand by the invitee. */
 export type Invitation = InvitationRead;
 export type Category = CategoryRead;
+export type CategoryCreateInput = CategoryCreate;
 export type Share = ShareRead;
 export type Expense = ExpenseRead;
 export type ExpensePage = PageExpenseRead;
@@ -41,6 +43,7 @@ export type Suggestion = SuggestionRead;
 /** Suggestions are computed after counting payments already sent, so nobody pays twice. */
 export type GroupBalance = GroupBalanceRead;
 export type Payment = PaymentRead;
+export type PaymentMethod = PaymentCreate['method'];
 /** `participants` omitted = group/category rule; otherwise an equal split between them. */
 export type ExpenseCreateInput = ExpenseCreate;
 /** Fields sent change; sending `participants` re-splits with today's members. */
@@ -51,4 +54,18 @@ export type PaymentCreateInput = PaymentCreate;
 export interface DateRange {
   from?: string;
   to?: string;
+}
+
+/** List filters the expenses endpoint accepts besides the date range. */
+export interface ExpenseListFilters extends DateRange {
+  /** Free-text search on the description. */
+  q?: string;
+}
+
+/** Filters the summary (insights) endpoint accepts. */
+export interface SummaryFilters extends DateRange {
+  category_id?: string;
+  payer_member_id?: string;
+  /** Only the caller's share of each expense (their personal expenses included). */
+  mine?: boolean;
 }

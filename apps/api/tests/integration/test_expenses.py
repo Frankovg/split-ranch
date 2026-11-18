@@ -111,7 +111,7 @@ def test_update_with_if_match(client: TestClient, house: House) -> None:
     moved = ok(
         client.patch(
             url,
-            json={"expense_date": "2026-04-01", "category_id": house.categories["Ocio"]},
+            json={"expense_date": "2026-04-01", "category_id": house.categories["Entertainment"]},
             headers=house.h("Juli", **{"If-Match": '"2"'}),
         )
     )
@@ -177,7 +177,7 @@ def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
             payer="Juli" if day % 2 else "Franco",
             date=f"2026-03-0{day}",
             description=f"Gasto {day}",
-            category="Ocio" if day == 3 else None,
+            category="Entertainment" if day == 3 else None,
         )
     add_expense(
         client, house, "Juli", amount=999, payer="Juli", date="2026-04-01", description="Abril"
@@ -206,7 +206,7 @@ def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
         len(
             ok(
                 client.get(
-                    house.url(f"/expenses?category_id={house.categories['Ocio']}"),
+                    house.url(f"/expenses?category_id={house.categories['Entertainment']}"),
                     headers=house.h("Ana"),
                 )
             )["items"]
@@ -264,7 +264,13 @@ def test_period_fields_are_gone(client: TestClient, house: House) -> None:
 
 def test_summary_uses_the_list_filters(client: TestClient, house: House) -> None:
     add_expense(
-        client, house, "Juli", amount=3000, payer="Juli", date="2026-03-02", category="Ocio"
+        client,
+        house,
+        "Juli",
+        amount=3000,
+        payer="Juli",
+        date="2026-03-02",
+        category="Entertainment",
     )
     add_expense(client, house, "Juli", amount=1000, payer="Franco", date="2026-03-20")
     add_expense(
@@ -283,7 +289,7 @@ def test_summary_uses_the_list_filters(client: TestClient, house: House) -> None
     # The personal expense is not shared spending.
     assert march["count"] == 2 and march["total_cents"] == 4000
     assert march["by_category"] == [
-        {"category_id": house.categories["Ocio"], "total_cents": 3000},
+        {"category_id": house.categories["Entertainment"], "total_cents": 3000},
         {"category_id": None, "total_cents": 1000},
     ]
     assert march["by_payer"] == [
@@ -297,6 +303,57 @@ def test_summary_uses_the_list_filters(client: TestClient, house: House) -> None
         )
     )
     assert franco["total_cents"] == 1000
+
+
+def test_summary_mine_sums_only_my_shares(client: TestClient, house: House) -> None:
+    juli, franco = house.members["Juli"], house.members["Franco"]
+    add_expense(
+        client,
+        house,
+        "Juli",
+        amount=3000,
+        payer="Juli",
+        date="2026-03-02",
+        category="Entertainment",
+        participants=[juli, franco],
+    )
+    # Juli takes no part in this one.
+    add_expense(
+        client,
+        house,
+        "Franco",
+        amount=1000,
+        payer="Franco",
+        date="2026-03-03",
+        participants=[franco],
+    )
+    add_expense(
+        client,
+        house,
+        "Juli",
+        amount=500,
+        payer="Juli",
+        date="2026-03-04",
+        split={"split_type": "personal"},
+    )
+    mine = ok(client.get(house.url("/summary?mine=true"), headers=house.h("Juli")))
+    # Half of the shared 30.00 plus the whole personal 5.00.
+    assert mine["count"] == 2 and mine["total_cents"] == 2000
+    assert mine["by_category"] == [
+        {"category_id": house.categories["Entertainment"], "total_cents": 1500},
+        {"category_id": None, "total_cents": 500},
+    ]
+    assert mine["by_payer"] == [{"member_id": juli, "total_cents": 2000}]
+    # Other filters still apply.
+    narrowed = ok(
+        client.get(
+            house.url(f"/summary?mine=true&category_id={house.categories['Entertainment']}"),
+            headers=house.h("Juli"),
+        )
+    )
+    assert narrowed["total_cents"] == 1500
+    group = ok(client.get(house.url("/summary"), headers=house.h("Juli")))
+    assert group["total_cents"] == 4000
 
 
 def test_edit_involving_member_who_left_is_refused(client: TestClient, house: House) -> None:
@@ -318,6 +375,7 @@ def test_edit_involving_member_who_left_is_refused(client: TestClient, house: Ho
                 "from_member_id": house.members["Franco"],
                 "to_member_id": house.members["Juli"],
                 "amount_cents": 500,
+                "method": "cash",
             },
             headers=house.h("Juli"),
         ),

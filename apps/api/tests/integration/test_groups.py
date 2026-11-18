@@ -266,7 +266,7 @@ def test_rule_precedence_and_fallback(
         )
     )
     e = add_expense(
-        client, house, "Juli", amount=1001, payer="Juli", date="2026-03-02", category="Luz"
+        client, house, "Juli", amount=1001, payer="Juli", date="2026-03-02", category="Healthcare"
     )
     assert [s["amount_cents"] for s in e["shares"]] == [501, 250, 250]
     assert e["split_origin"] == "group_default"
@@ -283,38 +283,41 @@ def test_rule_precedence_and_fallback(
     assert [s["amount_cents"] for s in e["shares"]] == [600, 300]
     assert e["split_origin"] == "override" and e["participant_mode"] == "subset"
 
-    # A rule change applies only to new expenses (Q1): the Luz expense keeps its split.
+    # A rule change applies only to new expenses (Q1): the Healthcare expense keeps its split.
     ok(
         client.put(
-            house.url(f"/categories/{house.categories['Luz']}/split-rule"),
+            house.url(f"/categories/{house.categories['Healthcare']}/split-rule"),
             json={"split_type": "equal"},
             headers=house.h("Ana"),
         )
     )
-    luz = ok(client.get(house.url("/expenses?q=Luz"), headers=house.h("Juli")))["items"][0]
+    luz = ok(client.get(house.url("/expenses?q=Healthcare"), headers=house.h("Juli")))["items"][0]
     assert luz["split_origin"] == "group_default"
     assert [s["amount_cents"] for s in luz["shares"]] == [501, 250, 250]
     luz2 = add_expense(
-        client, house, "Juli", amount=1001, payer="Juli", date="2026-03-03", category="Luz"
+        client, house, "Juli", amount=1001, payer="Juli", date="2026-03-03", category="Healthcare"
     )
     assert luz2["split_origin"] == "category"
     assert [s["amount_cents"] for s in luz2["shares"]] == [334, 334, 333]
 
     rules = ok(client.get(house.url("/split-rules"), headers=house.h("Franco")))
     assert rules["categories"] == [
-        {"category_id": house.categories["Luz"], "split": {"split_type": "equal", "shares": None}}
+        {
+            "category_id": house.categories["Healthcare"],
+            "split": {"split_type": "equal", "shares": None},
+        }
     ]
 
     # A single rule pointing to a member who left falls back to the next rule.
     ok(
         client.put(
-            house.url(f"/categories/{house.categories['Gas']}/split-rule"),
+            house.url(f"/categories/{house.categories['Insurance']}/split-rule"),
             json={"split_type": "single", "shares": [{"member_id": m["Ana"]}]},
             headers=house.h("Juli"),
         )
     )
     gas = add_expense(
-        client, house, "Juli", amount=400, payer="Juli", date="2026-03-03", category="Gas"
+        client, house, "Juli", amount=400, payer="Juli", date="2026-03-03", category="Insurance"
     )
     assert gas["rule_fallback"] is False and gas["split_origin"] == "category"
     # Settle Ana up (she owes 250 + 300 + 333 + 400) and let her leave.
@@ -322,7 +325,7 @@ def test_rule_precedence_and_fallback(
     pay(client, house, "Juli", payer="Ana", to="Juli", amount=owed)
     ok(client.post(house.url("/members/me/leave"), headers=house.h("Ana")), 204)
     gas2 = add_expense(
-        client, house, "Juli", amount=400, payer="Juli", date="2026-03-04", category="Gas"
+        client, house, "Juli", amount=400, payer="Juli", date="2026-03-04", category="Insurance"
     )
     assert gas2["rule_fallback"] is True and gas2["split_origin"] == "group_default"
     assert {s["member_id"] for s in gas2["shares"]} == {m["Juli"], m["Franco"]}

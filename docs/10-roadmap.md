@@ -65,7 +65,7 @@ Depends only on P1 (+ P0 UI). Can ship before or in parallel with P3–P5.
 | T-3.1 `get_actor` dependency (JWKS cache, claim checks) + `ensure_user` + `GET/PATCH /me` | Unit tests with locally signed ES256 test tokens: valid, expired, wrong `iss`/`aud`, `anon` role, `HS256`; first call creates `app.users` |
 | T-3.2 Supabase config as code (`supabase/config.toml` for local; documented dashboard settings for the cloud project: only Google provider, anonymous sign-ins off, token lifetime) | Fresh local stack reproduces the config; checklist ticked for the cloud project |
 | T-3.3 App auth flow (sign-in screen, `signInWithGoogle` → Supabase, encrypted MMKV session storage, AppState auto-refresh, Stack.Protected) | Kill app → reopen stays signed in; sign-out → back to sign-in; expired token transparently refreshed |
-| T-3.4 Groups + members + roles + default categories | Create group → admin; 12 default categories copied |
+| T-3.4 Groups + members + roles + default categories | Create group → admin; 9 default categories copied |
 | T-3.5 Invitations (code typed by hand; App Links later) | Second device joins with the code; expired handled |
 | T-3.6 Tenant-isolation test harness | Every group route returns 404 for outsiders |
 | T-3.7 Categories CRUD + archive (admin) | Archived categories hidden from pickers but kept on old expenses |

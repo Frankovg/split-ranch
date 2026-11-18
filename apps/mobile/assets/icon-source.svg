@@ -2,7 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>icon-source</title>
   <g id="Layer_1" data-name="Layer 1">
-    <rect id="bg" x="0" y="0" width="1024" height="1024" fill="#ae4728"/>
+    <rect id="bg" x="0" y="0" width="1024" height="1024" fill="#178264"/>
     <polygon id="chimney" points="677,209.8 787,209.8 787,381.4 677,308.8" fill="#f6eee7" stroke="#f6eee7" stroke-width="22" stroke-linejoin="round"/>
     <path id="walls" d="M205.1 383.6 L205.1 757.6 C205.1 814.067 233.333 842.3 289.8 842.3 L734.2 842.3 C790.667 842.3 818.9 814.067 818.9 757.6 L818.9 383.6" fill="none" stroke="#f6eee7" stroke-width="46" stroke-miterlimit="10"/>
     <polyline id="roof" points="157.8,433.1 512,196.6 866.2,433.1" fill="none" stroke="#f6eee7" stroke-width="68" stroke-linecap="round" stroke-linejoin="round"/>

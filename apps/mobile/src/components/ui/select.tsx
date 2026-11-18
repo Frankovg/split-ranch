@@ -1,4 +1,4 @@
-// Source: react-native-reusables select (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink.
+// Source: react-native-reusables select (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink; SelectItem renders its children (e.g. an icon) before the item text; SelectContent is as wide as its trigger on native (`matchTriggerWidth`, default true).
 import { type ComponentProps, Fragment, type ReactNode } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
@@ -73,11 +73,17 @@ function SelectContent({
   children,
   position = 'popper',
   portalHost,
+  matchTriggerWidth = true,
+  style,
   ...props
 }: ComponentProps<typeof SelectPrimitive.Content> & {
     className?: string;
     portalHost?: string;
+    /** Native: the menu is exactly as wide as its trigger (measured when it opens); false = content width. */
+    matchTriggerWidth?: boolean;
   }) {
+  const { triggerPosition } = SelectPrimitive.useRootContext();
+  const width = matchTriggerWidth && triggerPosition ? triggerPosition.width : undefined;
   return (
     <SelectPrimitive.Portal hostName={portalHost}>
       <FullWindowOverlay>
@@ -111,6 +117,7 @@ function SelectContent({
                   className
                 )}
                 position={position}
+                style={width === undefined ? style : { ...StyleSheet.flatten(style), width }}
                 {...props}>
                 <SelectScrollUpButton />
                 <SelectPrimitive.Viewport
@@ -152,7 +159,7 @@ function SelectItem({
   className,
   children,
   ...props
-}: ComponentProps<typeof SelectPrimitive.Item>) {
+}: Omit<ComponentProps<typeof SelectPrimitive.Item>, 'children'> & { children?: ReactNode }) {
   return (
     <SelectPrimitive.Item
       className={cn(
@@ -169,6 +176,7 @@ function SelectItem({
           <Icon as={Check} className='text-muted-foreground size-4 shrink-0' />
         </SelectPrimitive.ItemIndicator>
       </View>
+      {children}
       <SelectPrimitive.ItemText className='text-foreground group-active:text-accent-foreground select-none text-sm' />
     </SelectPrimitive.Item>
   );

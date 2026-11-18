@@ -47,6 +47,16 @@ export function monthRange(timeZone: string, offset: number, now: Date = new Dat
   return { from: iso(year, month, 1), to: iso(year, month, last) };
 }
 
+/**
+ * The calendar year `offset` years from today in the group's time zone, as an
+ * inclusive range: 0 = this year, -1 = last year.
+ */
+export function yearRange(timeZone: string, offset: number, now: Date = new Date()): Required<DateRange> {
+  const [y] = parts(todayIso(timeZone, now));
+  const year = y + offset;
+  return { from: iso(year, 1, 1), to: iso(year, 12, 31) };
+}
+
 /** Short day label, e.g. "7 nov". */
 export function dayLabel(isoDate: string, locale: string): string {
   const [y, m, d] = parts(isoDate);
@@ -70,6 +80,18 @@ export function monthLabel(isoDate: string, locale: string): string {
 /** Time of an instant in the group's time zone, e.g. "18:42". */
 export function timeLabel(instant: string, locale: string, timeZone: string): string {
   return formatter(locale, { hour: '2-digit', minute: '2-digit', timeZone }).format(new Date(instant));
+}
+
+/** Day and time of an instant in the group's time zone, e.g. "18 nov 2026, 18:42". */
+export function instantLabel(instant: string, locale: string, timeZone: string): string {
+  return formatter(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(instant));
 }
 
 export interface DaySection {

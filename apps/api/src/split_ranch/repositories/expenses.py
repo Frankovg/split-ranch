@@ -95,13 +95,45 @@ class SummaryRows:
     by_payer: list[tuple[UUID, int]]
 
 
-def summary(session: Session, group_id: UUID, filters: ExpenseFilters) -> SummaryRows:
-    """Totals of the live, shared (non-personal) expenses matching `filters`."""
+def summary(
+    session: Session,
+    group_id: UUID,
+    filters: ExpenseFilters,
+    *,
+    share_member_id: UUID | None = None,
+) -> SummaryRows:
+    """Totals of the live expenses matching `filters`.
 
-    def base(*cols: Any) -> Select[Any]:
-        return _filtered(select(*cols), group_id, filters).where(Expense.split_type != "personal")
+    Without `share_member_id`: full amounts of the shared (non-personal) expenses.
+    With it: only that member's share of each expense they take part in, personal
+    expenses included (a personal expense's single share is the whole amount).
+    """
+    if share_member_id is None:
+        amount = func.coalesce(func.sum(Expense.amount_cents), 0)
 
-    amount = func.coalesce(func.sum(Expense.amount_cents), 0)
+        def base(*cols: Any) -> Select[Any]:
+            return _filtered(select(*cols), group_id, filters).where(
+                Expense.split_type != "personal"
+            )
+
+    else:
+        amount = func.coalesce(func.sum(ExpenseShare.amount_cents), 0)
+
+        def base(*cols: Any) -> Select[Any]:
+            stmt = (
+                select(*cols)
+                .select_from(Expense)
+                .join(
+                    ExpenseShare,
+                    and_(
+                        ExpenseShare.expense_id == Expense.id,
+                        ExpenseShare.group_id == Expense.group_id,
+                        ExpenseShare.member_id == share_member_id,
+                    ),
+                )
+            )
+            return _filtered(stmt, group_id, filters)
+
     count, total = session.execute(base(func.count(), amount)).one()
     by_category = session.execute(
         base(Expense.category_id, amount)

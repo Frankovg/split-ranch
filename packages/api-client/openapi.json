@@ -1726,6 +1726,7 @@
           "expenses"
         ],
         "summary": "Get Summary",
+        "description": "Totals per category / payer; `mine=true` sums only the caller's shares.",
         "operationId": "get_summary_v1_groups__group_id__summary_get",
         "parameters": [
           {
@@ -1736,6 +1737,16 @@
               "type": "string",
               "format": "uuid",
               "title": "Group Id"
+            }
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Mine"
             }
           },
           {
@@ -4351,6 +4362,16 @@
             "minimum": 1.0,
             "title": "Amount Cents"
           },
+          "method": {
+            "type": "string",
+            "enum": [
+              "bizum",
+              "bank_transfer",
+              "cash",
+              "other"
+            ],
+            "title": "Method"
+          },
           "note": {
             "anyOf": [
               {
@@ -4370,7 +4391,8 @@
           "id",
           "from_member_id",
           "to_member_id",
-          "amount_cents"
+          "amount_cents",
+          "method"
         ],
         "title": "PaymentCreate"
       },
@@ -4445,6 +4467,23 @@
             ],
             "title": "Status"
           },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "bizum",
+                  "bank_transfer",
+                  "cash",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
           "note": {
             "anyOf": [
               {
@@ -4508,6 +4547,7 @@
           "to_member_id",
           "amount_cents",
           "status",
+          "method",
           "note",
           "created_by_user_id",
           "confirmed_at",
@@ -4864,7 +4904,7 @@
           "by_payer"
         ],
         "title": "SummaryRead",
-        "description": "Totals of the live, shared (non-personal) expenses matching the list filters."
+        "description": "Totals of the live expenses matching the list filters.\n\nBy default full amounts of shared (non-personal) expenses; with `mine=true` only the\ncaller's share of each expense they take part in, personal expenses included."
       },
       "ValidationError": {
         "properties": {

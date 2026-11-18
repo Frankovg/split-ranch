@@ -21,7 +21,7 @@ def march_house(
     m = house.members
     ok(
         client.put(
-            house.url(f"/categories/{house.categories['Alquiler']}/split-rule"),
+            house.url(f"/categories/{house.categories['Rent and Services']}/split-rule"),
             json={
                 "split_type": "percentages",
                 "shares": [
@@ -35,7 +35,7 @@ def march_house(
     )
     ok(
         client.put(
-            house.url(f"/categories/{house.categories['Internet']}/split-rule"),
+            house.url(f"/categories/{house.categories['Home']}/split-rule"),
             json={"split_type": "single", "shares": [{"member_id": m["Franco"]}]},
             headers=house.h("Juli"),
         )
@@ -46,7 +46,13 @@ def march_house(
 def _march_expenses(client: TestClient, house: House) -> dict[str, dict]:
     m = house.members
     e1 = add_expense(
-        client, house, "Juli", amount=120000, payer="Juli", date="2026-03-01", category="Alquiler"
+        client,
+        house,
+        "Juli",
+        amount=120000,
+        payer="Juli",
+        date="2026-03-01",
+        category="Rent and Services",
     )
     e2 = add_expense(
         client,
@@ -55,10 +61,10 @@ def _march_expenses(client: TestClient, house: House) -> dict[str, dict]:
         amount=10000,
         payer="Franco",
         date="2026-03-02",
-        category="Supermercado",
+        category="Groceries",
     )
     e3 = add_expense(
-        client, house, "Franco", amount=4000, payer="Franco", date="2026-03-03", category="Internet"
+        client, house, "Franco", amount=4000, payer="Franco", date="2026-03-03", category="Home"
     )
     e4 = add_expense(
         client,
@@ -67,7 +73,7 @@ def _march_expenses(client: TestClient, house: House) -> dict[str, dict]:
         amount=6000,
         payer="Ana",
         date="2026-03-04",
-        category="Restaurantes",
+        category="Restaurants and bars",
         description="Cena",
         participants=[m["Juli"], m["Ana"]],
     )
@@ -133,7 +139,7 @@ def test_payment_flow(client: TestClient, march_house: House) -> None:
 
     # CUJ 4: Franco records "sent"; the balance waits for Juli, the suggestion disappears.
     p = pay(client, house, "Franco", payer="Franco", to="Juli", amount=29333, note="Bizum")
-    assert p["status"] == "sent" and p["version"] == 1
+    assert p["status"] == "sent" and p["version"] == 1 and p["method"] == "bizum"
     assert nets(client, house)["Franco"] == -29333
     franco = next(
         b for b in _balance(client, house)["balances"] if b["member_id"] == house.members["Franco"]
@@ -164,8 +170,8 @@ def test_payment_flow(client: TestClient, march_house: House) -> None:
     assert _suggestions(client, house) == [("Ana", "Juli", 36333)]
     ok(client.post(house.url(f"/payments/{p2['id']}/cancel"), headers=_if("Ana", house, 2)))
     # The receiver records cash received directly as confirmed.
-    cash = pay(client, house, "Juli", payer="Ana", to="Juli", amount=36333, note="efectivo")
-    assert cash["status"] == "confirmed"
+    cash = pay(client, house, "Juli", payer="Ana", to="Juli", amount=36333, method="cash")
+    assert cash["status"] == "confirmed" and cash["method"] == "cash"
     assert nets(client, house) == {"Juli": 0, "Franco": 0, "Ana": 0}
     assert _suggestions(client, house) == []
 
@@ -186,6 +192,7 @@ def test_payment_rules(client: TestClient, march_house: House) -> None:
             "from_member_id": m["Franco"],
             "to_member_id": m["Juli"],
             "amount_cents": 100,
+            "method": "cash",
         },
         headers=house.h("Ana"),
     )
@@ -197,10 +204,14 @@ def test_payment_rules(client: TestClient, march_house: House) -> None:
             "from_member_id": m["Ana"],
             "to_member_id": m["Ana"],
             "amount_cents": 100,
+            "method": "cash",
         },
         headers=house.h("Ana"),
     )
     assert r.status_code == 422
+    # The method is required and must be one of the known ones.
+    pay(client, house, "Ana", payer="Ana", to="Juli", amount=100, method=None, expect=422)
+    pay(client, house, "Ana", payer="Ana", to="Juli", amount=100, method="paypal", expect=422)
 
     # Idempotent create: same id and payload -> 200; different payload -> 409.
     body = {
@@ -208,6 +219,7 @@ def test_payment_rules(client: TestClient, march_house: House) -> None:
         "from_member_id": m["Ana"],
         "to_member_id": m["Juli"],
         "amount_cents": 500,
+        "method": "bank_transfer",
     }
     first = ok(client.post(house.url("/payments"), json=body, headers=house.h("Ana")), 201)
     again = ok(client.post(house.url("/payments"), json=body, headers=house.h("Ana")), 200)
@@ -216,6 +228,8 @@ def test_payment_rules(client: TestClient, march_house: House) -> None:
         house.url("/payments"), json={**body, "amount_cents": 501}, headers=house.h("Ana")
     )
     assert r.status_code == 409 and r.json()["code"] == "id_conflict"
+    r = client.post(house.url("/payments"), json={**body, "method": "cash"}, headers=house.h("Ana"))
+    assert r.status_code == 409 and r.json()["code"] == "id_conflict"
 
 
 def test_editing_old_expense_moves_balance(client: TestClient, march_house: House) -> None:
@@ -223,7 +237,7 @@ def test_editing_old_expense_moves_balance(client: TestClient, march_house: Hous
     e = _march_expenses(client, house)
     pay(client, house, "Juli", payer="Franco", to="Juli", amount=29333)
     assert nets(client, house)["Franco"] == 0
-    # CUJ 6: Supermercado was 130,00 €, not 100,00 €. Any member fixes it in place; the
+    # CUJ 6: Groceries was 130,00 €, not 100,00 €. Any member fixes it in place; the
     # equal split over the same members is re-allocated.
     updated = ok(
         client.patch(

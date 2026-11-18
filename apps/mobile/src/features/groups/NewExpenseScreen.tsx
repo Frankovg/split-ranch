@@ -1,20 +1,29 @@
 import { useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import { router } from 'expo-router';
+import { Plus } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
+import { DateInput } from '@/components/DateInput';
 import { MoneyInput } from '@/components/MoneyInput';
 import { Screen } from '@/components/Screen';
 import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { currentMoneyLocale } from '@/i18n';
 import { MAX_AMOUNT_CENTS } from '@/lib/money';
 import { apiErrorCode } from '@/lib/api';
 import {
-  useActiveMembership,
   useCategories,
   useCreateExpense,
   useDeleteExpense,
@@ -22,36 +31,42 @@ import {
   useGroup,
   useUpdateExpense,
 } from './api';
+import { categoryIcon, categoryLabel, selectableCategories, sortByLabel } from './categories';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName, userName } from './components';
 import { todayIso } from './dates';
-import { GroupsScreen } from './GroupsScreen';
+import { useGroupId } from './route';
+import {
+  equalValues,
+  initialSplitState,
+  isDefaultSplit,
+  splitProblem,
+  splitSignature,
+  splitStateFromExpense,
+  toSplitSpec,
+} from './split-form';
+import { SplitTable } from './SplitTable';
 import type { Expense, ExpenseUpdateInput, Group } from './types';
+
+/** Select value of "Other": the expense has no category. */
+const OTHER_CATEGORY = '__other__';
 
 /** New expense, or edit/delete an existing one when `expenseId` is given. */
 export function NewExpenseScreen({ expenseId }: { expenseId?: string }) {
   const { t } = useTranslation();
-  const me = useActiveMembership();
-  const group = useGroup(me.data?.group_id);
-  const expense = useExpense(me.data?.group_id, expenseId);
+  const groupId = useGroupId();
+  const group = useGroup(groupId);
+  const expense = useExpense(groupId, expenseId);
 
-  if (me.isPending) return <LoadingScreen />;
-  if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
-  // No group (e.g. deep link after leaving it): the group query never runs.
-  if (!me.data) return <GroupsScreen embedded />;
   if (group.isPending || (expenseId && expense.isPending)) return <LoadingScreen />;
   if (group.isError) return <ErrorScreen t={t} onRetry={() => void group.refetch()} />;
-  if (expenseId && expense.isError) return <ErrorScreen t={t} onRetry={() => void expense.refetch()} />;
+  if (expenseId && expense.isError)
+    return <ErrorScreen t={t} onRetry={() => void expense.refetch()} />;
   return <ExpenseForm group={group.data} expense={expense.data} />;
-}
-
-/** The members an equal split names, or everyone when it follows the rule. */
-function initialParticipants(expense: Expense | undefined, everyone: string[]): string[] {
-  if (!expense || expense.participant_mode === 'all' || expense.split_type !== 'equal') return everyone;
-  return expense.shares.map((s) => s.member_id);
 }
 
 function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const { t } = useTranslation();
+  const locale = currentMoneyLocale();
   const members = activeMembers(group);
   const everyone = members.map((m) => m.id);
   const categories = useCategories(group.id);
@@ -62,22 +77,72 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const [newId] = useState(() => Crypto.randomUUID());
   const editing = expense !== undefined;
   const readOnly = editing && !expense.can_edit;
+  const today = todayIso(group.timezone);
 
   const [description, setDescription] = useState(expense?.description ?? '');
   const [amountCents, setAmountCents] = useState<number | null>(expense?.amount_cents ?? null);
   const [payer, setPayer] = useState(expense?.payer_member_id ?? group.my_member_id);
+  // The group's calendar day by default, not the device's (they differ abroad).
+  const [expenseDate, setExpenseDate] = useState(expense?.expense_date ?? today);
+  // '' = "Other" (no category).
   const [categoryId, setCategoryId] = useState<string>(expense?.category_id ?? '');
-  const startParticipants = initialParticipants(expense, everyone);
-  const [participants, setParticipants] = useState<string[]>(startParticipants);
+  const [startSplit] = useState(() =>
+    expense ? splitStateFromExpense(expense, everyone) : initialSplitState(0, everyone),
+  );
+  const [split, setSplit] = useState(startSplit);
   const [submitted, setSubmitted] = useState(false);
+
+  // After "Add category", select the category that appears in the list once it is created.
+  // Adjusted during render (react.dev "adjusting state when a prop changes"), not in an effect.
+  const [knownCategoryIds, setKnownCategoryIds] = useState<string[] | null>(null);
+  const categoryList = categories.data ?? [];
+  if (knownCategoryIds) {
+    const created = categoryList.find((c) => !c.archived_at && !knownCategoryIds.includes(c.id));
+    if (created) {
+      setKnownCategoryIds(null);
+      setCategoryId(created.id);
+    }
+  }
+
+  // Table rows: active members plus anyone who left but is still in a stored share.
+  const tableMembers = [...everyone, ...split.included.filter((id) => !everyone.includes(id))];
+  const showSplit = tableMembers.length > 1;
 
   const amountValid = amountCents !== null && amountCents > 0 && amountCents <= MAX_AMOUNT_CENTS;
   const descriptionValid = description.trim() !== '';
-  const valid = amountValid && descriptionValid && participants.length > 0;
-  const activeCategories = (categories.data ?? []).filter((c) => !c.archived_at || c.id === categoryId);
-  // Only equal splits can be changed here; weights/percentages/exact keep their shares.
-  const canChooseParticipants = members.length > 1 && (!editing || expense.split_type === 'equal');
+  const problem = showSplit ? splitProblem(split, amountCents) : null;
+  const valid = amountValid && descriptionValid && problem === null;
+  const activeCategories = selectableCategories(categoryList, categoryId);
+  const selectedCategory = activeCategories.find((c) => c.id === categoryId);
+  const categoryOption = {
+    value: categoryId || OTHER_CATEGORY,
+    label: selectedCategory ? categoryLabel(selectedCategory, t) : t('categories.other'),
+  };
+  // Every category plus "Other", always in alphabetical order.
+  const categoryOptions = sortByLabel(
+    [
+      ...activeCategories.map((c) => ({ value: c.id, label: categoryLabel(c, t), icon: categoryIcon(c) })),
+      { value: OTHER_CATEGORY, label: t('categories.other'), icon: categoryIcon(null) },
+    ],
+    locale,
+  );
+  const payerOption = { value: payer, label: memberName(group, payer, t) };
   const busy = create.isPending || update.isPending || remove.isPending;
+
+  const onAmountChange = (cents: number | null) => {
+    setAmountCents(cents);
+    // Typed amounts no longer add up to a new total: start again from equal amounts.
+    setSplit((s) => ({
+      ...s,
+      amounts: equalValues(cents ?? 0, s.included),
+      locked: s.mode === 'amount' ? [] : s.locked,
+    }));
+  };
+
+  const addCategory = () => {
+    setKnownCategoryIds(categoryList.map((c) => c.id));
+    router.push({ pathname: '/group/[groupId]/category/new', params: { groupId: group.id } });
+  };
 
   const onError = (error: unknown) => {
     const code = apiErrorCode(error);
@@ -86,13 +151,12 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
     else toast.error(t('expenses.saveFailed'));
   };
 
+  const onSuccess = () => router.back();
+
   const onSave = () => {
     setSubmitted(true);
     if (!valid || amountCents === null) return;
-    const sameMembers =
-      participants.length === startParticipants.length && participants.every((p) => startParticipants.includes(p));
     if (!editing) {
-      const allSelected = participants.length === everyone.length;
       create.mutate(
         {
           id: newId,
@@ -100,18 +164,11 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
           description: description.trim(),
           category_id: categoryId || null,
           payer_member_id: payer,
-          // The group's calendar day, not the device's (they differ abroad).
-          expense_date: todayIso(group.timezone),
-          // Everyone selected = let the group/category rule decide the split.
-          participants: allSelected ? undefined : everyone.filter((id) => participants.includes(id)),
+          expense_date: expenseDate,
+          // Untouched table (everyone, equally) = let the group/category rule decide.
+          split: showSplit && !isDefaultSplit(split, everyone) ? toSplitSpec(split) : undefined,
         },
-        {
-          onSuccess: () => {
-            toast.success(t('expenses.saved'));
-            router.back();
-          },
-          onError,
-        },
+        { onSuccess, onError },
       );
       return;
     }
@@ -121,44 +178,41 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
     if (description.trim() !== expense.description) changes.description = description.trim();
     if ((categoryId || null) !== expense.category_id) changes.category_id = categoryId || null;
     if (payer !== expense.payer_member_id) changes.payer_member_id = payer;
-    if (!sameMembers) changes.participants = everyone.filter((id) => participants.includes(id));
+    if (expenseDate !== expense.expense_date) changes.expense_date = expenseDate;
+    const splitChanged = splitSignature(split) !== splitSignature(startSplit);
+    // An exact split must be sent again when the amount changes (the API rejects it otherwise).
+    const resendExact =
+      changes.amount_cents !== undefined && split.enabled && split.mode === 'amount';
+    if (showSplit && (splitChanged || resendExact)) changes.split = toSplitSpec(split);
     if (Object.keys(changes).length === 0) {
       router.back();
       return;
     }
-    update.mutate(
-      { expense, changes },
-      {
-        onSuccess: () => {
-          toast.success(t('expenses.saved'));
-          router.back();
-        },
-        onError,
-      },
-    );
+    update.mutate({ expense, changes }, { onSuccess, onError });
   };
 
   const onDelete = () => {
     if (!expense) return;
-    Alert.alert(t('expenses.deleteTitle'), t('expenses.deleteBody', { description: expense.description }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () =>
-          remove.mutate(expense, {
-            onSuccess: () => {
-              toast.success(t('expenses.deleted'));
-              router.back();
-            },
-            onError,
-          }),
-      },
-    ]);
+    Alert.alert(
+      t('expenses.deleteTitle'),
+      t('expenses.deleteBody', { description: expense.description }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () =>
+            remove.mutate(expense, {
+              onSuccess: () => router.back(),
+              onError,
+            }),
+        },
+      ],
+    );
   };
 
   return (
-    <Screen>
+    <Screen className='gap-5'>
       {editing ? (
         <Text className='text-sm text-muted-foreground'>
           {t('expenses.addedBy', { name: userName(group, expense.created_by_user_id, t) })}
@@ -174,7 +228,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
           nativeID='expense-amount'
           size='lg'
           valueCents={amountCents}
-          onChangeCents={setAmountCents}
+          onChangeCents={onAmountChange}
           accessibilityLabel={t('expenses.amount')}
           error={submitted && !amountValid ? t('money.invalid') : undefined}
         />
@@ -197,58 +251,87 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
       </View>
 
       <View className='gap-1.5'>
-        <Label>{t('expenses.payer')}</Label>
-        <ToggleGroup
-          type='single'
-          variant='outline'
-          value={payer}
-          onValueChange={(v) => v && setPayer(v)}
-          className='flex-wrap justify-start gap-2'>
-          {members.map((m) => (
-            <ToggleGroupItem key={m.id} value={m.id} className='rounded-sm border-l'>
-              <Text>{memberName(group, m.id, t)}</Text>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <Label nativeID='expense-category'>{t('expenses.category')}</Label>
+        <View className='flex-row items-center gap-2'>
+          <View className='flex-1'>
+            <Select
+              value={categoryOption}
+              disabled={readOnly}
+              onValueChange={(option) =>
+                setCategoryId(!option || option.value === OTHER_CATEGORY ? '' : option.value)
+              }
+            >
+              <SelectTrigger aria-labelledby='expense-category' disabled={readOnly}>
+                <View className='flex-1 flex-row items-center gap-2'>
+                  <Icon as={categoryIcon(selectedCategory)} size={18} className='text-primary' />
+                  <SelectValue placeholder={t('categories.other')} />
+                </View>
+              </SelectTrigger>
+              <SelectContent>
+                <ScrollView className='max-h-80' keyboardShouldPersistTaps='handled'>
+                  {categoryOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value} label={o.label}>
+                      <Icon as={o.icon} size={18} className='text-primary' />
+                    </SelectItem>
+                  ))}
+                </ScrollView>
+              </SelectContent>
+            </Select>
+          </View>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-12'
+            disabled={readOnly}
+            onPress={addCategory}
+            accessibilityLabel={t('expenses.addCategory')}
+          >
+            <Icon as={Plus} size={20} />
+          </Button>
+        </View>
       </View>
 
-      {activeCategories.length > 0 ? (
-        <View className='gap-1.5'>
-          <Label>{t('expenses.category')}</Label>
-          <ToggleGroup
-            type='single'
-            variant='outline'
-            value={categoryId}
-            onValueChange={(v) => setCategoryId(v ?? '')}
-            className='flex-wrap justify-start gap-2'>
-            {activeCategories.map((c) => (
-              <ToggleGroupItem key={c.id} value={c.id} className='rounded-sm border-l'>
-                <Text>{c.name}</Text>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+      <View className='flex-row gap-3'>
+        <View className='flex-1 gap-1.5'>
+          <Label nativeID='expense-payer'>{t('expenses.payer')}</Label>
+          <Select
+            value={payerOption}
+            disabled={readOnly}
+            onValueChange={(option) => option && setPayer(option.value)}
+          >
+            <SelectTrigger aria-labelledby='expense-payer' disabled={readOnly}>
+              <SelectValue placeholder={t('home.you')} />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((m) => (
+                <SelectItem key={m.id} value={m.id} label={memberName(group, m.id, t)} />
+              ))}
+            </SelectContent>
+          </Select>
         </View>
-      ) : null}
+        <View className='flex-1 gap-1.5'>
+          <Label>{t('expenses.when')}</Label>
+          <DateInput
+            value={expenseDate}
+            onChange={setExpenseDate}
+            maximumDate={today > expenseDate ? today : expenseDate}
+            locale={locale}
+            accessibilityLabel={t('expenses.when')}
+            disabled={readOnly}
+          />
+        </View>
+      </View>
 
-      {canChooseParticipants ? (
-        <View className='gap-1.5'>
-          <Label>{t('expenses.splitBetween')}</Label>
-          <ToggleGroup
-            type='multiple'
-            variant='outline'
-            value={participants}
-            onValueChange={setParticipants}
-            className='flex-wrap justify-start gap-2'>
-            {members.map((m) => (
-              <ToggleGroupItem key={m.id} value={m.id} className='rounded-sm border-l'>
-                <Text>{memberName(group, m.id, t)}</Text>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          {submitted && participants.length === 0 ? (
-            <Text className='text-sm text-destructive'>{t('quick.selectAtLeastOne')}</Text>
-          ) : null}
-        </View>
+      {showSplit ? (
+        <SplitTable
+          group={group}
+          memberIds={tableMembers}
+          state={split}
+          onChange={setSplit}
+          amountCents={amountCents}
+          readOnly={readOnly}
+          submitted={submitted}
+        />
       ) : null}
 
       <Button size='lg' disabled={busy || readOnly} onPress={onSave}>

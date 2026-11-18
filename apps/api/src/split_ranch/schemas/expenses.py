@@ -107,7 +107,11 @@ class PayerTotalRead(ReadModel):
 
 
 class SummaryRead(ReadModel):
-    """Totals of the live, shared (non-personal) expenses matching the list filters."""
+    """Totals of the live expenses matching the list filters.
+
+    By default full amounts of shared (non-personal) expenses; with `mine=true` only the
+    caller's share of each expense they take part in, personal expenses included.
+    """
 
     count: int
     total_cents: int

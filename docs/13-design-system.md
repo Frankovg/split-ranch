@@ -55,7 +55,7 @@ Semantic colour tokens (HSL CSS variables, shadcn naming so copied components wo
 |---|---|---|---|
 | `background` / `foreground` | near-white / near-black | near-black / near-white | screens, text |
 | `card` / `card-foreground` | | | cards, sheets |
-| `primary` / `primary-foreground` | brand (warm terracotta/ranch tone, final in branding) | lighter variant | main actions |
+| `primary` / `primary-foreground` | deep mint `163 70% 30%` | mint `#5cedc2` | links, tab tint, focus, FAB, button press fill |
 | `secondary`, `muted`, `accent` (+ foregrounds) | | | chips, subtle backgrounds |
 | `destructive` | red | red (lighter) | delete |
 | `border`, `input`, `ring` | | | outlines, focus |
@@ -64,13 +64,17 @@ Semantic colour tokens (HSL CSS variables, shadcn naming so copied components wo
 | **`warning`** | amber | amber | edited after close, rule fallback |
 | `chart-1…6` | colour-blind-safe palette | | category charts, member colours |
 
+Brand palette (from the author's web portfolio; dark is the reference): background `#121212`, surfaces (`card`, `muted`) `#242424`, mint `#5cedc2` for `primary` and `positive`, deep green `#122f27` for `accent` and `border`, pink `#e453bc` for `negative`, `#ff2301` destructive, `#f5ec28` warning. Light keeps the hues, darkened where they are text on a light background. `chart-1…6` keep the Okabe-Ito order with the bluish green and reddish purple replaced by the brand mint and pink. Tailwind colours are `hsl(var(--x) / <alpha-value>)`, so opacity modifiers (`bg-primary/90`) work.
+
 Rules: never encode meaning only in colour — amounts owed carry a sign and a label ("Debes 12,50 €").
 
 Other tokens:
-- **Radius**: `--radius: 0.75rem` → `rounded-sm/md/lg/xl` derived.
+- **Radius**: `--radius: 0.5rem` → `rounded-sm` 4 px (buttons, toggles), `md` 6 px (inputs), `lg` 8 px, `xl` 12 px (cards, sheets).
 - **Spacing**: Tailwind 4-pt scale; screen gutter `px-4`; list row min height 56 dp.
-- **Typography**: system font (Roboto) in MVP; scale `text-xs … text-3xl`; amounts use `font-variant-numeric: tabular-nums` (`tabular-nums` class) and a dedicated `MoneyText` component.
+- **Typography**: Readex Pro (400/500/600/700), embedded by the `expo-font` config plugin as one Android family `ReadexPro` with a definition per weight, so `font-medium/semibold/bold` work; `font-sans` is the base of `Text`, inputs and the navigation theme. Scale `text-xs … text-3xl`; amounts use `font-variant-numeric: tabular-nums` (`tabular-nums` class) and a dedicated `MoneyText` component.
 - **Elevation**: minimal; borders over shadows (consistent in dark mode).
+- **Buttons**: `default` is a high-contrast surface (`bg-foreground`, `text-background`) that fills with `primary` from the left while pressed (the portfolio's hover fill); `outline` has a muted border that turns `primary` on press. The "+" `Fab` is a mint circle centred at the bottom.
+- **Background**: `ScreenBackground`, a static diagonal gradient `card → background → accent` (react-native-svg).
 - **Motion**: Reanimated; respect "remove animations" (`useReducedMotion`).
 
 ### Dark mode

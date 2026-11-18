@@ -3,7 +3,10 @@ import type { ExpoConfig } from 'expo/config';
 
 // Readex Pro (the brand typeface) files, resolved through the package so the path
 // works whether pnpm links it under this app or hoists it to the workspace root.
-const READEX_DIR = relative(__dirname, dirname(require.resolve('@expo-google-fonts/readex-pro/package.json')));
+const READEX_DIR = relative(
+  __dirname,
+  dirname(require.resolve('@expo-google-fonts/readex-pro/package.json')),
+);
 const READEX_WEIGHTS = [
   { weight: 400, file: '400Regular/ReadexPro_400Regular.ttf' },
   { weight: 500, file: '500Medium/ReadexPro_500Medium.ttf' },
@@ -24,7 +27,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.splitranch.app',
     adaptiveIcon: {
-      backgroundColor: '#AE4728',
+      backgroundColor: '#178264',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
@@ -42,6 +45,7 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-localization',
     'expo-secure-store',
+    '@react-native-community/datetimepicker',
     [
       'expo-font',
       {
@@ -68,6 +72,7 @@ const config: ExpoConfig = {
         dark: { backgroundColor: '#121212' },
       },
     ],
+    'expo-status-bar',
     // Google sign-in (react-native-nitro-google-signin) needs no config plugin on Android:
     // the native module is autolinked and the web client id is passed at runtime via
     // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Its plugin only adds the iOS URL scheme and throws

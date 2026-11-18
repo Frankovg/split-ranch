@@ -1,16 +1,15 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api';
 import { queryKeys } from '@/lib/query/client';
-import { usePreferencesStore } from '@/stores/preferences';
 import type {
-  DateRange,
+  CategoryCreateInput,
+  ExpenseListFilters,
   Expense,
   ExpenseCreateInput,
   ExpenseUpdateInput,
-  Me,
-  Membership,
   Payment,
   PaymentCreateInput,
+  SummaryFilters,
 } from './types';
 
 /** Optimistic-concurrency header: the API rejects the change if the row changed meanwhile. */
@@ -20,24 +19,6 @@ const fetchMe = () => unwrap(api.GET('/v1/me'));
 
 export function useMe() {
   return useQuery({ queryKey: queryKeys.me(), queryFn: fetchMe });
-}
-
-/** The chosen group if the user still belongs to it, else their first group, else null. */
-export function pickMembership(me: Me, activeGroupId: string | null): Membership | null {
-  return me.memberships.find((m) => m.group_id === activeGroupId) ?? me.memberships[0] ?? null;
-}
-
-/**
- * The group shown in the app: the one picked in the group list (persisted), falling back
- * to the first group. `data` is null when the user has no group yet.
- */
-export function useActiveMembership() {
-  const activeGroupId = usePreferencesStore((s) => s.activeGroupId);
-  return useQuery({
-    queryKey: queryKeys.me(),
-    queryFn: fetchMe,
-    select: (me: Me) => pickMembership(me, activeGroupId),
-  });
 }
 
 export function useGroups() {
@@ -52,11 +33,19 @@ export function useGroup(groupId: string | undefined) {
   });
 }
 
+/**
+ * Every category of the group, archived ones included so old expenses still show theirs;
+ * pickers offer only `selectableCategories`.
+ */
 export function useCategories(groupId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.categories(groupId ?? ''),
     queryFn: () =>
-      unwrap(api.GET('/v1/groups/{group_id}/categories', { params: { path: { group_id: groupId ?? '' } } })),
+      unwrap(
+        api.GET('/v1/groups/{group_id}/categories', {
+          params: { path: { group_id: groupId ?? '' }, query: { include_archived: true } },
+        }),
+      ),
     enabled: !!groupId,
   });
 }
@@ -70,36 +59,23 @@ export function useBalance(groupId: string | undefined) {
   });
 }
 
-/** The newest `limit` expenses (the Home "recent" card). */
-export function useRecentExpenses(groupId: string | undefined, limit: number) {
-  return useQuery({
-    queryKey: queryKeys.expenses(groupId ?? '', { limit }),
-    queryFn: () =>
-      unwrap(
-        api.GET('/v1/groups/{group_id}/expenses', {
-          params: { path: { group_id: groupId ?? '' }, query: { limit } },
-        }),
-      ),
-    enabled: !!groupId,
-  });
-}
-
 const EXPENSES_PAGE_SIZE = 50;
 
 /**
- * Expenses in a date range, newest first, page by page (cursor pagination). Its own key:
- * infinite data ({ pages, pageParams }) cannot share a cache entry with a plain useQuery.
+ * Expenses matching the filters (date range, text), newest first, page by page (cursor
+ * pagination). Its own key: infinite data ({ pages, pageParams }) cannot share a cache
+ * entry with a plain useQuery.
  */
-export function useExpensesInfinite(groupId: string | undefined, range: DateRange) {
+export function useExpensesInfinite(groupId: string | undefined, filters: ExpenseListFilters) {
   return useInfiniteQuery({
-    queryKey: queryKeys.expenses(groupId ?? '', { ...range, infinite: true }),
+    queryKey: queryKeys.expenses(groupId ?? '', { ...filters, infinite: true }),
     queryFn: ({ pageParam }) =>
       // Unset range ends and the first page's null cursor are left out of the query string.
       unwrap(
         api.GET('/v1/groups/{group_id}/expenses', {
           params: {
             path: { group_id: groupId ?? '' },
-            query: { from: range.from, to: range.to, limit: EXPENSES_PAGE_SIZE, cursor: pageParam },
+            query: { from: filters.from, to: filters.to, q: filters.q, limit: EXPENSES_PAGE_SIZE, cursor: pageParam },
           },
         }),
       ),
@@ -109,14 +85,23 @@ export function useExpensesInfinite(groupId: string | undefined, range: DateRang
   });
 }
 
-/** Total spent and totals per category / payer for the same range as the list. */
-export function useSummary(groupId: string | undefined, range: DateRange) {
+/** Total spent and totals per category / payer for the filters (insights). */
+export function useSummary(groupId: string | undefined, filters: SummaryFilters) {
   return useQuery({
-    queryKey: queryKeys.summary(groupId ?? '', { ...range }),
+    queryKey: queryKeys.summary(groupId ?? '', { ...filters }),
     queryFn: () =>
       unwrap(
         api.GET('/v1/groups/{group_id}/summary', {
-          params: { path: { group_id: groupId ?? '' }, query: { from: range.from, to: range.to } },
+          params: {
+            path: { group_id: groupId ?? '' },
+            query: {
+              from: filters.from,
+              to: filters.to,
+              category_id: filters.category_id,
+              payer_member_id: filters.payer_member_id,
+              mine: filters.mine,
+            },
+          },
         }),
       ),
     enabled: !!groupId,
@@ -168,26 +153,18 @@ function useInvalidateMembership() {
 
 export function useCreateGroup() {
   const invalidate = useInvalidateMembership();
-  const setActiveGroupId = usePreferencesStore((s) => s.setActiveGroupId);
   return useMutation({
     mutationFn: (name: string) => unwrap(api.POST('/v1/groups', { body: { name } })),
-    onSuccess: async (group) => {
-      setActiveGroupId(group.id);
-      await invalidate();
-    },
+    onSuccess: invalidate,
   });
 }
 
 export function useAcceptInvitation() {
   const invalidate = useInvalidateMembership();
-  const setActiveGroupId = usePreferencesStore((s) => s.setActiveGroupId);
   return useMutation({
     // Path params are URL-encoded by the client.
     mutationFn: (code: string) => unwrap(api.POST('/v1/invitations/{code}/accept', { params: { path: { code } } })),
-    onSuccess: async (group) => {
-      setActiveGroupId(group.id);
-      await invalidate();
-    },
+    onSuccess: invalidate,
   });
 }
 
@@ -244,6 +221,15 @@ export function useDeleteGroup(groupId: string) {
         }),
       ),
     onSuccess: invalidate,
+  });
+}
+
+export function useCreateCategory(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CategoryCreateInput) =>
+      unwrap(api.POST('/v1/groups/{group_id}/categories', { params: { path: { group_id: groupId } }, body: input })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories(groupId) }),
   });
 }
 

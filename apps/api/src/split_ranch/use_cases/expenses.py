@@ -439,9 +439,14 @@ def list_expenses(
     return items, next_cursor
 
 
-def get_summary(session: Session, actor: GroupActor, filters: ExpenseFilters) -> SummaryRead:
+def get_summary(
+    session: Session, actor: GroupActor, filters: ExpenseFilters, *, mine: bool = False
+) -> SummaryRead:
+    """Group spending, or with `mine` the actor's own share of it (personal expenses too)."""
     _check_range(filters)
-    rows = erepo.summary(session, actor.group_id, filters)
+    rows = erepo.summary(
+        session, actor.group_id, filters, share_member_id=actor.member_id if mine else None
+    )
     return SummaryRead(
         count=rows.count,
         total_cents=rows.total_cents,

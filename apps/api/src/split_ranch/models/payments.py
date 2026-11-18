@@ -23,6 +23,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from split_ranch.models.base import Base, created_at_col, in_check, updated_at_col, uuid_pk
 
 PAYMENT_STATUSES = ("sent", "confirmed", "disputed", "cancelled")
+# How the money moved. NULL only on payments recorded before migration 0007.
+PAYMENT_METHODS = ("bizum", "bank_transfer", "cash", "other")
 
 
 class Payment(Base):
@@ -39,6 +41,7 @@ class Payment(Base):
         CheckConstraint("amount_cents > 0 AND amount_cents <= 100000000", name="amount"),
         CheckConstraint("from_member_id <> to_member_id", name="distinct_members"),
         CheckConstraint(in_check("status", PAYMENT_STATUSES), name="status"),
+        CheckConstraint(in_check("method", PAYMENT_METHODS), name="method"),
         Index("ix_payments_group_created", "group_id", text("created_at DESC"), text("id DESC")),
     )
 
@@ -49,6 +52,7 @@ class Payment(Base):
     to_member_id: Mapped[UUID] = mapped_column()
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(16))
+    method: Mapped[str | None] = mapped_column(String(16))
     note: Mapped[str | None] = mapped_column(String(280))
     created_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

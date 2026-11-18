@@ -44,6 +44,7 @@ def _snapshot(p: Payment) -> dict[str, object]:
         "to_member_id": str(p.to_member_id),
         "amount_cents": p.amount_cents,
         "status": p.status,
+        "method": p.method,
         "note": p.note,
         "version": p.version,
     }
@@ -55,6 +56,7 @@ def _same_payload(p: Payment, data: PaymentCreate, actor: GroupActor) -> bool:
         and p.from_member_id == data.from_member_id
         and p.to_member_id == data.to_member_id
         and p.amount_cents == data.amount_cents
+        and p.method == data.method
         and p.note == data.note
     )
 
@@ -89,6 +91,7 @@ def record_payment(
         to_member_id=data.to_member_id,
         amount_cents=data.amount_cents,
         status=status,
+        method=data.method,
         note=data.note,
         created_by_user_id=actor.user_id,
         confirmed_at=now if status == "confirmed" else None,

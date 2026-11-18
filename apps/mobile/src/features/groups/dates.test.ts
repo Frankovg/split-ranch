@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayLabel, groupByDay, monthRange, todayIso } from './dates';
+import { dayLabel, groupByDay, instantLabel, monthRange, todayIso, yearRange } from './dates';
 import type { Expense } from './types';
 
 describe('todayIso', () => {
@@ -7,6 +7,14 @@ describe('todayIso', () => {
     const lateMadrid = new Date('2026-11-30T23:30:00Z'); // 1 Dec 00:30 in Madrid
     expect(todayIso('Europe/Madrid', lateMadrid)).toBe('2026-12-01');
     expect(todayIso('America/New_York', lateMadrid)).toBe('2026-11-30');
+  });
+});
+
+describe('instantLabel', () => {
+  it('shows the day in the group time zone', () => {
+    const lateMadrid = '2026-11-30T23:30:00Z'; // 1 Dec 00:30 in Madrid
+    expect(instantLabel(lateMadrid, 'en-GB', 'Europe/Madrid')).toContain('1 Dec 2026');
+    expect(instantLabel(lateMadrid, 'en-GB', 'America/New_York')).toContain('30 Nov 2026');
   });
 });
 
@@ -51,5 +59,14 @@ describe('groupByDay', () => {
       ['2026-03-07', ['a', 'b']],
       ['2026-03-05', ['c']],
     ]);
+  });
+});
+
+describe('yearRange', () => {
+  it('gives whole calendar years in the group time zone', () => {
+    const lateMadrid = new Date('2026-12-31T23:30:00Z'); // 1 Jan 2027 00:30 in Madrid
+    expect(yearRange('Europe/Madrid', 0, lateMadrid)).toEqual({ from: '2027-01-01', to: '2027-12-31' });
+    expect(yearRange('America/New_York', 0, lateMadrid)).toEqual({ from: '2026-01-01', to: '2026-12-31' });
+    expect(yearRange('Europe/Madrid', -2, lateMadrid)).toEqual({ from: '2025-01-01', to: '2025-12-31' });
   });
 });

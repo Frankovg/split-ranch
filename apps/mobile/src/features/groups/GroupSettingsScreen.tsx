@@ -13,7 +13,6 @@ import { Label } from '@/components/ui/label';
 import { Text } from '@/components/ui/text';
 import { apiErrorCode } from '@/lib/api';
 import {
-  useActiveMembership,
   useCreateInvitation,
   useDeleteGroup,
   useGroup,
@@ -22,17 +21,13 @@ import {
   useRenameGroup,
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
-import { GroupsScreen } from './GroupsScreen';
+import { useGroupId } from './route';
 import type { Group } from './types';
 
 /** Name, members and invite code (any member); remove members and delete (admin only). */
 export function GroupSettingsScreen() {
   const { t } = useTranslation();
-  const me = useActiveMembership();
-  const group = useGroup(me.data?.group_id);
-  if (me.isPending) return <LoadingScreen />;
-  if (me.isError) return <ErrorScreen t={t} onRetry={() => void me.refetch()} />;
-  if (!me.data) return <GroupsScreen embedded />;
+  const group = useGroup(useGroupId());
   if (group.isPending) return <LoadingScreen />;
   if (group.isError) return <ErrorScreen t={t} onRetry={() => void group.refetch()} />;
   return <Settings group={group.data} />;
@@ -74,7 +69,8 @@ function Settings({ group }: { group: Group }) {
       {
         text: t('group.leave'),
         style: 'destructive',
-        onPress: () => leave.mutate(undefined, { onSuccess: () => router.back(), onError: balanceError }),
+        // The group screens behind this one are gone for this user: back to the group list.
+        onPress: () => leave.mutate(undefined, { onSuccess: () => router.dismissTo('/'), onError: balanceError }),
       },
     ]);
 
@@ -101,7 +97,6 @@ function Settings({ group }: { group: Group }) {
             disabled={rename.isPending || name.trim() === '' || name.trim() === group.name}
             onPress={() =>
               rename.mutate(name.trim(), {
-                onSuccess: () => toast.success(t('group.renamed')),
                 onError: () => toast.error(t('common.error')),
               })
             }>
@@ -160,10 +155,7 @@ function Settings({ group }: { group: Group }) {
               disabled={deleteGroup.isPending || confirmName.trim() !== group.name}
               onPress={() =>
                 deleteGroup.mutate(confirmName.trim(), {
-                  onSuccess: () => {
-                    toast.success(t('group.deleted'));
-                    router.back();
-                  },
+                  onSuccess: () => router.dismissTo('/'),
                   onError: balanceError,
                 })
               }>

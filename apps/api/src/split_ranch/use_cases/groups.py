@@ -35,20 +35,18 @@ from split_ranch.schemas.groups import (
 from split_ranch.use_cases.balance import compute_group_balance
 from split_ranch.use_cases.common import audit, require_active, require_admin
 
-# Default categories copied into every new group (Spanish first; UI translates by icon).
+# Default categories copied into every new group, alphabetical. The app names them by
+# icon key in its own language; "Other" is the expense without a category (no row).
 DEFAULT_CATEGORIES: tuple[tuple[str, str, str], ...] = (
-    ("Supermercado", "cart", "#4CAF50"),
-    ("Alquiler", "home", "#795548"),
-    ("Luz", "bolt", "#FFC107"),
-    ("Agua", "droplet", "#03A9F4"),
-    ("Gas", "flame", "#FF5722"),
-    ("Internet", "wifi", "#3F51B5"),
-    ("Transporte", "bus", "#009688"),
-    ("Restaurantes", "utensils", "#E91E63"),
-    ("Ocio", "ticket", "#9C27B0"),
-    ("Salud", "heart", "#F44336"),
-    ("Hogar", "sofa", "#8BC34A"),
-    ("Otros", "dots", "#9E9E9E"),
+    ("Entertainment", "ticket", "#9C27B0"),
+    ("Groceries", "cart", "#4CAF50"),
+    ("Healthcare", "heart", "#F44336"),
+    ("Home", "sofa", "#8BC34A"),
+    ("Insurance", "shield", "#607D8B"),
+    ("Rent and Services", "home", "#795548"),
+    ("Restaurants and bars", "utensils", "#E91E63"),
+    ("Shopping", "bag", "#FF9800"),
+    ("Transport", "bus", "#009688"),
 )
 
 INVITE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"  # base32
