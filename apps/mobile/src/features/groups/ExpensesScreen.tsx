@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { ScreenBackground } from '@/components/ScreenBackground';
 import { currentMoneyLocale } from '@/i18n';
 import { displayMoney } from '@/lib/money';
 import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
@@ -73,6 +74,7 @@ export function ExpensesScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className='flex-1 bg-background'>
+      <ScreenBackground />
       <SectionList
         sections={sections}
         keyExtractor={(e) => e.id}
@@ -90,7 +92,7 @@ export function ExpensesScreen() {
               onValueChange={(v) => v && setRangeKey(v as RangeKey)}
               className='flex-wrap justify-start gap-2'>
               {(['thisMonth', 'lastMonth', 'all'] as const).map((key) => (
-                <ToggleGroupItem key={key} value={key} className='rounded-md border-l'>
+                <ToggleGroupItem key={key} value={key} className='rounded-sm border-l'>
                   <Text>{t(`expenses.range.${key}`)}</Text>
                 </ToggleGroupItem>
               ))}

@@ -205,7 +205,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
           onValueChange={(v) => v && setPayer(v)}
           className='flex-wrap justify-start gap-2'>
           {members.map((m) => (
-            <ToggleGroupItem key={m.id} value={m.id} className='rounded-md border-l'>
+            <ToggleGroupItem key={m.id} value={m.id} className='rounded-sm border-l'>
               <Text>{memberName(group, m.id, t)}</Text>
             </ToggleGroupItem>
           ))}
@@ -222,7 +222,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
             onValueChange={(v) => setCategoryId(v ?? '')}
             className='flex-wrap justify-start gap-2'>
             {activeCategories.map((c) => (
-              <ToggleGroupItem key={c.id} value={c.id} className='rounded-md border-l'>
+              <ToggleGroupItem key={c.id} value={c.id} className='rounded-sm border-l'>
                 <Text>{c.name}</Text>
               </ToggleGroupItem>
             ))}
@@ -240,7 +240,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
             onValueChange={setParticipants}
             className='flex-wrap justify-start gap-2'>
             {members.map((m) => (
-              <ToggleGroupItem key={m.id} value={m.id} className='rounded-md border-l'>
+              <ToggleGroupItem key={m.id} value={m.id} className='rounded-sm border-l'>
                 <Text>{memberName(group, m.id, t)}</Text>
               </ToggleGroupItem>
             ))}

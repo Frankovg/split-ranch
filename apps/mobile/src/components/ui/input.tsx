@@ -1,4 +1,4 @@
-// Source: react-native-reusables input (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink.
+// Source: react-native-reusables input (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: touch targets raised to >= 48dp (h-12), removed sm: shrink; portfolio style (brand font, transparent background, mint border on focus).
 import { type ComponentProps, type RefAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { Platform, TextInput } from 'react-native';
@@ -7,7 +7,7 @@ function Input({ className, ...props }: ComponentProps<typeof TextInput> & RefAt
   return (
     <TextInput
       className={cn(
-        'dark:bg-input/30 border-input bg-background text-foreground flex h-12 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-sm shadow-black/5',
+        'border-input bg-transparent text-foreground font-sans flex h-12 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-sm shadow-black/5',
         props.editable === false &&
         cn(
           'opacity-50',
@@ -19,7 +19,7 @@ function Input({ className, ...props }: ComponentProps<typeof TextInput> & RefAt
             'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
             'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive'
           ),
-          native: 'placeholder:text-muted-foreground/50',
+          native: 'placeholder:text-muted-foreground/50 focus:border-primary',
         }),
         className
       )}

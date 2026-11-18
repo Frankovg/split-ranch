@@ -13,6 +13,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@expo-google-fonts/readex-pro": "^0.4.1",
     "@hookform/resolvers": "^7.0.3",
     "@rn-primitives/avatar": "^1.5.2",
     "@rn-primitives/dialog": "^1.5.2",

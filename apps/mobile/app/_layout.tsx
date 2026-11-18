@@ -16,8 +16,9 @@ import { CACHE_BUSTER, CACHE_MAX_AGE, queryClient } from '@/lib/query/client';
 import { queryPersister } from '@/lib/query/persister';
 import { useAppStateFocus } from '@/lib/query/refresh';
 import { useSessionStore } from '@/stores/session';
-import { NAV_THEME } from '@/theme/navigation';
+import { FONT_FAMILY, NAV_THEME } from '@/theme/navigation';
 import { ThemeSync, useAppColorScheme } from '@/theme/ThemeSync';
+import { tokenColor } from '@/theme/tokens';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -73,7 +74,24 @@ export default function RootLayout() {
                 </Stack.Protected>
               </Stack>
             )}
-            <Toaster position='bottom-center' />
+            <Toaster
+              position='bottom-center'
+              theme={scheme}
+              toastOptions={{
+                // Portfolio toasts: page surface, the variant shown by a brand-coloured border.
+                style: {
+                  backgroundColor: tokenColor(scheme, 'card'),
+                  borderColor: tokenColor(scheme, 'border'),
+                  borderWidth: 1,
+                  borderRadius: 12,
+                },
+                titleStyle: { fontFamily: FONT_FAMILY, color: tokenColor(scheme, 'foreground') },
+                descriptionStyle: { fontFamily: FONT_FAMILY, color: tokenColor(scheme, 'muted-foreground') },
+                success: { borderColor: tokenColor(scheme, 'positive') },
+                error: { borderColor: tokenColor(scheme, 'negative') },
+                warning: { borderColor: tokenColor(scheme, 'warning') },
+              }}
+            />
             <PortalHost />
           </ThemeProvider>
         </PersistQueryClientProvider>

@@ -1,4 +1,4 @@
-// Source: react-native-reusables text (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+// Source: react-native-reusables text (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: base class uses the brand font (font-sans).
 import { type ComponentProps, type RefAttributes, createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
 import { Slot } from '@rn-primitives/slot';
@@ -7,7 +7,7 @@ import { Platform, Text as RNText, type Role } from 'react-native';
 
 const textVariants = cva(
   cn(
-    'text-foreground text-base',
+    'text-foreground font-sans text-base',
     Platform.select({
       web: 'select-text',
     })

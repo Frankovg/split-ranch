@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { ScreenBackground } from '@/components/ScreenBackground';
 import { isGoogleSignInAvailable, signInWithGoogle, SignInCancelledError } from './google';
 
 export function SignInScreen() {
@@ -36,6 +37,7 @@ export function SignInScreen() {
 
   return (
     <SafeAreaView className='flex-1 bg-background'>
+      <ScreenBackground />
       <View className='flex-1 justify-center gap-10 px-6'>
         <View className='gap-3'>
           <Text className='text-center text-4xl font-extrabold text-primary' role='heading'>

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
+import { ScreenBackground } from '@/components/ScreenBackground';
 import { currentMoneyLocale } from '@/i18n';
 import { apiErrorCode } from '@/lib/api';
 import { displayMoney } from '@/lib/money';
@@ -62,6 +63,7 @@ export function SettleScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className='flex-1 bg-background'>
+      <ScreenBackground />
       <ScrollView
         contentContainerClassName='gap-4 px-4 py-4'
         refreshControl={<RefreshControl refreshing={isRefetchingByUser} onRefresh={() => void refetchByUser()} />}>

@@ -1,4 +1,4 @@
-// Source: react-native-reusables toggle-group (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: none.
+// Source: react-native-reusables toggle-group (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: selected item uses the portfolio tab style (card surface, primary border, semibold text).
 import { type ComponentProps, createContext, useContext } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { TextClassContext } from '@/components/ui/text';
@@ -63,9 +63,9 @@ function ToggleGroupItem({
   return (
     <TextClassContext.Provider
       value={cn(
-        'text-sm text-foreground font-medium',
+        'text-sm text-foreground font-sans font-medium',
         ToggleGroupPrimitive.utils.getIsSelected(value, props.value)
-          ? 'text-accent-foreground'
+          ? 'text-foreground font-semibold'
           : Platform.select({ web: 'group-hover:text-muted-foreground' })
       )}>
       <ToggleGroupPrimitive.Item
@@ -75,10 +75,10 @@ function ToggleGroupItem({
             size: context.size || size,
           }),
           props.disabled && 'opacity-50',
-          ToggleGroupPrimitive.utils.getIsSelected(value, props.value) && 'bg-accent',
+          ToggleGroupPrimitive.utils.getIsSelected(value, props.value) && 'bg-card border-primary',
           'min-w-0 shrink-0 rounded-none shadow-none',
-          isFirst && 'rounded-l-md',
-          isLast && 'rounded-r-md',
+          isFirst && 'rounded-l-sm',
+          isLast && 'rounded-r-sm',
           (context.variant === 'outline' || variant === 'outline') && 'border-l-0',
           (context.variant === 'outline' || variant === 'outline') && isFirst && 'border-l',
           Platform.select({

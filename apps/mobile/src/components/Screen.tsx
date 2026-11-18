@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { cn } from '@/lib/utils';
+import { ScreenBackground } from './ScreenBackground';
 
 type ScreenProps = {
   children: ReactNode;
@@ -14,6 +15,7 @@ type ScreenProps = {
 export function Screen({ children, scroll = true, edges = ['bottom'], className }: ScreenProps) {
   return (
     <SafeAreaView edges={edges} className='flex-1 bg-background'>
+      <ScreenBackground />
       {scroll ? (
         <ScrollView
           keyboardShouldPersistTaps='handled'
