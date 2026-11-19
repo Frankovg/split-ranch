@@ -1,10 +1,11 @@
-"""SQLAlchemy ORM models (schema `app`): 8 tables."""
+"""SQLAlchemy ORM models (schema `app`): 9 tables."""
 
 from split_ranch.models.base import SCHEMA, Base
 from split_ranch.models.expenses import Expense, ExpenseShare
 from split_ranch.models.groups import (
     DEFAULT_SPLIT_RULE,
     Category,
+    CategoryPreset,
     Group,
     GroupMember,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "SCHEMA",
     "Base",
     "Category",
+    "CategoryPreset",
     "Expense",
     "ExpenseShare",
     "Group",

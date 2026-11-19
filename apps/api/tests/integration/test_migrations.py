@@ -33,7 +33,7 @@ def test_round_trip(database_url: str, engine: Engine) -> None:
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0009"
+        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0010"
         for table in ("users", "groups", "group_members", "payments", "history"):
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
         for table in ("households", "periods", "settlement_transfers"):

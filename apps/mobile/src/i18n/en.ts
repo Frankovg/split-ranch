@@ -68,6 +68,8 @@ const en: typeof es = {
   },
   group: {
     settings: 'Group settings',
+    presets: 'Automatic categories',
+    presetsHint: 'Pick a category from the expense description.',
     menu: 'More options',
     name: 'Name',
     admin: 'Admin',
@@ -207,6 +209,24 @@ const en: typeof es = {
       bag: 'Shopping',
       bus: 'Transport',
     },
+  },
+  presets: {
+    title: 'Automatic categories',
+    intro:
+      'When the description of a new expense contains one of these words, its category is picked. Case and accents are ignored.',
+    empty: 'None yet. Add the first one below.',
+    listTitle: 'Saved words',
+    addTitle: 'New word',
+    keyword: 'Description',
+    keywordPlaceholder: 'Groceries',
+    keywordRequired: 'Write a word.',
+    category: 'Category',
+    categoryRequired: 'Pick a category.',
+    add: 'Add',
+    exists: 'There is already an automatic category with this word.',
+    saveFailed: 'Could not save.',
+    deleteLabel: 'Delete “{{keyword}}”',
+    deleteFailed: 'Could not delete.',
   },
   settings: {
     title: 'Settings',

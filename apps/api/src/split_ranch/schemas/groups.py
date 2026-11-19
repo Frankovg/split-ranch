@@ -118,3 +118,20 @@ class CategoryRead(ReadModel):
     is_default: bool
     sort_key: int
     archived_at: datetime | None
+
+
+# ------------------------------------------------------- category presets
+
+
+class CategoryPresetCreate(StrictModel):
+    """New expenses whose description contains `keyword` get `category_id`."""
+
+    keyword: str = Field(min_length=1, max_length=40)
+    category_id: Id
+
+
+class CategoryPresetRead(ReadModel):
+    id: Id
+    keyword: str
+    category_id: Id
+    created_at: datetime

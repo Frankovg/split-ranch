@@ -6,6 +6,8 @@
 import type {
   BalanceRead,
   CategoryCreate,
+  CategoryPresetCreate,
+  CategoryPresetRead,
   CategoryRead,
   ExpenseCreate,
   ExpenseRead,
@@ -33,6 +35,9 @@ export type Group = GroupRead;
 export type Invitation = InvitationRead;
 export type Category = CategoryRead;
 export type CategoryCreateInput = CategoryCreate;
+/** A keyword that picks a category for new expenses whose description contains it. */
+export type CategoryPreset = CategoryPresetRead;
+export type CategoryPresetCreateInput = CategoryPresetCreate;
 export type Share = ShareRead;
 export type Expense = ExpenseRead;
 export type ExpensePage = PageExpenseRead;

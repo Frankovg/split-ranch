@@ -66,6 +66,8 @@ const es = {
   },
   group: {
     settings: 'Ajustes del grupo',
+    presets: 'Categorías automáticas',
+    presetsHint: 'Elige una categoría según la descripción del gasto.',
     menu: 'Más opciones',
     name: 'Nombre',
     admin: 'Administrador',
@@ -205,6 +207,24 @@ const es = {
       bag: 'Compras',
       bus: 'Transporte',
     },
+  },
+  presets: {
+    title: 'Categorías automáticas',
+    intro:
+      'Si la descripción de un gasto nuevo contiene una de estas palabras, se elige su categoría. No distingue mayúsculas ni acentos.',
+    empty: 'Aún no hay ninguna. Añade la primera abajo.',
+    listTitle: 'Palabras guardadas',
+    addTitle: 'Nueva palabra',
+    keyword: 'Descripción',
+    keywordPlaceholder: 'Supermercado',
+    keywordRequired: 'Escribe una palabra.',
+    category: 'Categoría',
+    categoryRequired: 'Elige una categoría.',
+    add: 'Añadir',
+    exists: 'Ya hay una categoría automática con esa palabra.',
+    saveFailed: 'No se pudo guardar.',
+    deleteLabel: 'Borrar «{{keyword}}»',
+    deleteFailed: 'No se pudo borrar.',
   },
   settings: {
     title: 'Ajustes',

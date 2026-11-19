@@ -2,7 +2,7 @@
 
 Supabase Postgres (Frankfurt). All our tables live in the **`app` schema**, which is *not* in Supabase's exposed API schemas, and is managed exclusively by Alembic. Supabase-owned schemas (`auth`, `storage`, …) are never migrated or written by us; the only link to them is that `app.users.id` equals `auth.users.id` (the JWT `sub`). No foreign key into `auth` (keeps Alembic independent and lets us anonymise instead of cascading).
 
-**8 tables.** Migration 0006 (2026-11-17, design: [egm/design_draft.md](egm/design_draft.md)) replaced households and periods with **groups** and one running balance: `periods` and `settlement_transfers` are gone and `payments` records what members pay each other. A table exists only when a feature the app has today needs it; tables for unbuilt features (Google Sheets, push notifications, recurring expenses, budgets…) are added by the migration of that feature. See [Why these tables and no others](#why-these-tables-and-no-others).
+**9 tables.** Migration 0006 (2026-11-17, design: [egm/design_draft.md](egm/design_draft.md)) replaced households and periods with **groups** and one running balance: `periods` and `settlement_transfers` are gone and `payments` records what members pay each other. A table exists only when a feature the app has today needs it; migration 0010 (2026-11-19) added `category_presets`; tables for unbuilt features (Google Sheets, push notifications, recurring expenses, budgets…) are added by the migration of that feature. See [Why these tables and no others](#why-these-tables-and-no-others).
 
 Conventions:
 - Primary keys: `uuid` generated **by the client or server as UUIDv7** (time-ordered, good index locality; lets the app create IDs offline).
@@ -20,6 +20,8 @@ erDiagram
   users ||--o{ group_members : "is"
   groups ||--o{ group_members : has
   groups ||--o{ categories : owns
+  groups ||--o{ category_presets : owns
+  categories ||--o{ category_presets : "picked by"
   groups ||--o{ expenses : contains
   groups ||--o{ payments : records
   groups ||--o{ history : records
@@ -50,10 +52,11 @@ Quick splits have **no server tables** (decided 2026-11-10; the `quick_*` tables
 | `groups` | `id`, `name`, `timezone` (default `Europe/Madrid`), `created_by`, `split_rule` jsonb (default `{"split_type": "equal"}`), `invite_code` (8 chars base32, unique, NULL), `invite_expires_at`, `deleted_at` | A user can belong to several groups. `split_rule` is the group's default rule. **One join code per group**: valid 7 days, reusable, regenerated when it expires or is revoked. Deletion is soft (`deleted_at`) |
 | `group_members` | `id`, `group_id`, `user_id`, `role` ('admin','member'), `status` ('active','left'), `sort_key`, `joined_at`, `left_at` | `UNIQUE(group_id, user_id)` (rejoining reactivates the row); partial unique index `uq_group_members_one_admin (group_id) WHERE role='admin' AND status='active'`: **exactly one active admin**. **Expenses reference `member_id`, not `user_id`**, so history survives leaving |
 | `categories` | `id`, `group_id`, `name`, `icon`, `color`, `is_default`, `archived_at`, `sort_key`, `split_rule` jsonb NULL | `UNIQUE(group_id, lower(name)) WHERE archived_at IS NULL`. Defaults are **copied** into each group on creation. `split_rule` overrides the group rule for this category |
+| `category_presets` | `id`, `group_id`, `category_id`, `keyword` (1–40 chars), `created_at` | `UNIQUE(group_id, lower(keyword))`; tenant-safe FK `(category_id, group_id)` → `categories` (`ON DELETE CASCADE`). A new expense whose description contains the keyword gets the category: the **app** does the matching while the description is typed (case and accents ignored, longest keyword wins); the API only stores the list. Empty by default; archiving a category deletes its presets |
 | `expenses` | `id`, `group_id`, `category_id`, `payer_member_id`, `amount_cents`, `description` (≤ 140), `notes`, `expense_date`, `split_type`, `split_origin` ('override','category','recurring','group_default'), `participant_mode` ('all','subset'), `rule_fallback`, `source` ('manual','ai_text','ai_voice','recurring'), `created_by_user_id`, `updated_by_user_id`, `version`, `created_at`, `updated_at`, `deleted_at`, `deleted_reason` | `0 < amount_cents ≤ 100 000 000`; index `(group_id, expense_date DESC, id DESC)` for keyset pagination and date filters |
 | `expense_shares` | `expense_id`, `member_id`, `group_id`, `sort_key`, `amount_cents`, `weight` / `basis_points` / `exact_cents` (inputs kept to re-edit the split) | PK `(expense_id, member_id)`. Deferred constraint trigger: `SUM(amount_cents) = expenses.amount_cents` |
 | `payments` | `id` (client UUIDv7), `group_id`, `from_member_id`, `to_member_id`, `amount_cents`, `status` ('sent','confirmed','disputed','cancelled'), `method` ('bizum','bank_transfer','cash','other'; required by the API, NULL only on rows from before migration 0007), `note` (optional details), `created_by_user_id`, `confirmed_at`, `confirmed_by_user_id`, `version`, `created_at`, `updated_at` | `from <> to`; `0 < amount ≤ 100 000 000`; tenant-safe FKs to both members. Only `confirmed` payments count in the balance ([03 §3](03-business-rules.md#3-balance-and-payments)) |
-| `history` | `id`, `group_id`, `entity` ('expense','payment','group','group_member','category','split_rule'), `entity_id`, `version` NULL, `action`, `actor_user_id`, `reason`, `before` jsonb, `after` jsonb, `created_at` | Append-only (a trigger rejects `UPDATE`; `split_api` has no `UPDATE/DELETE`). Expense rows carry `version` and the full `before`/`after` state (shares included): `UNIQUE(entity_id, version) WHERE entity='expense'` |
+| `history` | `id`, `group_id`, `entity` ('expense','payment','group','group_member','category','category_preset','split_rule'), `entity_id`, `version` NULL, `action`, `actor_user_id`, `reason`, `before` jsonb, `after` jsonb, `created_at` | Append-only (a trigger rejects `UPDATE`; `split_api` has no `UPDATE/DELETE`). Expense rows carry `version` and the full `before`/`after` state (shares included): `UNIQUE(entity_id, version) WHERE entity='expense'` |
 
 ### Split rules as JSON
 

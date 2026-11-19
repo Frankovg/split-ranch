@@ -22,6 +22,10 @@ export default function AppLayout() {
       <Stack.Screen name='group/[groupId]/settle' options={{ headerShown: true, title: t('settle.title') }} />
       <Stack.Screen name='group/[groupId]/settings' options={{ headerShown: true, title: t('group.settings') }} />
       <Stack.Screen
+        name='group/[groupId]/category-presets'
+        options={{ headerShown: true, title: t('presets.title') }}
+      />
+      <Stack.Screen
         name='group/[groupId]/expense/new'
         options={{ headerShown: true, title: t('expenses.add'), presentation: 'modal' }}
       />

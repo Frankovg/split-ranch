@@ -247,6 +247,47 @@ export interface paths {
         patch: operations["update_category_v1_groups__group_id__categories__category_id__patch"];
         trace?: never;
     };
+    "/v1/groups/{group_id}/category-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Category Presets
+         * @description Keywords that pick a category for new expenses (empty until members add some).
+         */
+        get: operations["list_category_presets_v1_groups__group_id__category_presets_get"];
+        put?: never;
+        /**
+         * Create Category Preset
+         * @description `409 preset_exists` when the keyword is taken (case ignored).
+         */
+        post: operations["create_category_preset_v1_groups__group_id__category_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{group_id}/category-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Category Preset */
+        delete: operations["delete_category_preset_v1_groups__group_id__category_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups/{group_id}/split-rules": {
         parameters: {
             query?: never;
@@ -553,6 +594,39 @@ export interface components {
             color?: string | null;
             /** Sort Key */
             sort_key?: number | null;
+        };
+        /**
+         * CategoryPresetCreate
+         * @description New expenses whose description contains `keyword` get `category_id`.
+         */
+        CategoryPresetCreate: {
+            /** Keyword */
+            keyword: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+        };
+        /** CategoryPresetRead */
+        CategoryPresetRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Keyword */
+            keyword: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** CategoryRead */
         CategoryRead: {
@@ -1229,6 +1303,8 @@ export interface components {
 export type BalanceRead = components['schemas']['BalanceRead'];
 export type BasisPointsShare = components['schemas']['BasisPointsShare'];
 export type CategoryCreate = components['schemas']['CategoryCreate'];
+export type CategoryPresetCreate = components['schemas']['CategoryPresetCreate'];
+export type CategoryPresetRead = components['schemas']['CategoryPresetRead'];
 export type CategoryRead = components['schemas']['CategoryRead'];
 export type CategoryRuleRead = components['schemas']['CategoryRuleRead'];
 export type CategoryTotalRead = components['schemas']['CategoryTotalRead'];
@@ -1901,6 +1977,108 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CategoryRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_category_presets_v1_groups__group_id__category_presets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPresetRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_category_preset_v1_groups__group_id__category_presets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryPresetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPresetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_preset_v1_groups__group_id__category_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                preset_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

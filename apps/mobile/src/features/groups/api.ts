@@ -3,6 +3,7 @@ import { api, unwrap } from '@/lib/api';
 import { queryKeys } from '@/lib/query/client';
 import type {
   CategoryCreateInput,
+  CategoryPresetCreateInput,
   ExpenseListFilters,
   Expense,
   ExpenseCreateInput,
@@ -45,6 +46,18 @@ export function useCategories(groupId: string | undefined) {
         api.GET('/v1/groups/{group_id}/categories', {
           params: { path: { group_id: groupId ?? '' }, query: { include_archived: true } },
         }),
+      ),
+    enabled: !!groupId,
+  });
+}
+
+/** The group's category presets (keyword → category), empty until members add some. */
+export function useCategoryPresets(groupId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.categoryPresets(groupId ?? ''),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/category-presets', { params: { path: { group_id: groupId ?? '' } } }),
       ),
     enabled: !!groupId,
   });
@@ -230,6 +243,30 @@ export function useCreateCategory(groupId: string) {
     mutationFn: (input: CategoryCreateInput) =>
       unwrap(api.POST('/v1/groups/{group_id}/categories', { params: { path: { group_id: groupId } }, body: input })),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories(groupId) }),
+  });
+}
+
+export function useCreateCategoryPreset(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CategoryPresetCreateInput) =>
+      unwrap(
+        api.POST('/v1/groups/{group_id}/category-presets', { params: { path: { group_id: groupId } }, body: input }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
+  });
+}
+
+export function useDeleteCategoryPreset(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) =>
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}/category-presets/{preset_id}', {
+          params: { path: { group_id: groupId, preset_id: presetId } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
   });
 }
 

@@ -22,12 +22,21 @@ def test_non_member_gets_404_everywhere(
     house = make_house(client, make_user, ("Juli", "Franco"))
     expense = add_expense(client, house, "Juli", amount=1000, payer="Juli", date="2026-03-02")
     payment = pay(client, house, "Franco", payer="Franco", to="Juli", amount=500)
+    preset = ok(
+        client.post(
+            house.url("/category-presets"),
+            json={"keyword": "Super", "category_id": house.categories["Groceries"]},
+            headers=house.h("Juli"),
+        ),
+        201,
+    )
     real_ids = {
         "group_id": house.id,
         "expense_id": expense["id"],
         "member_id": house.members["Franco"],
         "category_id": house.categories["Groceries"],
         "payment_id": payment["id"],
+        "preset_id": preset["id"],
     }
     outsider = make_user("Mallory")
     # The outsider has a group of their own: membership must be checked per path.

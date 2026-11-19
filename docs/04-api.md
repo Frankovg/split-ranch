@@ -23,7 +23,7 @@ Groups replaced households and periods in migration 0006 (design: [egm/design_dr
 | Rate limits | Planned: per user (e.g. 120 req/min) and per IP on public endpoints; `429` + `Retry-After`. Not built |
 
 ### Error codes (`code`)
-`unauthenticated`, `token_expired`, `forbidden_role` (403), `not_found`, `validation_error`, `split_mismatch`, `invalid_split`, `invalid_ratios`, `invalid_payer`, `invalid_category`, `invalid_source`, `invalid_payment`, `version_conflict` (412), `precondition_required` (428), `id_conflict` (409), `invitation_expired` (410), `already_member` (409), `category_exists` (409), `category_archived` (409), `member_has_open_balance` (409), `group_has_open_balances` (409), `member_left` (409), `cannot_remove_self` (409), `confirm_name` (422), `payment_state_changed` (409), `rate_limited`.
+`unauthenticated`, `token_expired`, `forbidden_role` (403), `not_found`, `validation_error`, `split_mismatch`, `invalid_split`, `invalid_ratios`, `invalid_payer`, `invalid_category`, `invalid_source`, `invalid_payment`, `version_conflict` (412), `precondition_required` (428), `id_conflict` (409), `invitation_expired` (410), `already_member` (409), `category_exists` (409), `category_archived` (409), `preset_exists` (409), `invalid_keyword` (422), `member_has_open_balance` (409), `group_has_open_balances` (409), `member_left` (409), `cannot_remove_self` (409), `confirm_name` (422), `payment_state_changed` (409), `rate_limited`.
 
 Removed with periods: `period_locked`, `reason_required`, `period_state_changed`, `no_open_period`, `period_open`, `period_not_latest`, `last_admin`.
 
@@ -70,6 +70,8 @@ Every active member has the same rights; the admin (the creator, or whoever the 
 | GET | `/groups/{gid}/split-rules` | member |
 | PUT | `/groups/{gid}/split-rules/default` | member |
 | PUT/DELETE | `/groups/{gid}/categories/{cid}/split-rule` | member |
+| GET/POST | `/groups/{gid}/category-presets` | member: `{keyword, category_id}` → keyword that picks the category for new expenses (`409 preset_exists`, `422 invalid_category` if not an active category of the group) |
+| DELETE | `/groups/{gid}/category-presets/{pid}` | member |
 
 Split rule payload (shared by rules, expense overrides and AI tools):
 

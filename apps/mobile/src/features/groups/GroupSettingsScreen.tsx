@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Share2, UserMinus } from 'lucide-react-native';
+import { ChevronRight, Share2, UserMinus, Wand2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Alert, Share, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -134,6 +134,22 @@ function Settings({ group }: { group: Group }) {
             </View>
           ))}
           <Text className='pt-2 text-sm text-muted-foreground'>{t('group.inviteHint')}</Text>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('group.presets')}</CardTitle>
+          <CardDescription>{t('group.presetsHint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant='outline'
+            onPress={() => router.push({ pathname: '/group/[groupId]/category-presets', params: { groupId: group.id } })}>
+            <Icon as={Wand2} size={18} />
+            <Text>{t('group.presets')}</Text>
+            <Icon as={ChevronRight} size={18} className='ml-auto' />
+          </Button>
         </CardContent>
       </Card>
 

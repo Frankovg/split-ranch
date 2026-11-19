@@ -25,6 +25,7 @@ import { MAX_AMOUNT_CENTS } from '@/lib/money';
 import { apiErrorCode } from '@/lib/api';
 import {
   useCategories,
+  useCategoryPresets,
   useCreateExpense,
   useDeleteExpense,
   useExpense,
@@ -32,6 +33,7 @@ import {
   useUpdateExpense,
 } from './api';
 import { categoryIcon, categoryLabel, selectableCategories, sortByLabel } from './categories';
+import { matchCategoryPreset } from './category-presets';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName, userName } from './components';
 import { todayIso } from './dates';
 import { useGroupId } from './route';
@@ -70,6 +72,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const members = activeMembers(group);
   const everyone = members.map((m) => m.id);
   const categories = useCategories(group.id);
+  const presets = useCategoryPresets(group.id);
   const create = useCreateExpense(group.id);
   const update = useUpdateExpense(group.id);
   const remove = useDeleteExpense(group.id);
@@ -86,6 +89,9 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const [expenseDate, setExpenseDate] = useState(expense?.expense_date ?? today);
   // '' = "Other" (no category).
   const [categoryId, setCategoryId] = useState<string>(expense?.category_id ?? '');
+  // Category presets pick the category of a new expense from its description until the
+  // user chooses one by hand; edits never change the stored category on their own.
+  const [categoryPicked, setCategoryPicked] = useState(editing);
   const [startSplit] = useState(() =>
     expense ? splitStateFromExpense(expense, everyone) : initialSplitState(0, everyone),
   );
@@ -101,6 +107,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
     if (created) {
       setKnownCategoryIds(null);
       setCategoryId(created.id);
+      setCategoryPicked(true);
     }
   }
 
@@ -128,6 +135,18 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   );
   const payerOption = { value: payer, label: memberName(group, payer, t) };
   const busy = create.isPending || update.isPending || remove.isPending;
+
+  const onDescriptionChange = (text: string) => {
+    setDescription(text);
+    if (categoryPicked) return;
+    const activeIds = new Set(selectableCategories(categoryList).map((c) => c.id));
+    setCategoryId(matchCategoryPreset(text, presets.data, activeIds) ?? '');
+  };
+
+  const onCategoryChange = (value: string | undefined) => {
+    setCategoryPicked(true);
+    setCategoryId(!value || value === OTHER_CATEGORY ? '' : value);
+  };
 
   const onAmountChange = (cents: number | null) => {
     setAmountCents(cents);
@@ -239,7 +258,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
         <Input
           aria-labelledby='expense-description'
           value={description}
-          onChangeText={setDescription}
+          onChangeText={onDescriptionChange}
           placeholder={t('expenses.descriptionPlaceholder')}
           maxLength={140}
           editable={!readOnly}
@@ -257,9 +276,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
             <Select
               value={categoryOption}
               disabled={readOnly}
-              onValueChange={(option) =>
-                setCategoryId(!option || option.value === OTHER_CATEGORY ? '' : option.value)
-              }
+              onValueChange={(option) => onCategoryChange(option?.value)}
             >
               <SelectTrigger aria-labelledby='expense-category' disabled={readOnly}>
                 <View className='flex-1 flex-row items-center gap-2'>
