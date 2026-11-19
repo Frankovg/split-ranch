@@ -1,0 +1,9 @@
+# Gitleaks config: default rules plus project-specific allowlist.
+[extend]
+useDefault = true
+
+[allowlist]
+# Firebase client config for FCM: contains only public identifiers by design
+# (the API key ships inside every APK). See docs/05-mobile-app.md.
+description = 'Firebase client config (public identifiers)'
+paths = ['''^apps/mobile/google-services\.json$''']
