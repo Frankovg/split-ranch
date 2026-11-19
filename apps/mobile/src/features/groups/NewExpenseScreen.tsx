@@ -23,29 +23,32 @@ import { Text } from '@/components/ui/text';
 import { currentMoneyLocale } from '@/i18n';
 import { MAX_AMOUNT_CENTS } from '@/lib/money';
 import { apiErrorCode } from '@/lib/api';
+import { askOnceInContext } from '@/features/notifications/register';
 import {
   useCategories,
+  useCategoryPresets,
   useCreateExpense,
   useDeleteExpense,
   useExpense,
   useGroup,
+  useSplitRules,
   useUpdateExpense,
 } from './api';
 import { categoryIcon, categoryLabel, selectableCategories, sortByLabel } from './categories';
+import { matchCategoryPreset } from './category-presets';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName, userName } from './components';
 import { todayIso } from './dates';
 import { useGroupId } from './route';
 import {
   equalValues,
-  initialSplitState,
-  isDefaultSplit,
   splitProblem,
   splitSignature,
   splitStateFromExpense,
   toSplitSpec,
 } from './split-form';
+import { splitStateFromRule } from './split-rule';
 import { SplitTable } from './SplitTable';
-import type { Expense, ExpenseUpdateInput, Group } from './types';
+import type { Expense, ExpenseUpdateInput, Group, SplitRule } from './types';
 
 /** Select value of "Other": the expense has no category. */
 const OTHER_CATEGORY = '__other__';
@@ -56,20 +59,34 @@ export function NewExpenseScreen({ expenseId }: { expenseId?: string }) {
   const groupId = useGroupId();
   const group = useGroup(groupId);
   const expense = useExpense(groupId, expenseId);
+  // A new expense starts from the group's default rule. If the rules cannot be loaded it
+  // starts "Equally": an untouched table is not sent, so the API still applies the rule.
+  const rules = useSplitRules(expenseId ? undefined : groupId);
 
-  if (group.isPending || (expenseId && expense.isPending)) return <LoadingScreen />;
+  if (group.isPending || (expenseId ? expense.isPending : rules.isPending)) {
+    return <LoadingScreen />;
+  }
   if (group.isError) return <ErrorScreen t={t} onRetry={() => void group.refetch()} />;
   if (expenseId && expense.isError)
     return <ErrorScreen t={t} onRetry={() => void expense.refetch()} />;
-  return <ExpenseForm group={group.data} expense={expense.data} />;
+  return <ExpenseForm group={group.data} expense={expense.data} defaultRule={rules.data?.default} />;
 }
 
-function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
+function ExpenseForm({
+  group,
+  expense,
+  defaultRule,
+}: {
+  group: Group;
+  expense?: Expense;
+  defaultRule?: SplitRule;
+}) {
   const { t } = useTranslation();
   const locale = currentMoneyLocale();
   const members = activeMembers(group);
   const everyone = members.map((m) => m.id);
   const categories = useCategories(group.id);
+  const presets = useCategoryPresets(group.id);
   const create = useCreateExpense(group.id);
   const update = useUpdateExpense(group.id);
   const remove = useDeleteExpense(group.id);
@@ -86,8 +103,11 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const [expenseDate, setExpenseDate] = useState(expense?.expense_date ?? today);
   // '' = "Other" (no category).
   const [categoryId, setCategoryId] = useState<string>(expense?.category_id ?? '');
+  // Category presets pick the category of a new expense from its description until the
+  // user chooses one by hand; edits never change the stored category on their own.
+  const [categoryPicked, setCategoryPicked] = useState(editing);
   const [startSplit] = useState(() =>
-    expense ? splitStateFromExpense(expense, everyone) : initialSplitState(0, everyone),
+    expense ? splitStateFromExpense(expense, everyone) : splitStateFromRule(defaultRule, everyone),
   );
   const [split, setSplit] = useState(startSplit);
   const [submitted, setSubmitted] = useState(false);
@@ -101,6 +121,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
     if (created) {
       setKnownCategoryIds(null);
       setCategoryId(created.id);
+      setCategoryPicked(true);
     }
   }
 
@@ -129,6 +150,18 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   const payerOption = { value: payer, label: memberName(group, payer, t) };
   const busy = create.isPending || update.isPending || remove.isPending;
 
+  const onDescriptionChange = (text: string) => {
+    setDescription(text);
+    if (categoryPicked) return;
+    const activeIds = new Set(selectableCategories(categoryList).map((c) => c.id));
+    setCategoryId(matchCategoryPreset(text, presets.data, activeIds) ?? '');
+  };
+
+  const onCategoryChange = (value: string | undefined) => {
+    setCategoryPicked(true);
+    setCategoryId(!value || value === OTHER_CATEGORY ? '' : value);
+  };
+
   const onAmountChange = (cents: number | null) => {
     setAmountCents(cents);
     // Typed amounts no longer add up to a new total: start again from equal amounts.
@@ -141,7 +174,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
 
   const addCategory = () => {
     setKnownCategoryIds(categoryList.map((c) => c.id));
-    router.push({ pathname: '/group/[groupId]/category/new', params: { groupId: group.id } });
+    router.navigate({ pathname: '/group/[groupId]/category/new', params: { groupId: group.id } });
   };
 
   const onError = (error: unknown) => {
@@ -165,10 +198,19 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
           category_id: categoryId || null,
           payer_member_id: payer,
           expense_date: expenseDate,
-          // Untouched table (everyone, equally) = let the group/category rule decide.
-          split: showSplit && !isDefaultSplit(split, everyone) ? toSplitSpec(split) : undefined,
+          // Untouched table (as the group rule set it up) = let the group/category rule decide.
+          split: showSplit && splitSignature(split) !== splitSignature(startSplit) ? toSplitSpec(split) : undefined,
         },
-        { onSuccess, onError },
+        {
+          onSuccess: () => {
+            onSuccess();
+            // First saved expense: a good moment to ask for the notification permission.
+            void askOnceInContext().catch((error: unknown) =>
+              console.warn('Failed to ask for the notification permission', error),
+            );
+          },
+          onError,
+        },
       );
       return;
     }
@@ -239,7 +281,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
         <Input
           aria-labelledby='expense-description'
           value={description}
-          onChangeText={setDescription}
+          onChangeText={onDescriptionChange}
           placeholder={t('expenses.descriptionPlaceholder')}
           maxLength={140}
           editable={!readOnly}
@@ -257,9 +299,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
             <Select
               value={categoryOption}
               disabled={readOnly}
-              onValueChange={(option) =>
-                setCategoryId(!option || option.value === OTHER_CATEGORY ? '' : option.value)
-              }
+              onValueChange={(option) => onCategoryChange(option?.value)}
             >
               <SelectTrigger aria-labelledby='expense-category' disabled={readOnly}>
                 <View className='flex-1 flex-row items-center gap-2'>

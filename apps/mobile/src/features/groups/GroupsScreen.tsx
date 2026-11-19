@@ -59,14 +59,14 @@ export function GroupsScreen() {
             icon: Plus,
             label: t('groups.createTitle'),
             description: t('groups.createBody'),
-            onPress: () => router.push('/groups/new'),
+            onPress: () => router.navigate('/groups/new'),
           },
           {
             key: 'join',
             icon: KeyRound,
             label: t('groups.joinTitle'),
             description: t('groups.joinBody'),
-            onPress: () => router.push('/groups/join'),
+            onPress: () => router.navigate('/groups/join'),
           },
         ]}
       />
@@ -85,7 +85,7 @@ function GroupCard({ group }: { group: Group }) {
   return (
     <Pressable
       accessibilityRole='button'
-      onPress={() => router.push({ pathname: '/group/[groupId]', params: { groupId: group.id } })}
+      onPress={() => router.navigate({ pathname: '/group/[groupId]', params: { groupId: group.id } })}
       className='active:opacity-80'
     >
       <Card className='flex-row items-center gap-3 px-4 py-4'>

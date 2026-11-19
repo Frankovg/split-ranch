@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api';
 export const CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 /** Bump when response shapes or query keys change, to discard every persisted cache. */
-export const CACHE_BUSTER = '1';
+export const CACHE_BUSTER = '2';
 
 /**
  * Shared QueryClient, persisted to MMKV by PersistQueryClientProvider (app/_layout.tsx).
@@ -28,11 +28,19 @@ export const queryKeys = {
   groups: () => ['groups'] as const,
   group: (groupId: string) => ['group', groupId] as const,
   categories: (groupId: string) => ['group', groupId, 'categories'] as const,
+  categoryPresets: (groupId: string) => ['group', groupId, 'category-presets'] as const,
+  splitRules: (groupId: string) => ['group', groupId, 'split-rules'] as const,
   balance: (groupId: string) => ['group', groupId, 'balance'] as const,
   payments: (groupId: string) => ['group', groupId, 'payments'] as const,
+  /** Prefix of every summary of the group, whatever its filters. */
+  summaries: (groupId: string) => ['group', groupId, 'summary'] as const,
   summary: (groupId: string, filters: Record<string, unknown> = {}) =>
     ['group', groupId, 'summary', filters] as const,
+  /** Prefix of every expense list of the group (home, search), whatever its filters. */
+  expenseLists: (groupId: string) => ['group', groupId, 'expenses'] as const,
   expenses: (groupId: string, filters: Record<string, unknown> = {}) =>
     ['group', groupId, 'expenses', filters] as const,
+  /** Prefix of every single-expense query of the group. */
+  expenseDetails: (groupId: string) => ['group', groupId, 'expense'] as const,
   expense: (groupId: string, expenseId: string) => ['group', groupId, 'expense', expenseId] as const,
 };

@@ -1,4 +1,4 @@
-"""Categories and split rules (group default + per category)."""
+"""Categories, category presets and split rules (group default + per category)."""
 
 from __future__ import annotations
 
@@ -12,9 +12,15 @@ from split_ranch.core import clock
 from split_ranch.core.actor import GroupActor
 from split_ranch.core.errors import Conflict, NotFound, Unprocessable
 from split_ranch.domain import BASIS_POINTS_TOTAL
-from split_ranch.models import Category, Group
+from split_ranch.models import Category, CategoryPreset, Group
 from split_ranch.repositories import groups as hrepo
-from split_ranch.schemas.groups import CategoryCreate, CategoryRead, CategoryUpdate
+from split_ranch.schemas.groups import (
+    CategoryCreate,
+    CategoryPresetCreate,
+    CategoryPresetRead,
+    CategoryRead,
+    CategoryUpdate,
+)
 from split_ranch.schemas.split import (
     CategoryRuleRead,
     PercentagesSplit,
@@ -29,8 +35,11 @@ from split_ranch.use_cases.split_resolution import spec_member_ids
 __all__ = [
     "archive_category",
     "create_category",
+    "create_category_preset",
+    "delete_category_preset",
     "delete_category_rule",
     "list_categories",
+    "list_category_presets",
     "list_rules",
     "set_category_rule",
     "set_default_rule",
@@ -135,6 +144,77 @@ def archive_category(session: Session, actor: GroupActor, category_id: UUID) -> 
             action="archive",
             diff={},
         )
+        # Its presets would pick a category new expenses cannot use: they go with it.
+        for preset in session.scalars(
+            select(CategoryPreset).where(
+                CategoryPreset.group_id == actor.group_id,
+                CategoryPreset.category_id == category.id,
+            )
+        ).all():
+            _delete_preset(session, actor, preset)
+    session.commit()
+
+
+# ------------------------------------------------------- category presets
+#
+# A preset is a keyword: the app picks its category for a new expense whose description
+# contains it. The matching happens in the app; the API keeps the group's list.
+
+
+def list_category_presets(session: Session, actor: GroupActor) -> list[CategoryPresetRead]:
+    return [
+        CategoryPresetRead.model_validate(p)
+        for p in hrepo.list_category_presets(session, actor.group_id)
+    ]
+
+
+def create_category_preset(
+    session: Session, actor: GroupActor, data: CategoryPresetCreate
+) -> CategoryPresetRead:
+    require_active(actor)
+    keyword = data.keyword.strip()
+    if not keyword:
+        raise Unprocessable("keyword must not be blank", code="invalid_keyword")
+    category = hrepo.get_category(session, actor.group_id, data.category_id, include_archived=False)
+    if category is None:
+        raise Unprocessable("Category is not active in this group", code="invalid_category")
+    if hrepo.category_preset_keyword_taken(session, actor.group_id, keyword):
+        raise Conflict("A preset with this keyword already exists", code="preset_exists")
+    preset = CategoryPreset(group_id=actor.group_id, category_id=category.id, keyword=keyword)
+    session.add(preset)
+    session.flush()
+    audit(
+        session,
+        group_id=actor.group_id,
+        entity="category_preset",
+        entity_id=preset.id,
+        actor_user_id=actor.user_id,
+        action="create",
+        diff={"keyword": keyword, "category_id": str(category.id)},
+    )
+    session.commit()
+    return CategoryPresetRead.model_validate(preset)
+
+
+def _delete_preset(session: Session, actor: GroupActor, preset: CategoryPreset) -> None:
+    audit(
+        session,
+        group_id=actor.group_id,
+        entity="category_preset",
+        entity_id=preset.id,
+        actor_user_id=actor.user_id,
+        action="delete",
+        diff={"keyword": preset.keyword, "category_id": str(preset.category_id)},
+    )
+    session.delete(preset)
+
+
+def delete_category_preset(session: Session, actor: GroupActor, preset_id: UUID) -> None:
+    require_active(actor)
+    preset = hrepo.get_category_preset(session, actor.group_id, preset_id)
+    if preset is None:
+        raise NotFound("Preset not found")
+    _delete_preset(session, actor, preset)
     session.commit()
 
 

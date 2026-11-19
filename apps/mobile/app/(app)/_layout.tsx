@@ -15,12 +15,18 @@ export default function AppLayout() {
       <Stack.Screen name='(tabs)' />
       <Stack.Screen name='groups/new' options={{ headerShown: true, title: t('groups.createTitle') }} />
       <Stack.Screen name='groups/join' options={{ headerShown: true, title: t('groups.joinTitle') }} />
+      <Stack.Screen name='notifications' options={{ headerShown: true, title: t('notifications.title') }} />
       {/* The group home sets its own title (the group's name) and header actions. */}
       <Stack.Screen name='group/[groupId]' options={{ headerShown: true, title: '' }} />
       <Stack.Screen name='group/[groupId]/search' options={{ headerShown: true, title: t('search.title') }} />
       <Stack.Screen name='group/[groupId]/insights' options={{ headerShown: true, title: t('insights.title') }} />
       <Stack.Screen name='group/[groupId]/settle' options={{ headerShown: true, title: t('settle.title') }} />
       <Stack.Screen name='group/[groupId]/settings' options={{ headerShown: true, title: t('group.settings') }} />
+      <Stack.Screen name='group/[groupId]/split-rule' options={{ headerShown: true, title: t('rule.title') }} />
+      <Stack.Screen
+        name='group/[groupId]/category-presets'
+        options={{ headerShown: true, title: t('presets.title') }}
+      />
       <Stack.Screen
         name='group/[groupId]/expense/new'
         options={{ headerShown: true, title: t('expenses.add'), presentation: 'modal' }}

@@ -72,7 +72,7 @@ def test_history_append_only(db_session: Session, expense: tuple[str, str, str])
     sp.rollback()
 
 
-def test_schema_has_eight_tables(db_session: Session) -> None:
+def test_schema_has_ten_tables(db_session: Session) -> None:
     tables = (
         db_session.execute(
             text(
@@ -85,12 +85,14 @@ def test_schema_has_eight_tables(db_session: Session) -> None:
     )
     assert tables == [
         "categories",
+        "category_presets",
         "expense_shares",
         "expenses",
         "group_members",
         "groups",
         "history",
         "payments",
+        "push_tokens",
         "users",
     ]
 

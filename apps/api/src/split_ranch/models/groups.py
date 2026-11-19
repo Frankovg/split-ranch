@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -122,10 +123,41 @@ class Category(Base):
     updated_at: Mapped[datetime] = updated_at_col()
 
 
+class CategoryPreset(Base):
+    """A keyword that picks a category for new expenses whose description contains it.
+
+    Each group sets its own (none by default); the app does the matching while the
+    expense is typed, the API only stores the list.
+    """
+
+    __tablename__ = "category_presets"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["category_id", "group_id"],
+            ["categories.id", "categories.group_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("char_length(keyword) BETWEEN 1 AND 40", name="keyword_length"),
+        Index(
+            "uq_category_presets_group_keyword",
+            "group_id",
+            func.lower(text("keyword")),
+            unique=True,
+        ),
+    )
+
+    id: Mapped[UUID] = uuid_pk()
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
+    category_id: Mapped[UUID] = mapped_column()
+    keyword: Mapped[str] = mapped_column(String(40))
+    created_at: Mapped[datetime] = created_at_col()
+
+
 __all__ = [
     "DEFAULT_SPLIT_RULE",
     "SPLIT_TYPES",
     "Category",
+    "CategoryPreset",
     "Group",
     "GroupMember",
 ]

@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from split_ranch.models import Category, Group, GroupMember, User
+from split_ranch.models import Category, CategoryPreset, Group, GroupMember, User
 
 
 def get_group(session: Session, group_id: UUID, *, for_update: bool = False) -> Group | None:
@@ -45,6 +45,24 @@ def list_members_with_users(session: Session, group_id: UUID) -> Sequence[tuple[
         .order_by(GroupMember.sort_key, GroupMember.id)
     ).all()
     return [(m, u) for m, u in rows]
+
+
+def members_with_users_by_group(
+    session: Session, group_ids: Sequence[UUID]
+) -> dict[UUID, list[tuple[GroupMember, User]]]:
+    """`list_members_with_users` for several groups in one query (same order per group)."""
+    result: dict[UUID, list[tuple[GroupMember, User]]] = {gid: [] for gid in group_ids}
+    if not group_ids:
+        return result
+    rows = session.execute(
+        select(GroupMember, User)
+        .join(User, User.id == GroupMember.user_id)
+        .where(GroupMember.group_id.in_(group_ids))
+        .order_by(GroupMember.group_id, GroupMember.sort_key, GroupMember.id)
+    ).all()
+    for m, u in rows:
+        result[m.group_id].append((m, u))
+    return result
 
 
 def get_member(
@@ -118,3 +136,33 @@ def get_group_by_invite_code(
     if for_update:
         stmt = stmt.with_for_update()
     return session.scalars(stmt).first()
+
+
+def list_category_presets(session: Session, group_id: UUID) -> Sequence[CategoryPreset]:
+    """The group's presets whose category is still active, by keyword."""
+    return session.scalars(
+        select(CategoryPreset)
+        .join(
+            Category,
+            (Category.id == CategoryPreset.category_id)
+            & (Category.group_id == CategoryPreset.group_id),
+        )
+        .where(CategoryPreset.group_id == group_id, Category.archived_at.is_(None))
+        .order_by(func.lower(CategoryPreset.keyword), CategoryPreset.id)
+    ).all()
+
+
+def get_category_preset(session: Session, group_id: UUID, preset_id: UUID) -> CategoryPreset | None:
+    return session.scalars(
+        select(CategoryPreset).where(
+            CategoryPreset.group_id == group_id, CategoryPreset.id == preset_id
+        )
+    ).first()
+
+
+def category_preset_keyword_taken(session: Session, group_id: UUID, keyword: str) -> bool:
+    stmt = select(CategoryPreset.id).where(
+        CategoryPreset.group_id == group_id,
+        func.lower(CategoryPreset.keyword) == keyword.strip().lower(),
+    )
+    return session.scalars(stmt).first() is not None

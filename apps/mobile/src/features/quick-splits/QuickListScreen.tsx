@@ -18,7 +18,7 @@ function EventRow({ event }: { event: QuickEvent }) {
   const result = useMemo(() => computeQuickResult(event), [event]);
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/quick/[id]', params: { id: event.id } })}
+      onPress={() => router.navigate({ pathname: '/quick/[id]', params: { id: event.id } })}
       role='button'
       className='min-h-14 flex-row items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 active:bg-accent'>
       <View className='flex-1 gap-0.5'>
@@ -42,7 +42,7 @@ export function QuickListScreen() {
 
   const onNew = () => {
     const id = createEvent(t('quick.defaultTitle'));
-    router.push({ pathname: '/quick/[id]', params: { id } });
+    router.navigate({ pathname: '/quick/[id]', params: { id } });
   };
 
   if (events.length === 0) {

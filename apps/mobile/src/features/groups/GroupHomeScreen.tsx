@@ -135,7 +135,7 @@ export function GroupHomeScreen() {
       <Fab
         label={t('expenses.add')}
         onPress={() =>
-          router.push({ pathname: '/group/[groupId]/expense/new', params: { groupId: g.id } })
+          router.navigate({ pathname: '/group/[groupId]/expense/new', params: { groupId: g.id } })
         }
       />
     </SafeAreaView>
@@ -257,7 +257,7 @@ function BalanceCard({ group, balance }: { group: Group; balance: GroupBalance }
               size='sm'
               className='self-start px-0'
               onPress={() =>
-                router.push({
+                router.navigate({
                   pathname: '/group/[groupId]/settings',
                   params: { groupId: group.id },
                 })
@@ -271,7 +271,7 @@ function BalanceCard({ group, balance }: { group: Group; balance: GroupBalance }
           <Button
             variant='outline'
             onPress={() =>
-              router.push({ pathname: '/group/[groupId]/settle', params: { groupId: group.id } })
+              router.navigate({ pathname: '/group/[groupId]/settle', params: { groupId: group.id } })
             }
           >
             <Icon as={ArrowLeftRight} size={18} />

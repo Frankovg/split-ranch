@@ -120,11 +120,6 @@ export function toSplitSpec(state: SplitFormState): SplitSpecInput {
   }
 }
 
-/** True while the table still shows its defaults: everyone, equally, split on. */
-export function isDefaultSplit(state: SplitFormState, everyone: readonly string[]): boolean {
-  return state.enabled && state.mode === 'equal' && state.included.length === everyone.length;
-}
-
 /** The table state that shows how a stored expense is split. */
 export function splitStateFromExpense(expense: Expense, everyone: string[]): SplitFormState {
   const base = initialSplitState(expense.amount_cents, everyone);

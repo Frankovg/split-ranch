@@ -26,6 +26,8 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   android: {
     package: 'com.splitranch.app',
+    // Firebase app registration for FCM (public identifiers only; safe to commit).
+    googleServicesFile: './google-services.json',
     adaptiveIcon: {
       backgroundColor: '#178264',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -73,6 +75,16 @@ const config: ExpoConfig = {
       },
     ],
     'expo-status-bar',
+    [
+      'expo-notifications',
+      {
+        // Android status-bar icon: 96x96, white on transparent.
+        icon: './assets/notification-icon.png',
+        color: '#178264',
+        // Channel for FCM messages that arrive without one (channels: src/features/notifications).
+        defaultChannel: 'expenses',
+      },
+    ],
     // Google sign-in (react-native-nitro-google-signin) needs no config plugin on Android:
     // the native module is autolinked and the web client id is passed at runtime via
     // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Its plugin only adds the iOS URL scheme and throws

@@ -2,7 +2,7 @@
 
 Supabase Postgres (Frankfurt). All our tables live in the **`app` schema**, which is *not* in Supabase's exposed API schemas, and is managed exclusively by Alembic. Supabase-owned schemas (`auth`, `storage`, …) are never migrated or written by us; the only link to them is that `app.users.id` equals `auth.users.id` (the JWT `sub`). No foreign key into `auth` (keeps Alembic independent and lets us anonymise instead of cascading).
 
-**8 tables.** Migration 0006 (2026-11-17, design: [egm/design_draft.md](egm/design_draft.md)) replaced households and periods with **groups** and one running balance: `periods` and `settlement_transfers` are gone and `payments` records what members pay each other. A table exists only when a feature the app has today needs it; tables for unbuilt features (Google Sheets, push notifications, recurring expenses, budgets…) are added by the migration of that feature. See [Why these tables and no others](#why-these-tables-and-no-others).
+**10 tables.** Migration 0006 (2026-11-17, design: [egm/design_draft.md](egm/design_draft.md)) replaced households and periods with **groups** and one running balance: `periods` and `settlement_transfers` are gone and `payments` records what members pay each other. A table exists only when a feature the app has today needs it; migration 0010 (2026-11-19) added `category_presets` and 0011 (2026-11-19) added `push_tokens` (plus `users.notification_prefs`); tables for unbuilt features (Google Sheets, recurring expenses, budgets…) are added by the migration of that feature. See [Why these tables and no others](#why-these-tables-and-no-others).
 
 Conventions:
 - Primary keys: `uuid` generated **by the client or server as UUIDv7** (time-ordered, good index locality; lets the app create IDs offline).
@@ -18,8 +18,11 @@ Conventions:
 ```mermaid
 erDiagram
   users ||--o{ group_members : "is"
+  users ||--o{ push_tokens : "has devices"
   groups ||--o{ group_members : has
   groups ||--o{ categories : owns
+  groups ||--o{ category_presets : owns
+  categories ||--o{ category_presets : "picked by"
   groups ||--o{ expenses : contains
   groups ||--o{ payments : records
   groups ||--o{ history : records
@@ -46,14 +49,16 @@ Quick splits have **no server tables** (decided 2026-11-10; the `quick_*` tables
 
 | Table | Key columns | Constraints / notes |
 |---|---|---|
-| `users` | `id` (= Supabase `auth.users.id`), `email`, `display_name`, `avatar_url`, `locale`, `created_at`, `deleted_at` | Unique `lower(email)` among live users. Created/updated by `ensure_user` from the JWT claims |
+| `users` | `id` (= Supabase `auth.users.id`), `email`, `display_name`, `avatar_url`, `locale`, `notification_prefs` jsonb, `created_at`, `deleted_at` | Unique `lower(email)` among live users. Created/updated by `ensure_user` from the JWT claims. `notification_prefs` holds the in-app switches `{enabled, expense_created, expense_changed, payments, member_joined}` (all `true` by default), read and changed through `GET/PATCH /v1/me` |
+| `push_tokens` | `id`, `user_id`, `token` (Expo push token, unique), `platform` ('android','ios'), `locale` ('es','en': the app language on that device), `last_ticket_id`, `last_ticket_at`, `created_at`, `updated_at` | One row per device; `user_id` → `users` `ON DELETE CASCADE`. Registering a token another user had moves it (account switch on the same phone). `last_ticket_*` keep the latest unchecked Expo push ticket, so its receipt is read on a later send (no worker); tokens Expo reports as `DeviceNotRegistered` are deleted. See [05 §Push notifications](05-mobile-app.md#push-notifications) |
 | `groups` | `id`, `name`, `timezone` (default `Europe/Madrid`), `created_by`, `split_rule` jsonb (default `{"split_type": "equal"}`), `invite_code` (8 chars base32, unique, NULL), `invite_expires_at`, `deleted_at` | A user can belong to several groups. `split_rule` is the group's default rule. **One join code per group**: valid 7 days, reusable, regenerated when it expires or is revoked. Deletion is soft (`deleted_at`) |
 | `group_members` | `id`, `group_id`, `user_id`, `role` ('admin','member'), `status` ('active','left'), `sort_key`, `joined_at`, `left_at` | `UNIQUE(group_id, user_id)` (rejoining reactivates the row); partial unique index `uq_group_members_one_admin (group_id) WHERE role='admin' AND status='active'`: **exactly one active admin**. **Expenses reference `member_id`, not `user_id`**, so history survives leaving |
 | `categories` | `id`, `group_id`, `name`, `icon`, `color`, `is_default`, `archived_at`, `sort_key`, `split_rule` jsonb NULL | `UNIQUE(group_id, lower(name)) WHERE archived_at IS NULL`. Defaults are **copied** into each group on creation. `split_rule` overrides the group rule for this category |
+| `category_presets` | `id`, `group_id`, `category_id`, `keyword` (1–40 chars), `created_at` | `UNIQUE(group_id, lower(keyword))`; tenant-safe FK `(category_id, group_id)` → `categories` (`ON DELETE CASCADE`). A new expense whose description contains the keyword gets the category: the **app** does the matching while the description is typed (case and accents ignored, longest keyword wins); the API only stores the list. Empty by default; archiving a category deletes its presets |
 | `expenses` | `id`, `group_id`, `category_id`, `payer_member_id`, `amount_cents`, `description` (≤ 140), `notes`, `expense_date`, `split_type`, `split_origin` ('override','category','recurring','group_default'), `participant_mode` ('all','subset'), `rule_fallback`, `source` ('manual','ai_text','ai_voice','recurring'), `created_by_user_id`, `updated_by_user_id`, `version`, `created_at`, `updated_at`, `deleted_at`, `deleted_reason` | `0 < amount_cents ≤ 100 000 000`; index `(group_id, expense_date DESC, id DESC)` for keyset pagination and date filters |
 | `expense_shares` | `expense_id`, `member_id`, `group_id`, `sort_key`, `amount_cents`, `weight` / `basis_points` / `exact_cents` (inputs kept to re-edit the split) | PK `(expense_id, member_id)`. Deferred constraint trigger: `SUM(amount_cents) = expenses.amount_cents` |
 | `payments` | `id` (client UUIDv7), `group_id`, `from_member_id`, `to_member_id`, `amount_cents`, `status` ('sent','confirmed','disputed','cancelled'), `method` ('bizum','bank_transfer','cash','other'; required by the API, NULL only on rows from before migration 0007), `note` (optional details), `created_by_user_id`, `confirmed_at`, `confirmed_by_user_id`, `version`, `created_at`, `updated_at` | `from <> to`; `0 < amount ≤ 100 000 000`; tenant-safe FKs to both members. Only `confirmed` payments count in the balance ([03 §3](03-business-rules.md#3-balance-and-payments)) |
-| `history` | `id`, `group_id`, `entity` ('expense','payment','group','group_member','category','split_rule'), `entity_id`, `version` NULL, `action`, `actor_user_id`, `reason`, `before` jsonb, `after` jsonb, `created_at` | Append-only (a trigger rejects `UPDATE`; `split_api` has no `UPDATE/DELETE`). Expense rows carry `version` and the full `before`/`after` state (shares included): `UNIQUE(entity_id, version) WHERE entity='expense'` |
+| `history` | `id`, `group_id`, `entity` ('expense','payment','group','group_member','category','category_preset','split_rule'), `entity_id`, `version` NULL, `action`, `actor_user_id`, `reason`, `before` jsonb, `after` jsonb, `created_at` | Append-only (a trigger rejects `UPDATE`; `split_api` has no `UPDATE/DELETE`). Expense rows carry `version` and the full `before`/`after` state (shares included): `UNIQUE(entity_id, version) WHERE entity='expense'` |
 
 ### Split rules as JSON
 
@@ -91,7 +96,7 @@ The app generates each expense and payment `id` (UUIDv7) before sending it. Re-s
 | `idempotency_keys` (0005) | client-generated ids |
 | `periods`, `settlement_transfers` (0006) | one running balance per group + `payments` |
 | Columns `expenses.period_id`, `expenses.adjusts_expense_id`, `household_members.joined_period_seq` / `left_period_seq` (0006; the tables were renamed `households` → `groups`, `household_members` → `group_members`) | `group_members.joined_at` / `left_at`; edits in place instead of adjustments |
-| `group_spreadsheets`, `sheet_tabs`, `push_tokens`, job-queue tables | nothing yet: those features are not built |
+| `group_spreadsheets`, `sheet_tabs`, job-queue tables | nothing yet: those features are not built |
 
 ### Future tables (created by the migration of their feature)
 
@@ -100,7 +105,6 @@ The app generates each expense and payment `id` (UUIDv7) before sending it. Re-s
 | Recurring expenses | `recurring_expenses` (template + schedule + `split_rule` jsonb); `expenses.recurring_expense_id` |
 | Budgets | `budgets` (category, amount, alert thresholds) |
 | Comments / reactions | `comments`, `reactions` |
-| Push notifications | device tokens (a `push_tokens` table, or a jsonb column on `users`) |
 | Google Sheets | spreadsheet id on `groups`, a sync hash per exported month |
 | AI | `expenses.status` ('draft','confirmed'), `expenses.source_transcript`, usage counters |
 

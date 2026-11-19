@@ -26,6 +26,12 @@ from split_ranch.repositories import groups as grepo
 from split_ranch.repositories import payments as prepo
 from split_ranch.schemas.payments import PaymentCreate, PaymentDispute, PaymentNote, PaymentRead
 from split_ranch.use_cases.common import audit, check_version, require_active
+from split_ranch.use_cases.notifications import (
+    EventKind,
+    NotificationEvent,
+    Notifier,
+    NullNotifier,
+)
 
 DEFAULT_PAGE = 50
 MAX_PAGE = 200
@@ -36,6 +42,21 @@ _TRANSITIONS: dict[str, tuple[str, tuple[str, ...], str]] = {
     "dispute": ("to", ("sent",), "disputed"),
     "cancel": ("from", ("sent", "disputed"), "cancelled"),
 }
+
+
+_NO_NOTIFIER = NullNotifier()
+
+# Transition -> (event kind, who is told: the other party of the payment).
+_TRANSITION_EVENTS: dict[str, tuple[EventKind, str]] = {
+    "confirm": ("payment_confirmed", "from"),
+    "dispute": ("payment_disputed", "from"),
+    "cancel": ("payment_cancelled", "to"),
+}
+
+
+def _event(kind: EventKind, actor: GroupActor, payment: Payment, side: str) -> NotificationEvent:
+    member = payment.from_member_id if side == "from" else payment.to_member_id
+    return NotificationEvent(kind, actor.group_id, actor.user_id, payment.id, frozenset({member}))
 
 
 def _snapshot(p: Payment) -> dict[str, object]:
@@ -62,7 +83,11 @@ def _same_payload(p: Payment, data: PaymentCreate, actor: GroupActor) -> bool:
 
 
 def record_payment(
-    session: Session, actor: GroupActor, data: PaymentCreate
+    session: Session,
+    actor: GroupActor,
+    data: PaymentCreate,
+    *,
+    notifier: Notifier = _NO_NOTIFIER,
 ) -> tuple[int, PaymentRead]:
     """Returns (201, created) or (200, stored) for an identical retry of the same id."""
     require_active(actor)
@@ -115,6 +140,11 @@ def record_payment(
         diff=_snapshot(payment),
     )
     session.commit()
+    # Sent: the receiver should confirm it. Recorded as received (cash): tell the payer.
+    if status == "sent":
+        notifier.notify(_event("payment_sent", actor, payment, "to"))
+    else:
+        notifier.notify(_event("payment_recorded", actor, payment, "from"))
     return 201, PaymentRead.model_validate(payment)
 
 
@@ -125,6 +155,8 @@ def transition_payment(
     action: str,
     data: PaymentNote | PaymentDispute,
     if_match: int | None,
+    *,
+    notifier: Notifier = _NO_NOTIFIER,
 ) -> PaymentRead:
     require_active(actor)
     who, allowed_from, target = _TRANSITIONS[action]
@@ -160,6 +192,8 @@ def transition_payment(
         diff={"before": before, "after": _snapshot(payment)},
     )
     session.commit()
+    kind, side = _TRANSITION_EVENTS[action]
+    notifier.notify(_event(kind, actor, payment, side))
     return PaymentRead.model_validate(payment)
 
 

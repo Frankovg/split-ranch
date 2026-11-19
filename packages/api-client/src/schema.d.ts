@@ -69,8 +69,35 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Me */
+        /**
+         * Update Me
+         * @description Profile and notification switches (`notifications` is a partial update).
+         */
         patch: operations["update_me_v1_me_patch"];
+        trace?: never;
+    };
+    "/v1/me/push-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register Push Token
+         * @description Register (or refresh) this device's Expo push token for the signed-in user.
+         */
+        put: operations["register_push_token_v1_me_push_tokens_put"];
+        post?: never;
+        /**
+         * Unregister Push Token
+         * @description Stop sending to this device (sign-out). Unknown tokens are ignored.
+         */
+        delete: operations["unregister_push_token_v1_me_push_tokens_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/groups": {
@@ -245,6 +272,47 @@ export interface paths {
         head?: never;
         /** Update Category */
         patch: operations["update_category_v1_groups__group_id__categories__category_id__patch"];
+        trace?: never;
+    };
+    "/v1/groups/{group_id}/category-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Category Presets
+         * @description Keywords that pick a category for new expenses (empty until members add some).
+         */
+        get: operations["list_category_presets_v1_groups__group_id__category_presets_get"];
+        put?: never;
+        /**
+         * Create Category Preset
+         * @description `409 preset_exists` when the keyword is taken (case ignored).
+         */
+        post: operations["create_category_preset_v1_groups__group_id__category_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/groups/{group_id}/category-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Category Preset */
+        delete: operations["delete_category_preset_v1_groups__group_id__category_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/groups/{group_id}/split-rules": {
@@ -553,6 +621,39 @@ export interface components {
             color?: string | null;
             /** Sort Key */
             sort_key?: number | null;
+        };
+        /**
+         * CategoryPresetCreate
+         * @description New expenses whose description contains `keyword` get `category_id`.
+         */
+        CategoryPresetCreate: {
+            /** Keyword */
+            keyword: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+        };
+        /** CategoryPresetRead */
+        CategoryPresetRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Keyword */
+            keyword: string;
+            /**
+             * Category Id
+             * Format: uuid
+             */
+            category_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** CategoryRead */
         CategoryRead: {
@@ -882,6 +983,7 @@ export interface components {
             locale: string;
             /** Memberships */
             memberships: components["schemas"]["MembershipRead"][];
+            notifications: components["schemas"]["NotificationPrefs"];
         };
         /** MeUpdate */
         MeUpdate: {
@@ -889,6 +991,7 @@ export interface components {
             display_name?: string | null;
             /** Locale */
             locale?: string | null;
+            notifications?: components["schemas"]["NotificationPrefsUpdate"] | null;
         };
         /** MemberRead */
         MemberRead: {
@@ -944,6 +1047,53 @@ export interface components {
             role: string;
             /** Status */
             status: string;
+        };
+        /**
+         * NotificationPrefs
+         * @description In-app switches. `enabled` is the master switch; the rest are per event type.
+         */
+        NotificationPrefs: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Expense Created
+             * @default true
+             */
+            expense_created: boolean;
+            /**
+             * Expense Changed
+             * @default true
+             */
+            expense_changed: boolean;
+            /**
+             * Payments
+             * @default true
+             */
+            payments: boolean;
+            /**
+             * Member Joined
+             * @default true
+             */
+            member_joined: boolean;
+        };
+        /**
+         * NotificationPrefsUpdate
+         * @description Partial update: only the fields sent change.
+         */
+        NotificationPrefsUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Expense Created */
+            expense_created?: boolean | null;
+            /** Expense Changed */
+            expense_changed?: boolean | null;
+            /** Payments */
+            payments?: boolean | null;
+            /** Member Joined */
+            member_joined?: boolean | null;
         };
         /** Page[ExpenseRead] */
         Page_ExpenseRead_: {
@@ -1078,6 +1228,27 @@ export interface components {
              * @enum {string}
              */
             split_type: "personal";
+        };
+        /** PushTokenDelete */
+        PushTokenDelete: {
+            /** Token */
+            token: string;
+        };
+        /** PushTokenIn */
+        PushTokenIn: {
+            /** Token */
+            token: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios";
+            /**
+             * Locale
+             * @default es
+             * @enum {string}
+             */
+            locale?: "es" | "en";
         };
         /** RevisionRead */
         RevisionRead: {
@@ -1229,6 +1400,8 @@ export interface components {
 export type BalanceRead = components['schemas']['BalanceRead'];
 export type BasisPointsShare = components['schemas']['BasisPointsShare'];
 export type CategoryCreate = components['schemas']['CategoryCreate'];
+export type CategoryPresetCreate = components['schemas']['CategoryPresetCreate'];
+export type CategoryPresetRead = components['schemas']['CategoryPresetRead'];
 export type CategoryRead = components['schemas']['CategoryRead'];
 export type CategoryRuleRead = components['schemas']['CategoryRuleRead'];
 export type CategoryTotalRead = components['schemas']['CategoryTotalRead'];
@@ -1254,6 +1427,8 @@ export type MeUpdate = components['schemas']['MeUpdate'];
 export type MemberRead = components['schemas']['MemberRead'];
 export type MemberRef = components['schemas']['MemberRef'];
 export type MembershipRead = components['schemas']['MembershipRead'];
+export type NotificationPrefs = components['schemas']['NotificationPrefs'];
+export type NotificationPrefsUpdate = components['schemas']['NotificationPrefsUpdate'];
 export type PageExpenseRead = components['schemas']['Page_ExpenseRead_'];
 export type PagePaymentRead = components['schemas']['Page_PaymentRead_'];
 export type PayerTotalRead = components['schemas']['PayerTotalRead'];
@@ -1263,6 +1438,8 @@ export type PaymentNote = components['schemas']['PaymentNote'];
 export type PaymentRead = components['schemas']['PaymentRead'];
 export type PercentagesSplit = components['schemas']['PercentagesSplit'];
 export type PersonalSplit = components['schemas']['PersonalSplit'];
+export type PushTokenDelete = components['schemas']['PushTokenDelete'];
+export type PushTokenIn = components['schemas']['PushTokenIn'];
 export type RevisionRead = components['schemas']['RevisionRead'];
 export type ShareRead = components['schemas']['ShareRead'];
 export type SingleSplit = components['schemas']['SingleSplit'];
@@ -1393,6 +1570,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_push_token_v1_me_push_tokens_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unregister_push_token_v1_me_push_tokens_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenDelete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1901,6 +2144,108 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CategoryRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_category_presets_v1_groups__group_id__category_presets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPresetRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_category_preset_v1_groups__group_id__category_presets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryPresetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryPresetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_preset_v1_groups__group_id__category_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                preset_id: string;
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

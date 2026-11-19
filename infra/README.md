@@ -27,7 +27,7 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 
 ## 3. Render (Free web service, region Frankfurt)
 - [ ] New Blueprint from `infra/render.yaml`. It defines **one** web service running the API (there is no background worker). Migrations run at the end of the build, because the pre-deploy command is paid-only.
-- [ ] Env group `split-ranch-prod`: `DATABASE_URL`, `DATABASE_URL_SESSION`, `SUPABASE_URL`, `SUPABASE_JWT_ISSUER` (`https://<ref>.supabase.co/auth/v1`), `SUPABASE_SECRET_KEY`, `SENTRY_DSN`, `APP_ENV=prod`.
+- [ ] Env group `split-ranch-prod`: `DATABASE_URL`, `DATABASE_URL_SESSION`, `SUPABASE_URL`, `SUPABASE_JWT_ISSUER` (`https://<ref>.supabase.co/auth/v1`), `SUPABASE_SECRET_KEY`, `SENTRY_DSN`, `APP_ENV=prod`, and optionally `EXPO_ACCESS_TOKEN` (Expo push security; turn on "enhanced security for push notifications" in the Expo dashboard only after this is deployed, or every push fails with `UNAUTHORIZED`).
 - [ ] Deploys: automatic from `main` once CI passes (`autoDeployTrigger: checksPass`).
 
 ## 4. Expo / EAS (free tier)

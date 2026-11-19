@@ -54,7 +54,7 @@ export function SignInScreen() {
           {!available ? (
             <Text className='text-center text-sm text-muted-foreground'>{t('auth.notConfigured')}</Text>
           ) : null}
-          <Button size='lg' variant='outline' onPress={() => router.push('/quick-splits')}>
+          <Button size='lg' variant='outline' onPress={() => router.navigate('/quick-splits')}>
             <Icon as={Calculator} size={20} />
             <Text>{t('auth.quickSplits')}</Text>
           </Button>
@@ -66,7 +66,7 @@ export function SignInScreen() {
             <Text>{t('auth.privacy')}</Text>
           </Button>
           {__DEV__ ? (
-            <Button variant='ghost' onPress={() => router.push('/dev/gallery')}>
+            <Button variant='ghost' onPress={() => router.navigate('/dev/gallery')}>
               <Icon as={Palette} size={18} />
               <Text>{t('settings.gallery')}</Text>
             </Button>

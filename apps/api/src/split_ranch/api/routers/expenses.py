@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, Query, Response
 from fastapi.responses import JSONResponse
 
-from split_ranch.api.deps import GroupActorDep, IfMatchDep, SessionDep, etag
+from split_ranch.api.deps import GroupActorDep, IfMatchDep, NotifierDep, SessionDep, etag
 from split_ranch.repositories.expenses import ExpenseFilters
 from split_ranch.schemas.common import Page
 from split_ranch.schemas.expenses import (
@@ -72,8 +72,10 @@ def get_summary(
 
 
 @router.post("/expenses", status_code=201, response_model=ExpenseRead)
-def create_expense(data: ExpenseCreate, actor: GroupActorDep, session: SessionDep) -> JSONResponse:
-    result = expenses.create_expense(session, actor, data)
+def create_expense(
+    data: ExpenseCreate, actor: GroupActorDep, session: SessionDep, notifier: NotifierDep
+) -> JSONResponse:
+    result = expenses.create_expense(session, actor, data, notifier=notifier)
     return JSONResponse(result.body, status_code=result.status, headers=etag(result.version))
 
 
@@ -101,8 +103,9 @@ def update_expense(
     session: SessionDep,
     if_match: IfMatchDep,
     response: Response,
+    notifier: NotifierDep,
 ) -> ExpenseRead:
-    result = expenses.update_expense(session, actor, expense_id, data, if_match)
+    result = expenses.update_expense(session, actor, expense_id, data, if_match, notifier=notifier)
     response.headers.update(etag(result.version))
     return result
 
@@ -113,9 +116,12 @@ def delete_expense(
     actor: GroupActorDep,
     session: SessionDep,
     if_match: IfMatchDep,
+    notifier: NotifierDep,
     data: Annotated[ExpenseDeleteIn | None, Body()] = None,
 ) -> Response:
-    expenses.delete_expense(session, actor, expense_id, data or ExpenseDeleteIn(), if_match)
+    expenses.delete_expense(
+        session, actor, expense_id, data or ExpenseDeleteIn(), if_match, notifier=notifier
+    )
     return Response(status_code=204)
 
 

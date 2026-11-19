@@ -1,14 +1,17 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/lib/api';
 import { queryKeys } from '@/lib/query/client';
+import { invalidateExpenseChange, invalidatePaymentChange } from './invalidation';
 import type {
   CategoryCreateInput,
+  CategoryPresetCreateInput,
   ExpenseListFilters,
   Expense,
   ExpenseCreateInput,
   ExpenseUpdateInput,
   Payment,
   PaymentCreateInput,
+  SplitRule,
   SummaryFilters,
 } from './types';
 
@@ -46,6 +49,28 @@ export function useCategories(groupId: string | undefined) {
           params: { path: { group_id: groupId ?? '' }, query: { include_archived: true } },
         }),
       ),
+    enabled: !!groupId,
+  });
+}
+
+/** The group's category presets (keyword â†’ category), empty until members add some. */
+export function useCategoryPresets(groupId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.categoryPresets(groupId ?? ''),
+    queryFn: () =>
+      unwrap(
+        api.GET('/v1/groups/{group_id}/category-presets', { params: { path: { group_id: groupId ?? '' } } }),
+      ),
+    enabled: !!groupId,
+  });
+}
+
+/** The group's default split rule and its category rules. */
+export function useSplitRules(groupId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.splitRules(groupId ?? ''),
+    queryFn: () =>
+      unwrap(api.GET('/v1/groups/{group_id}/split-rules', { params: { path: { group_id: groupId ?? '' } } })),
     enabled: !!groupId,
   });
 }
@@ -134,10 +159,14 @@ export function usePayments(groupId: string | undefined) {
   });
 }
 
-/** Any expense or payment change can alter balances, lists and totals: refresh the group. */
-function useInvalidateGroup(groupId: string) {
+function useInvalidateExpenseChange(groupId: string) {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: queryKeys.group(groupId) });
+  return () => invalidateExpenseChange(qc, groupId);
+}
+
+function useInvalidatePaymentChange(groupId: string) {
+  const qc = useQueryClient();
+  return () => invalidatePaymentChange(qc, groupId);
 }
 
 /** Membership changes also change `/me` and the group list. */
@@ -233,8 +262,44 @@ export function useCreateCategory(groupId: string) {
   });
 }
 
+export function useCreateCategoryPreset(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CategoryPresetCreateInput) =>
+      unwrap(
+        api.POST('/v1/groups/{group_id}/category-presets', { params: { path: { group_id: groupId } }, body: input }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
+  });
+}
+
+export function useDeleteCategoryPreset(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (presetId: string) =>
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}/category-presets/{preset_id}', {
+          params: { path: { group_id: groupId, preset_id: presetId } },
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
+  });
+}
+
+/** Replace the group's default rule; it applies only to expenses created afterwards. */
+export function useSetDefaultRule(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rule: SplitRule) =>
+      unwrap(
+        api.PUT('/v1/groups/{group_id}/split-rules/default', { params: { path: { group_id: groupId } }, body: rule }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.splitRules(groupId) }),
+  });
+}
+
 export function useCreateExpense(groupId: string) {
-  const invalidate = useInvalidateGroup(groupId);
+  const invalidate = useInvalidateExpenseChange(groupId);
   return useMutation({
     // The client-generated `input.id` makes the POST idempotent: a retry returns the
     // stored expense instead of creating a duplicate.
@@ -245,7 +310,7 @@ export function useCreateExpense(groupId: string) {
 }
 
 export function useUpdateExpense(groupId: string) {
-  const invalidate = useInvalidateGroup(groupId);
+  const invalidate = useInvalidateExpenseChange(groupId);
   return useMutation({
     mutationFn: ({ expense, changes }: { expense: Expense; changes: ExpenseUpdateInput }) =>
       unwrap(
@@ -259,7 +324,7 @@ export function useUpdateExpense(groupId: string) {
 }
 
 export function useDeleteExpense(groupId: string) {
-  const invalidate = useInvalidateGroup(groupId);
+  const invalidate = useInvalidateExpenseChange(groupId);
   return useMutation({
     mutationFn: (expense: Expense) =>
       unwrap(
@@ -272,7 +337,7 @@ export function useDeleteExpense(groupId: string) {
 }
 
 export function useRecordPayment(groupId: string) {
-  const invalidate = useInvalidateGroup(groupId);
+  const invalidate = useInvalidatePaymentChange(groupId);
   return useMutation({
     // Client-generated id: a retry returns the stored payment (no double payment).
     mutationFn: (input: PaymentCreateInput) =>
@@ -300,7 +365,7 @@ function postPaymentAction(groupId: string, payment: Payment, action: PaymentAct
 }
 
 export function usePaymentAction(groupId: string) {
-  const invalidate = useInvalidateGroup(groupId);
+  const invalidate = useInvalidatePaymentChange(groupId);
   return useMutation({
     mutationFn: ({ payment, action, note }: { payment: Payment; action: PaymentAction; note?: string }) =>
       unwrap(postPaymentAction(groupId, payment, action, note)),

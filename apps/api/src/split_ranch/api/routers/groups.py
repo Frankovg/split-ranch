@@ -1,13 +1,21 @@
-"""Groups, invitation code, members, categories and split rules."""
+"""Groups, invitation code, members, categories, category presets and split rules."""
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Response
+from fastapi import APIRouter, Body, Depends, Response
 
-from split_ranch.api.deps import ActorDep, GroupActorDep, SessionDep
+from split_ranch.api.deps import (
+    ActorDep,
+    GroupActorDep,
+    NotifierDep,
+    SessionDep,
+    limit_invitations,
+)
 from split_ranch.schemas.groups import (
     CategoryCreate,
+    CategoryPresetCreate,
+    CategoryPresetRead,
     CategoryRead,
     CategoryUpdate,
     GroupCreate,
@@ -66,14 +74,16 @@ def revoke_invitation(actor: GroupActorDep, session: SessionDep) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/invitations/{code}")
+@router.get("/invitations/{code}", dependencies=[Depends(limit_invitations)])
 def preview_invitation(code: str, actor: ActorDep, session: SessionDep) -> InvitationPreview:
     return groups.preview_invitation(session, actor, code)
 
 
-@router.post("/invitations/{code}/accept")
-def accept_invitation(code: str, actor: ActorDep, session: SessionDep) -> GroupRead:
-    return groups.accept_invitation(session, actor, code)
+@router.post("/invitations/{code}/accept", dependencies=[Depends(limit_invitations)])
+def accept_invitation(
+    code: str, actor: ActorDep, session: SessionDep, notifier: NotifierDep
+) -> GroupRead:
+    return groups.accept_invitation(session, actor, code, notifier=notifier)
 
 
 # ---------------------------------------------------------------- members
@@ -119,6 +129,29 @@ def update_category(
 @router.delete("/groups/{group_id}/categories/{category_id}", status_code=204)
 def archive_category(category_id: UUID, actor: GroupActorDep, session: SessionDep) -> Response:
     rules.archive_category(session, actor, category_id)
+    return Response(status_code=204)
+
+
+# ------------------------------------------------------- category presets
+
+
+@router.get("/groups/{group_id}/category-presets")
+def list_category_presets(actor: GroupActorDep, session: SessionDep) -> list[CategoryPresetRead]:
+    """Keywords that pick a category for new expenses (empty until members add some)."""
+    return rules.list_category_presets(session, actor)
+
+
+@router.post("/groups/{group_id}/category-presets", status_code=201)
+def create_category_preset(
+    data: CategoryPresetCreate, actor: GroupActorDep, session: SessionDep
+) -> CategoryPresetRead:
+    """`409 preset_exists` when the keyword is taken (case ignored)."""
+    return rules.create_category_preset(session, actor, data)
+
+
+@router.delete("/groups/{group_id}/category-presets/{preset_id}", status_code=204)
+def delete_category_preset(preset_id: UUID, actor: GroupActorDep, session: SessionDep) -> Response:
+    rules.delete_category_preset(session, actor, preset_id)
     return Response(status_code=204)
 
 

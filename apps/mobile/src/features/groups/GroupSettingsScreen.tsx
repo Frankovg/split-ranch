@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Share2, UserMinus } from 'lucide-react-native';
+import { ChevronRight, Percent, Share2, UserMinus, Wand2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Alert, Share, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Text } from '@/components/ui/text';
+import { currentMoneyLocale } from '@/i18n';
 import { apiErrorCode } from '@/lib/api';
 import {
   useCreateInvitation,
@@ -19,10 +20,11 @@ import {
   useLeaveGroup,
   useRemoveMember,
   useRenameGroup,
+  useSplitRules,
 } from './api';
 import { activeMembers, ErrorScreen, LoadingScreen, memberName } from './components';
 import { useGroupId } from './route';
-import type { Group } from './types';
+import type { Group, SplitRule } from './types';
 
 /** Name, members and invite code (any member); remove members and delete (admin only). */
 export function GroupSettingsScreen() {
@@ -43,6 +45,7 @@ function Settings({ group }: { group: Group }) {
   const leave = useLeaveGroup(group.id);
   const removeMember = useRemoveMember(group.id);
   const deleteGroup = useDeleteGroup(group.id);
+  const rules = useSplitRules(group.id);
 
   const balanceError = (error: unknown) =>
     toast.error(
@@ -137,6 +140,40 @@ function Settings({ group }: { group: Group }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('rule.title')}</CardTitle>
+          <CardDescription>
+            {rules.data ? <RuleSummary group={group} rule={rules.data.default} /> : t('rule.settingsHint')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant='outline'
+            onPress={() => router.navigate({ pathname: '/group/[groupId]/split-rule', params: { groupId: group.id } })}>
+            <Icon as={Percent} size={18} />
+            <Text>{t('rule.edit')}</Text>
+            <Icon as={ChevronRight} size={18} className='ml-auto' />
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('group.presets')}</CardTitle>
+          <CardDescription>{t('group.presetsHint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant='outline'
+            onPress={() => router.navigate({ pathname: '/group/[groupId]/category-presets', params: { groupId: group.id } })}>
+            <Icon as={Wand2} size={18} />
+            <Text>{t('group.presets')}</Text>
+            <Icon as={ChevronRight} size={18} className='ml-auto' />
+          </Button>
+        </CardContent>
+      </Card>
+
       <Button variant='outline' disabled={leave.isPending} onPress={onLeave}>
         <Text>{t('group.leave')}</Text>
       </Button>
@@ -166,4 +203,16 @@ function Settings({ group }: { group: Group }) {
       ) : null}
     </Screen>
   );
+}
+
+/** "Equal parts" or "Custom: You 60 %, Ana 40 %" (members who left are not listed). */
+function RuleSummary({ group, rule }: { group: Group; rule: SplitRule }) {
+  const { t } = useTranslation();
+  if (rule.split_type !== 'percentages') return t('rule.summaryEqual');
+  const format = new Intl.NumberFormat(currentMoneyLocale(), { maximumFractionDigits: 2 });
+  const active = new Set(activeMembers(group).map((m) => m.id));
+  const parts = rule.shares
+    .filter((s) => active.has(s.member_id))
+    .map((s) => `${memberName(group, s.member_id, t)} ${format.format(s.basis_points / 100)} %`);
+  return t('rule.summaryCustom', { parts: parts.join(', ') });
 }

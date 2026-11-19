@@ -16,7 +16,7 @@ flowchart LR
 
   subgraph Supabase["Supabase — Frankfurt (eu-central-1)"]
     Auth["Supabase Auth<br/>(Google provider, JWKS)"]
-    DB[("Postgres<br/>schema app: 9 tables")]
+    DB[("Postgres<br/>schema app: 10 tables")]
   end
 
   GoogleID["Google Identity<br/>(Credential Manager)"]
@@ -31,7 +31,7 @@ flowchart LR
   App -. errors .-> Sentry
 ```
 
-One backend process: the HTTP API. **There is no background worker or job queue**: nothing the app does today needs work outside a request. Google Sheets sync and push notifications are not built; when they are, each picks the lightest option that works (sending in the request, FastAPI background tasks, Expo's own notification APIs, or `pg_cron`) before considering a queue again.
+One backend process: the HTTP API. **There is no background worker or job queue**: nothing the app does today needs work outside a request. Push notifications are sent to the Expo Push Service as a FastAPI background task right after the response (own DB session; failures are logged and reported to Sentry, never returned to the client), and push receipts are checked on a later send instead of by a scheduled job. Google Sheets sync is not built; when it is, it picks the lightest option that works (sending in the request, FastAPI background tasks or `pg_cron`) before considering a queue again.
 
 **Supabase is used for exactly two things: Auth and Postgres.** The app talks to Supabase only to sign in and keep its session fresh (`supabase-js` auth client). All data reads and writes go through FastAPI. We do **not** use the Supabase Data API (PostgREST), Realtime, Storage or Edge Functions: our tables live in a private `app` schema that is not exposed, so the publishable key shipped in the app cannot read them.
 

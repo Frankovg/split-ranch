@@ -76,7 +76,7 @@ export function ExpenseRow({
     <Pressable
       accessibilityRole='button'
       onPress={() =>
-        router.push({ pathname: '/group/[groupId]/expense/[id]', params: { groupId: group.id, id: expense.id } })
+        router.navigate({ pathname: '/group/[groupId]/expense/[id]', params: { groupId: group.id, id: expense.id } })
       }
       className='flex-row items-center gap-3 py-3 active:opacity-70'>
       <View

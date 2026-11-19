@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
+from collections.abc import Sequence
 from datetime import timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 from split_ranch.core import clock
 from split_ranch.core.actor import Actor, GroupActor
 from split_ranch.core.errors import AppError, Conflict, NotFound, Unprocessable
-from split_ranch.models import DEFAULT_SPLIT_RULE, Category, Group, GroupMember, Payment
+from split_ranch.models import DEFAULT_SPLIT_RULE, Category, Group, GroupMember, Payment, User
 from split_ranch.repositories import groups as repo
 from split_ranch.schemas.groups import (
     GroupCreate,
@@ -34,6 +35,9 @@ from split_ranch.schemas.groups import (
 )
 from split_ranch.use_cases.balance import compute_group_balance
 from split_ranch.use_cases.common import audit, require_active, require_admin
+from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
+
+_NO_NOTIFIER = NullNotifier()
 
 # Default categories copied into every new group, alphabetical. The app names them by
 # icon key in its own language; "Other" is the expense without a category (no row).
@@ -61,8 +65,15 @@ def _validate_timezone(tz: str) -> None:
         raise Unprocessable(f"Unknown time zone {tz!r}") from exc
 
 
-def _group_read(session: Session, group: Group, actor_member: GroupMember) -> GroupRead:
-    members = repo.list_members_with_users(session, group.id)
+def _group_read(
+    session: Session,
+    group: Group,
+    actor_member: GroupMember,
+    members: Sequence[tuple[GroupMember, User]] | None = None,
+) -> GroupRead:
+    """`members` may be preloaded (group lists); otherwise they are queried here."""
+    if members is None:
+        members = repo.list_members_with_users(session, group.id)
     return GroupRead(
         id=group.id,
         name=group.name,
@@ -139,9 +150,10 @@ def create_group(session: Session, actor: Actor, data: GroupCreate) -> GroupRead
 
 
 def list_groups(session: Session, actor: Actor) -> list[GroupRead]:
-    return [
-        _group_read(session, g, m) for g, m in repo.list_groups_for_user(session, actor.user_id)
-    ]
+    rows = repo.list_groups_for_user(session, actor.user_id)
+    # One members query for every group instead of one per group.
+    members = repo.members_with_users_by_group(session, [g.id for g, _ in rows])
+    return [_group_read(session, g, m, members[g.id]) for g, m in rows]
 
 
 def get_group(session: Session, actor: GroupActor) -> GroupRead:
@@ -297,7 +309,9 @@ def preview_invitation(session: Session, actor: Actor, code: str) -> InvitationP
     )
 
 
-def accept_invitation(session: Session, actor: Actor, code: str) -> GroupRead:
+def accept_invitation(
+    session: Session, actor: Actor, code: str, *, notifier: Notifier = _NO_NOTIFIER
+) -> GroupRead:
     """Join with the code. Existing expenses are never re-split for the newcomer."""
     group = _group_for_code(session, code, for_update=True)
     existing = repo.get_membership(session, group.id, actor.user_id)
@@ -343,6 +357,7 @@ def accept_invitation(session: Session, actor: Actor, code: str) -> GroupRead:
         diff={"user_id": str(actor.user_id)},
     )
     session.commit()
+    notifier.notify(NotificationEvent("member_joined", group.id, actor.user_id, member.id))
     return _group_read(session, group, member)
 
 
