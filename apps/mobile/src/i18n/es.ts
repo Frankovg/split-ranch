@@ -208,6 +208,24 @@ const es = {
       bus: 'Transporte',
     },
   },
+  rule: {
+    title: 'Cómo se dividen los gastos',
+    settingsHint: 'La división que usan los gastos nuevos, salvo que la cambies en el gasto.',
+    edit: 'Cambiar la división',
+    intro: 'Los gastos nuevos se dividen así, salvo que elijas otra división en el propio gasto.',
+    mode: { equal: 'Partes iguales', custom: 'Personalizado' },
+    hint: {
+      equal: 'Todos pagan lo mismo, también quienes se unan más tarde.',
+      custom:
+        'El porcentaje que paga cada miembro. Deben sumar 100 %; los miembros nuevos pagan 0 % hasta que lo actualices.',
+    },
+    summaryEqual: 'Partes iguales entre todos.',
+    summaryCustom: 'Personalizado: {{parts}}',
+    membersChanged: 'Los miembros han cambiado desde que se guardó esta división: revisa los porcentajes.',
+    onlyNew: 'Los cambios solo se aplican a los gastos que se añadan a partir de ahora; los existentes mantienen su división.',
+    saved: 'División guardada.',
+    saveFailed: 'No se pudo guardar la división.',
+  },
   presets: {
     title: 'Categorías automáticas',
     intro:

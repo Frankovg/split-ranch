@@ -10,6 +10,7 @@ import type {
   ExpenseUpdateInput,
   Payment,
   PaymentCreateInput,
+  SplitRule,
   SummaryFilters,
 } from './types';
 
@@ -59,6 +60,16 @@ export function useCategoryPresets(groupId: string | undefined) {
       unwrap(
         api.GET('/v1/groups/{group_id}/category-presets', { params: { path: { group_id: groupId ?? '' } } }),
       ),
+    enabled: !!groupId,
+  });
+}
+
+/** The group's default split rule and its category rules. */
+export function useSplitRules(groupId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.splitRules(groupId ?? ''),
+    queryFn: () =>
+      unwrap(api.GET('/v1/groups/{group_id}/split-rules', { params: { path: { group_id: groupId ?? '' } } })),
     enabled: !!groupId,
   });
 }
@@ -267,6 +278,18 @@ export function useDeleteCategoryPreset(groupId: string) {
         }),
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
+  });
+}
+
+/** Replace the group's default rule; it applies only to expenses created afterwards. */
+export function useSetDefaultRule(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rule: SplitRule) =>
+      unwrap(
+        api.PUT('/v1/groups/{group_id}/split-rules/default', { params: { path: { group_id: groupId } }, body: rule }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.splitRules(groupId) }),
   });
 }
 

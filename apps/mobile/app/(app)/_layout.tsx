@@ -21,6 +21,7 @@ export default function AppLayout() {
       <Stack.Screen name='group/[groupId]/insights' options={{ headerShown: true, title: t('insights.title') }} />
       <Stack.Screen name='group/[groupId]/settle' options={{ headerShown: true, title: t('settle.title') }} />
       <Stack.Screen name='group/[groupId]/settings' options={{ headerShown: true, title: t('group.settings') }} />
+      <Stack.Screen name='group/[groupId]/split-rule' options={{ headerShown: true, title: t('rule.title') }} />
       <Stack.Screen
         name='group/[groupId]/category-presets'
         options={{ headerShown: true, title: t('presets.title') }}

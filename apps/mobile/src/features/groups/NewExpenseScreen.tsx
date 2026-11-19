@@ -30,6 +30,7 @@ import {
   useDeleteExpense,
   useExpense,
   useGroup,
+  useSplitRules,
   useUpdateExpense,
 } from './api';
 import { categoryIcon, categoryLabel, selectableCategories, sortByLabel } from './categories';
@@ -39,15 +40,14 @@ import { todayIso } from './dates';
 import { useGroupId } from './route';
 import {
   equalValues,
-  initialSplitState,
-  isDefaultSplit,
   splitProblem,
   splitSignature,
   splitStateFromExpense,
   toSplitSpec,
 } from './split-form';
+import { splitStateFromRule } from './split-rule';
 import { SplitTable } from './SplitTable';
-import type { Expense, ExpenseUpdateInput, Group } from './types';
+import type { Expense, ExpenseUpdateInput, Group, SplitRule } from './types';
 
 /** Select value of "Other": the expense has no category. */
 const OTHER_CATEGORY = '__other__';
@@ -58,15 +58,28 @@ export function NewExpenseScreen({ expenseId }: { expenseId?: string }) {
   const groupId = useGroupId();
   const group = useGroup(groupId);
   const expense = useExpense(groupId, expenseId);
+  // A new expense starts from the group's default rule. If the rules cannot be loaded it
+  // starts "Equally": an untouched table is not sent, so the API still applies the rule.
+  const rules = useSplitRules(expenseId ? undefined : groupId);
 
-  if (group.isPending || (expenseId && expense.isPending)) return <LoadingScreen />;
+  if (group.isPending || (expenseId ? expense.isPending : rules.isPending)) {
+    return <LoadingScreen />;
+  }
   if (group.isError) return <ErrorScreen t={t} onRetry={() => void group.refetch()} />;
   if (expenseId && expense.isError)
     return <ErrorScreen t={t} onRetry={() => void expense.refetch()} />;
-  return <ExpenseForm group={group.data} expense={expense.data} />;
+  return <ExpenseForm group={group.data} expense={expense.data} defaultRule={rules.data?.default} />;
 }
 
-function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
+function ExpenseForm({
+  group,
+  expense,
+  defaultRule,
+}: {
+  group: Group;
+  expense?: Expense;
+  defaultRule?: SplitRule;
+}) {
   const { t } = useTranslation();
   const locale = currentMoneyLocale();
   const members = activeMembers(group);
@@ -93,7 +106,7 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
   // user chooses one by hand; edits never change the stored category on their own.
   const [categoryPicked, setCategoryPicked] = useState(editing);
   const [startSplit] = useState(() =>
-    expense ? splitStateFromExpense(expense, everyone) : initialSplitState(0, everyone),
+    expense ? splitStateFromExpense(expense, everyone) : splitStateFromRule(defaultRule, everyone),
   );
   const [split, setSplit] = useState(startSplit);
   const [submitted, setSubmitted] = useState(false);
@@ -184,8 +197,8 @@ function ExpenseForm({ group, expense }: { group: Group; expense?: Expense }) {
           category_id: categoryId || null,
           payer_member_id: payer,
           expense_date: expenseDate,
-          // Untouched table (everyone, equally) = let the group/category rule decide.
-          split: showSplit && !isDefaultSplit(split, everyone) ? toSplitSpec(split) : undefined,
+          // Untouched table (as the group rule set it up) = let the group/category rule decide.
+          split: showSplit && splitSignature(split) !== splitSignature(startSplit) ? toSplitSpec(split) : undefined,
         },
         { onSuccess, onError },
       );

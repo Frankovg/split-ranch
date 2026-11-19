@@ -29,6 +29,7 @@ export const queryKeys = {
   group: (groupId: string) => ['group', groupId] as const,
   categories: (groupId: string) => ['group', groupId, 'categories'] as const,
   categoryPresets: (groupId: string) => ['group', groupId, 'category-presets'] as const,
+  splitRules: (groupId: string) => ['group', groupId, 'split-rules'] as const,
   balance: (groupId: string) => ['group', groupId, 'balance'] as const,
   payments: (groupId: string) => ['group', groupId, 'payments'] as const,
   summary: (groupId: string, filters: Record<string, unknown> = {}) =>

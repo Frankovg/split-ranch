@@ -210,6 +210,23 @@ const en: typeof es = {
       bus: 'Transport',
     },
   },
+  rule: {
+    title: 'How expenses are split',
+    settingsHint: 'The split new expenses use unless you change it on the expense.',
+    edit: 'Change the split',
+    intro: 'New expenses are split this way unless you choose another split on the expense itself.',
+    mode: { equal: 'Equal parts', custom: 'Custom' },
+    hint: {
+      equal: 'Everyone pays the same, including people who join later.',
+      custom: 'The percentage each member pays. They must add up to 100 %; new members pay 0 % until you update it.',
+    },
+    summaryEqual: 'Equal parts between everyone.',
+    summaryCustom: 'Custom: {{parts}}',
+    membersChanged: 'Members have changed since this split was saved: check the percentages.',
+    onlyNew: 'Changes apply only to expenses added from now on; existing ones keep their split.',
+    saved: 'Split saved.',
+    saveFailed: 'Could not save the split.',
+  },
   presets: {
     title: 'Automatic categories',
     intro:

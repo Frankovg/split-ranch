@@ -23,6 +23,7 @@ import type {
   PaymentCreate,
   PaymentRead,
   ShareRead,
+  SplitRulesRead,
   SuggestionRead,
   SummaryRead,
 } from '@split-ranch/api-client';
@@ -39,6 +40,10 @@ export type CategoryCreateInput = CategoryCreate;
 export type CategoryPreset = CategoryPresetRead;
 export type CategoryPresetCreateInput = CategoryPresetCreate;
 export type Share = ShareRead;
+/** The group's default rule and the category rules (a `SplitSpec` each). */
+export type SplitRules = SplitRulesRead;
+/** A stored split rule: what new expenses use when nobody picks a split by hand. */
+export type SplitRule = SplitRulesRead['default'];
 export type Expense = ExpenseRead;
 export type ExpensePage = PageExpenseRead;
 export type PaymentPage = PagePaymentRead;
