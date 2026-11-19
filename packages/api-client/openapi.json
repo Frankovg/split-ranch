@@ -125,6 +125,7 @@
           "me"
         ],
         "summary": "Update Me",
+        "description": "Profile and notification switches (`notifications` is a partial update).",
         "operationId": "update_me_v1_me_patch",
         "parameters": [
           {
@@ -164,6 +165,110 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/push-tokens": {
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Register Push Token",
+        "description": "Register (or refresh) this device's Expo push token for the signed-in user.",
+        "operationId": "register_push_token_v1_me_push_tokens_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Unregister Push Token",
+        "description": "Stop sending to this device (sign-out). Unknown tokens are ignored.",
+        "operationId": "unregister_push_token_v1_me_push_tokens_delete",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenDelete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -4351,6 +4456,9 @@
             },
             "type": "array",
             "title": "Memberships"
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/NotificationPrefs"
           }
         },
         "type": "object",
@@ -4360,7 +4468,8 @@
           "display_name",
           "avatar_url",
           "locale",
-          "memberships"
+          "memberships",
+          "notifications"
         ],
         "title": "MeRead"
       },
@@ -4390,6 +4499,16 @@
               }
             ],
             "title": "Locale"
+          },
+          "notifications": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationPrefsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4511,6 +4630,108 @@
           "status"
         ],
         "title": "MembershipRead"
+      },
+      "NotificationPrefs": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "expense_created": {
+            "type": "boolean",
+            "title": "Expense Created",
+            "default": true
+          },
+          "expense_changed": {
+            "type": "boolean",
+            "title": "Expense Changed",
+            "default": true
+          },
+          "payments": {
+            "type": "boolean",
+            "title": "Payments",
+            "default": true
+          },
+          "member_joined": {
+            "type": "boolean",
+            "title": "Member Joined",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "expense_created",
+          "expense_changed",
+          "payments",
+          "member_joined"
+        ],
+        "title": "NotificationPrefs",
+        "description": "In-app switches. `enabled` is the master switch; the rest are per event type."
+      },
+      "NotificationPrefsUpdate": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "expense_created": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Created"
+          },
+          "expense_changed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Changed"
+          },
+          "payments": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payments"
+          },
+          "member_joined": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Joined"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NotificationPrefsUpdate",
+        "description": "Partial update: only the fields sent change."
       },
       "Page_ExpenseRead_": {
         "properties": {
@@ -4845,6 +5066,58 @@
           "split_type"
         ],
         "title": "PersonalSplit"
+      },
+      "PushTokenDelete": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^Expo(nent)?PushToken\\[.+\\]$",
+            "title": "Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "PushTokenDelete"
+      },
+      "PushTokenIn": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^Expo(nent)?PushToken\\[.+\\]$",
+            "title": "Token"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "es",
+              "en"
+            ],
+            "title": "Locale",
+            "default": "es"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token",
+          "platform"
+        ],
+        "title": "PushTokenIn"
       },
       "RevisionRead": {
         "properties": {

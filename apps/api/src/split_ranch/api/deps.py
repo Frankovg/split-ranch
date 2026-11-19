@@ -7,8 +7,8 @@ from uuid import UUID
 
 import sentry_sdk
 import structlog
-from fastapi import Depends, Header, Request
-from sqlalchemy.orm import Session
+from fastapi import BackgroundTasks, Depends, Header, Request
+from sqlalchemy.orm import Session, sessionmaker
 
 from split_ranch.core.actor import Actor, GroupActor
 from split_ranch.core.db import get_session
@@ -18,7 +18,14 @@ from split_ranch.core.observability import set_sentry_user
 from split_ranch.core.rate_limit import RateLimiter
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings
+from split_ranch.integrations.expo_push import ExpoPushClient
 from split_ranch.repositories import groups as hrepo
+from split_ranch.use_cases.notifications import (
+    NotificationEvent,
+    Notifier,
+    NullNotifier,
+    dispatch_safely,
+)
 from split_ranch.use_cases.users import ensure_user
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -113,3 +120,30 @@ IfMatchDep = Annotated[int | None, Depends(parse_if_match)]
 
 def etag(version: int) -> dict[str, str]:
     return {"ETag": f'"{version}"'}
+
+
+class BackgroundNotifier:
+    """Queues each event as a background task: it is sent after the response."""
+
+    def __init__(
+        self,
+        tasks: BackgroundTasks,
+        session_factory: sessionmaker[Session],
+        client: ExpoPushClient,
+    ) -> None:
+        self._tasks = tasks
+        self._session_factory = session_factory
+        self._client = client
+
+    def notify(self, event: NotificationEvent) -> None:
+        self._tasks.add_task(dispatch_safely, self._session_factory, self._client, event)
+
+
+def get_notifier(request: Request, background_tasks: BackgroundTasks) -> Notifier:
+    client: ExpoPushClient | None = request.app.state.push_client
+    if client is None:
+        return NullNotifier()
+    return BackgroundNotifier(background_tasks, request.app.state.session_factory, client)
+
+
+NotifierDep = Annotated[Notifier, Depends(get_notifier)]

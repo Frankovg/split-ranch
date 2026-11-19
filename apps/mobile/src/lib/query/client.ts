@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api';
 export const CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 /** Bump when response shapes or query keys change, to discard every persisted cache. */
-export const CACHE_BUSTER = '1';
+export const CACHE_BUSTER = '2';
 
 /**
  * Shared QueryClient, persisted to MMKV by PersistQueryClientProvider (app/_layout.tsx).

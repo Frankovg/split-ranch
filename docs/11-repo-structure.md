@@ -78,6 +78,7 @@ SUPABASE_SECRET_KEY=            # server only (future account deletion)
 GOOGLE_SERVICE_ACCOUNT_JSON_B64=
 GOOGLE_SHEETS_SPREADSHEET_ID=   # user-owned spreadsheet shared with the service account
 SENTRY_DSN=
+EXPO_ACCESS_TOKEN=              # server only: Expo push security token (optional)
 APP_ENV=dev
 # supabase/config.toml reads these for the local Google provider
 SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID=

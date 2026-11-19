@@ -5,7 +5,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Response
 
-from split_ranch.api.deps import ActorDep, GroupActorDep, SessionDep, limit_invitations
+from split_ranch.api.deps import (
+    ActorDep,
+    GroupActorDep,
+    NotifierDep,
+    SessionDep,
+    limit_invitations,
+)
 from split_ranch.schemas.groups import (
     CategoryCreate,
     CategoryPresetCreate,
@@ -74,8 +80,10 @@ def preview_invitation(code: str, actor: ActorDep, session: SessionDep) -> Invit
 
 
 @router.post("/invitations/{code}/accept", dependencies=[Depends(limit_invitations)])
-def accept_invitation(code: str, actor: ActorDep, session: SessionDep) -> GroupRead:
-    return groups.accept_invitation(session, actor, code)
+def accept_invitation(
+    code: str, actor: ActorDep, session: SessionDep, notifier: NotifierDep
+) -> GroupRead:
+    return groups.accept_invitation(session, actor, code, notifier=notifier)
 
 
 # ---------------------------------------------------------------- members

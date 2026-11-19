@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field
 
 from split_ranch.schemas.common import Id, ReadModel, StrictModel
+from split_ranch.schemas.notifications import NotificationPrefs, NotificationPrefsUpdate
 
 Role = Literal["admin", "member"]
 
@@ -31,11 +32,13 @@ class UserRead(ReadModel):
 
 class MeRead(UserRead):
     memberships: list[MembershipRead]
+    notifications: NotificationPrefs
 
 
 class MeUpdate(StrictModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
+    notifications: NotificationPrefsUpdate | None = None
 
 
 # ------------------------------------------------------------- groups

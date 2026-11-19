@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 from split_ranch.core.actor import Actor
 from split_ranch.core.errors import NotFound
 from split_ranch.core.security import TokenClaims
-from split_ranch.models import Group, GroupMember, User
+from split_ranch.models import DEFAULT_NOTIFICATION_PREFS, Group, GroupMember, User
 from split_ranch.schemas.groups import MembershipRead, MeRead, MeUpdate, UserRead
+from split_ranch.schemas.notifications import NotificationPrefs
 
 
 class _EnsureUserCache:
@@ -109,6 +110,9 @@ def get_me(session: Session, actor: Actor) -> MeRead:
     base = UserRead.model_validate(user)
     return MeRead(
         **base.model_dump(),
+        notifications=NotificationPrefs.model_validate(
+            {**DEFAULT_NOTIFICATION_PREFS, **(user.notification_prefs or {})}
+        ),
         memberships=[
             MembershipRead(
                 group_id=m.group_id,
@@ -128,5 +132,13 @@ def update_profile(session: Session, actor: Actor, data: MeUpdate) -> MeRead:
         user.display_name = data.display_name.strip()
     if data.locale is not None:
         user.locale = data.locale
+    if data.notifications is not None:
+        changes = data.notifications.model_dump(exclude_none=True)
+        # A new dict, so SQLAlchemy sees the JSONB column as changed.
+        user.notification_prefs = {
+            **DEFAULT_NOTIFICATION_PREFS,
+            **(user.notification_prefs or {}),
+            **changes,
+        }
     session.commit()
     return get_me(session, actor)

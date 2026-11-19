@@ -65,7 +65,8 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Group settings | Rename, members (admin badge), invite (share the code), leave; admin: remove member, delete group (type the name) |
 | Categories & rules | Group settings → "How expenses are split": the default rule, *Equal parts* (`equal` without shares: every active member, later joiners included) or *Custom* (`percentages` naming every active member, 0 % allowed, live 100 % check). Saved rules apply only to new expenses. Planned: per-category rules. Any member may edit them |
 | Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips (tap to rename, mark "Soy yo" or remove), result card with a manual "Debe / Ha pagado" button per debtor, Share |
-| Settings | Theme (system/light/dark), language, sign out. Planned: profile, notifications, delete account |
+| Settings | Theme (system/light/dark), language, **Notifications** (opens the switches screen), sign out. Planned: profile, delete account |
+| Notifications (`/notifications`) | Master switch plus one switch per event type (new expense, expense edited/deleted, payments, new member), saved on the server (`/v1/me`). Shows a notice with a button to the system settings when the OS permission is denied |
 
 ## State and data
 
@@ -98,10 +99,14 @@ Why RHF + Zod: uncontrolled inputs keep re-renders low on mid-range Android phon
 
 ## Push notifications
 
-- `expo-notifications` + Expo Push Service; FCM v1 credentials uploaded to EAS. Requires a development build and a real device for testing.
-- Register after sign-in and when permission is granted (Android 13+ runtime permission: ask in context, e.g. after creating the first expense, not at launch).
-- Channels: `expenses`, `settlement`, `reminders` (users can mute per channel in Android settings).
-- Notification payload carries `{type, group_id, path}`; tapping navigates with Expo Router.
+- `expo-notifications` + Expo Push Service. Android delivery goes through FCM: `google-services.json` (Firebase project, public identifiers, committed) is set as `android.googleServicesFile`, and the FCM V1 service-account key is uploaded to EAS (never in the repo). Requires a development build and a real device for testing.
+- Code: `src/features/notifications/` (`register.ts`, `channels.ts`, `NotificationObserver.tsx` mounted in the root layout, `NotificationSettingsScreen.tsx`).
+- **Registration:** channels → permission → Expo push token → `PUT /v1/me/push-tokens {token, platform, locale}`. Done silently after sign-in when permission is already granted, again when the token or the app language changes (the server writes the text in the device's language). The permission is asked in context: after the first saved expense, or when the user turns the master switch on; never at launch. Android 13+: the prompt only appears once a channel exists, so channels are created first.
+- **Sign-out:** `DELETE /v1/me/push-tokens` before `supabase.auth.signOut()` (it still needs the session); a failure does not block signing out.
+- **Events** (never sent to the member who did the action, to members who left, or to users with the switch off): new expense → every other active member; expense edited/deleted → its payer and participants (before and after the edit); payment sent → receiver; payment recorded as received, confirmed or disputed → payer; payment cancelled → receiver; member joined → the rest of the group.
+- **Channels:** `expenses`, `payments`, `group` (users can mute each in Android settings; `expenses` is the plugin's `defaultChannel`).
+- **Payload:** `data = {type, group_id, url}` with `url` one of `/group/<id>`, `/group/<id>/settle`, `/group/<id>/expense/<id>` (validated by `routing.ts`). A push received with the app open shows a banner and invalidates the group's queries; a tap (also from a cold start, `getLastNotificationResponse`) opens `url` with Expo Router.
+- **Server side** (`apps/api` `use_cases/notifications.py`): sent after the response as a FastAPI background task with its own DB session; Expo is called with HTTPX (batches of 100, optional `EXPO_ACCESS_TOKEN` for enhanced push security); receipts are checked lazily on the next send to the same device (15 min – 24 h after the ticket).
 
 ## Offline
 

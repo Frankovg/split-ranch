@@ -23,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { currentMoneyLocale } from '@/i18n';
 import { MAX_AMOUNT_CENTS } from '@/lib/money';
 import { apiErrorCode } from '@/lib/api';
+import { askOnceInContext } from '@/features/notifications/register';
 import {
   useCategories,
   useCategoryPresets,
@@ -200,7 +201,16 @@ function ExpenseForm({
           // Untouched table (as the group rule set it up) = let the group/category rule decide.
           split: showSplit && splitSignature(split) !== splitSignature(startSplit) ? toSplitSpec(split) : undefined,
         },
-        { onSuccess, onError },
+        {
+          onSuccess: () => {
+            onSuccess();
+            // First saved expense: a good moment to ask for the notification permission.
+            void askOnceInContext().catch((error: unknown) =>
+              console.warn('Failed to ask for the notification permission', error),
+            );
+          },
+          onError,
+        },
       );
       return;
     }

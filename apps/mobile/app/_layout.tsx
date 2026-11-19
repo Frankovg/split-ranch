@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { AuthListener } from '@/features/auth/AuthListener';
+import { NotificationObserver } from '@/features/notifications/NotificationObserver';
 import { LanguageSync } from '@/i18n/LanguageSync';
 import { CACHE_BUSTER, CACHE_MAX_AGE, queryClient } from '@/lib/query/client';
 import { queryPersister } from '@/lib/query/persister';
@@ -49,6 +50,7 @@ export default function RootLayout() {
             <ThemeSync />
             <LanguageSync />
             <AuthListener />
+            <NotificationObserver />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
             {status === 'loading' ? null : (
               <Stack screenOptions={{ headerShown: false }}>

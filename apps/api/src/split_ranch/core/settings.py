@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
+    # Push notifications through the Expo Push Service. The access token is optional until
+    # "enhanced security for push notifications" is enabled on the Expo account.
+    push_enabled: bool = True
+    expo_access_token: str | None = None
+    push_timeout_seconds: float = 5.0
+
     min_app_version: str = "0.1.0"
     public_web_url: str = "https://split.ranch"
 

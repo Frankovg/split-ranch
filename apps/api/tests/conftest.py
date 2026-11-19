@@ -197,6 +197,9 @@ def settings() -> Settings:
         log_level="WARNING",
         # apps/api/.env may hold a real DSN; tests must never report to Sentry.
         sentry_dsn=None,
+        # Tests never reach Expo; test_notifications injects its own notifier.
+        push_enabled=False,
+        expo_access_token=None,
     )
 
 

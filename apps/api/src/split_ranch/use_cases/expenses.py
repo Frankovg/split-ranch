@@ -42,6 +42,7 @@ from split_ranch.schemas.expenses import (
 )
 from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec, spec_from_json
 from split_ranch.use_cases.common import check_version, require_active
+from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
 from split_ranch.use_cases.split_resolution import (
     Resolution,
     ResolvedShare,
@@ -50,6 +51,8 @@ from split_ranch.use_cases.split_resolution import (
     rule_from_spec,
     spec_from_stored,
 )
+
+_NO_NOTIFIER = NullNotifier()
 
 DEFAULT_PAGE = 50
 MAX_PAGE = 200
@@ -327,6 +330,7 @@ def create_expense(
     data: ExpenseCreate,
     *,
     trusted_source: bool = False,
+    notifier: Notifier = _NO_NOTIFIER,
 ) -> CreateResult:
     """Create an expense. Public clients may only use `source='manual'`.
 
@@ -385,6 +389,8 @@ def create_expense(
     session.flush()
     body = to_read(session, actor, expense).model_dump(mode="json")
     session.commit()
+    # Only a real creation notifies: the idempotent retry above returned already.
+    notifier.notify(NotificationEvent("expense_created", actor.group_id, actor.user_id, expense.id))
     return CreateResult(201, body, expense.version)
 
 
@@ -465,6 +471,16 @@ def list_revisions(session: Session, actor: GroupActor, expense_id: UUID) -> lis
 # ----------------------------------------------------------------- update
 
 
+def _involved_members(
+    session: Session, expense: Expense, before: dict[str, Any]
+) -> frozenset[UUID]:
+    """Payer and participants before and after a change: who an edit or deletion affects."""
+    members = {expense.payer_member_id, UUID(before["payer_member_id"])}
+    members.update(UUID(s["member_id"]) for s in before["shares"])
+    members.update(s.member_id for s in _stored_shares(session, expense))
+    return frozenset(members)
+
+
 def _stored_spec(session: Session, expense: Expense) -> SplitSpec:
     """The expense's own split as an explicit spec (keeps its participants and inputs)."""
     stored = _stored_shares(session, expense)
@@ -479,6 +495,8 @@ def update_expense(
     expense_id: UUID,
     data: ExpenseUpdate,
     if_match: int | None,
+    *,
+    notifier: Notifier = _NO_NOTIFIER,
 ) -> ExpenseRead:
     require_active(actor)
     expense = _load(session, actor, expense_id, for_update=True)
@@ -541,6 +559,15 @@ def update_expense(
     session.flush()
     _revision(session, expense, "update", actor.user_id, before)
     session.commit()
+    notifier.notify(
+        NotificationEvent(
+            "expense_updated",
+            actor.group_id,
+            actor.user_id,
+            expense.id,
+            _involved_members(session, expense, before),
+        )
+    )
     return to_read(session, actor, expense)
 
 
@@ -550,6 +577,8 @@ def delete_expense(
     expense_id: UUID,
     data: ExpenseDeleteIn,
     if_match: int | None,
+    *,
+    notifier: Notifier = _NO_NOTIFIER,
 ) -> None:
     require_active(actor)
     expense = _load(session, actor, expense_id, for_update=True)
@@ -565,3 +594,12 @@ def delete_expense(
     session.flush()
     _revision(session, expense, "delete", actor.user_id, before, data.reason)
     session.commit()
+    notifier.notify(
+        NotificationEvent(
+            "expense_deleted",
+            actor.group_id,
+            actor.user_id,
+            expense.id,
+            _involved_members(session, expense, before),
+        )
+    )

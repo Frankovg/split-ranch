@@ -35,6 +35,9 @@ from split_ranch.schemas.groups import (
 )
 from split_ranch.use_cases.balance import compute_group_balance
 from split_ranch.use_cases.common import audit, require_active, require_admin
+from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
+
+_NO_NOTIFIER = NullNotifier()
 
 # Default categories copied into every new group, alphabetical. The app names them by
 # icon key in its own language; "Other" is the expense without a category (no row).
@@ -306,7 +309,9 @@ def preview_invitation(session: Session, actor: Actor, code: str) -> InvitationP
     )
 
 
-def accept_invitation(session: Session, actor: Actor, code: str) -> GroupRead:
+def accept_invitation(
+    session: Session, actor: Actor, code: str, *, notifier: Notifier = _NO_NOTIFIER
+) -> GroupRead:
     """Join with the code. Existing expenses are never re-split for the newcomer."""
     group = _group_for_code(session, code, for_update=True)
     existing = repo.get_membership(session, group.id, actor.user_id)
@@ -352,6 +357,7 @@ def accept_invitation(session: Session, actor: Actor, code: str) -> GroupRead:
         diff={"user_id": str(actor.user_id)},
     )
     session.commit()
+    notifier.notify(NotificationEvent("member_joined", group.id, actor.user_id, member.id))
     return _group_read(session, group, member)
 
 

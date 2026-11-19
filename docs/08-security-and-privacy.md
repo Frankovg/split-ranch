@@ -48,10 +48,10 @@ Members who left get 404 on every group route, like outsiders. Flat edit rights 
 ## Secrets management
 | Secret | Where |
 |---|---|
-| Supabase DB URLs (transaction + session pooler, `split_api` role), Supabase secret key (server only), Sentry DSN (server) | Render environment groups per env |
+| Supabase DB URLs (transaction + session pooler, `split_api` role), Supabase secret key (server only), Sentry DSN (server), Expo push access token `EXPO_ACCESS_TOKEN` (server) | Render environment groups per env |
 | Supabase Google provider client secret | Supabase dashboard (per project) |
 | EAS build-time values (Sentry auth token, Google client IDs, Supabase URL + publishable key — public, but per environment) | EAS environment variables |
-| FCM v1 service account | EAS credentials |
+| FCM v1 service account (Firebase Admin SDK key; `firebase-adminsdk.json` is git-ignored if kept locally) | EAS credentials |
 | Local dev | `.env` (git-ignored); `.env.example` committed |
 Rotation runbook documented in `infra/README.md` (Phase 7).
 
@@ -61,7 +61,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 **Personal data processed:** name, email, avatar URL (Google), group membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
 
-**Lawful bases:** contract (providing the service to members); legitimate interest (security logs, fraud/abuse prevention); consent (push notifications, optional analytics). Non-user names in Quick splits: legitimate interest of the user, minimised (first names only, encouraged), never used for anything else.
+**Lawful bases:** contract (providing the service to members); legitimate interest (security logs, fraud/abuse prevention); consent (push notifications: the Android permission plus the in-app switches in Settings → Notifications, both off-able at any time; optional analytics). Non-user names in Quick splits: legitimate interest of the user, minimised (first names only, encouraged), never used for anything else.
 
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).

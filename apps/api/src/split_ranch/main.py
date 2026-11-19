@@ -19,6 +19,7 @@ from split_ranch.core.observability import init_sentry
 from split_ranch.core.rate_limit import RateLimiter
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings, get_settings
+from split_ranch.integrations.expo_push import ExpoPushClient
 
 log = structlog.get_logger(__name__)
 
@@ -30,6 +31,7 @@ def create_app(
     *,
     engine: Engine | None = None,
     token_verifier: TokenVerifier | None = None,
+    push_client: ExpoPushClient | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_json)
@@ -52,6 +54,14 @@ def create_app(
         leeway_seconds=settings.jwt_leeway_seconds,
         cache_seconds=settings.jwks_cache_seconds,
     )
+
+    # None turns push notifications off (no request ever reaches Expo).
+    if push_client is None and settings.push_enabled:
+        push_client = ExpoPushClient(
+            access_token=settings.expo_access_token,
+            timeout_seconds=settings.push_timeout_seconds,
+        )
+    app.state.push_client = push_client
 
     app.state.user_rate_limiter = RateLimiter(settings.rate_limit_per_minute)
     app.state.invite_rate_limiter = RateLimiter(settings.invite_rate_limit_per_minute)

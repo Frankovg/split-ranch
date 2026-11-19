@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { LogOut, Palette } from 'lucide-react-native';
+import { Bell, ChevronRight, LogOut, Palette } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Text } from '@/components/ui/text';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { signOut } from '@/features/auth/google';
+import { unregisterDevice } from '@/features/notifications/register';
 import {
   usePreferencesStore,
   type LanguagePreference,
@@ -21,6 +22,16 @@ import { useSessionStore } from '@/stores/session';
 
 const THEMES: ThemePreference[] = ['system', 'light', 'dark'];
 const LANGUAGES: LanguagePreference[] = ['system', 'es', 'en'];
+
+/** Stop pushes to this phone first: the API call still needs the session. */
+async function signOutDevice() {
+  try {
+    await unregisterDevice();
+  } catch (error) {
+    console.warn('Failed to unregister the push token', error);
+  }
+  await signOut();
+}
 
 export function SettingsScreen() {
   const { t } = useTranslation();
@@ -86,11 +97,24 @@ export function SettingsScreen() {
 
       <Card>
         <CardHeader>
+          <CardTitle>{t('notifications.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button variant='outline' className='justify-start' onPress={() => router.push('/notifications')}>
+            <Icon as={Bell} size={18} />
+            <Text className='flex-1 text-left'>{t('settings.notifications')}</Text>
+            <Icon as={ChevronRight} size={18} className='text-muted-foreground' />
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t('settings.account')}</CardTitle>
         </CardHeader>
         <CardContent className='gap-3'>
           {email ? <Text className='text-muted-foreground'>{t('auth.signedInAs', { email })}</Text> : null}
-          <Button variant='outline' onPress={() => void signOut()}>
+          <Button variant='outline' onPress={() => void signOutDevice()}>
             <Icon as={LogOut} size={18} />
             <Text>{t('auth.signOut')}</Text>
           </Button>

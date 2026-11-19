@@ -72,7 +72,7 @@ def test_history_append_only(db_session: Session, expense: tuple[str, str, str])
     sp.rollback()
 
 
-def test_schema_has_nine_tables(db_session: Session) -> None:
+def test_schema_has_ten_tables(db_session: Session) -> None:
     tables = (
         db_session.execute(
             text(
@@ -92,6 +92,7 @@ def test_schema_has_nine_tables(db_session: Session) -> None:
         "groups",
         "history",
         "payments",
+        "push_tokens",
         "users",
     ]
 

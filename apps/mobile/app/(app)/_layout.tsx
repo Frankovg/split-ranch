@@ -15,6 +15,7 @@ export default function AppLayout() {
       <Stack.Screen name='(tabs)' />
       <Stack.Screen name='groups/new' options={{ headerShown: true, title: t('groups.createTitle') }} />
       <Stack.Screen name='groups/join' options={{ headerShown: true, title: t('groups.joinTitle') }} />
+      <Stack.Screen name='notifications' options={{ headerShown: true, title: t('notifications.title') }} />
       {/* The group home sets its own title (the group's name) and header actions. */}
       <Stack.Screen name='group/[groupId]' options={{ headerShown: true, title: '' }} />
       <Stack.Screen name='group/[groupId]/search' options={{ headerShown: true, title: t('search.title') }} />

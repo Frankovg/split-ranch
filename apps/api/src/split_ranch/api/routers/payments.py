@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Response
 from fastapi.responses import JSONResponse
 
-from split_ranch.api.deps import GroupActorDep, IfMatchDep, SessionDep, etag
+from split_ranch.api.deps import GroupActorDep, IfMatchDep, NotifierDep, SessionDep, etag
 from split_ranch.schemas.common import Page
 from split_ranch.schemas.payments import (
     GroupBalanceRead,
@@ -16,6 +16,7 @@ from split_ranch.schemas.payments import (
     PaymentRead,
 )
 from split_ranch.use_cases import balance, payments
+from split_ranch.use_cases.notifications import Notifier
 
 router = APIRouter(prefix="/groups/{group_id}", tags=["payments"])
 
@@ -42,9 +43,11 @@ def list_payments(
 
 
 @router.post("/payments", status_code=201, response_model=PaymentRead)
-def record_payment(data: PaymentCreate, actor: GroupActorDep, session: SessionDep) -> JSONResponse:
+def record_payment(
+    data: PaymentCreate, actor: GroupActorDep, session: SessionDep, notifier: NotifierDep
+) -> JSONResponse:
     """The payer records `sent`; the receiver records `confirmed` (cash received)."""
-    status, result = payments.record_payment(session, actor, data)
+    status, result = payments.record_payment(session, actor, data, notifier=notifier)
     return JSONResponse(
         result.model_dump(mode="json"), status_code=status, headers=etag(result.version)
     )
@@ -67,8 +70,11 @@ def _transition(
     session: SessionDep,
     if_match: int | None,
     response: Response,
+    notifier: Notifier,
 ) -> PaymentRead:
-    result = payments.transition_payment(session, actor, payment_id, action, data, if_match)
+    result = payments.transition_payment(
+        session, actor, payment_id, action, data, if_match, notifier=notifier
+    )
     response.headers.update(etag(result.version))
     return result
 
@@ -80,11 +86,12 @@ def confirm_payment(
     session: SessionDep,
     if_match: IfMatchDep,
     response: Response,
+    notifier: NotifierDep,
     data: PaymentNote | None = None,
 ) -> PaymentRead:
     """Receiver only."""
     return _transition(
-        "confirm", payment_id, data or PaymentNote(), actor, session, if_match, response
+        "confirm", payment_id, data or PaymentNote(), actor, session, if_match, response, notifier
     )
 
 
@@ -96,9 +103,10 @@ def dispute_payment(
     session: SessionDep,
     if_match: IfMatchDep,
     response: Response,
+    notifier: NotifierDep,
 ) -> PaymentRead:
     """Receiver only; a note is required."""
-    return _transition("dispute", payment_id, data, actor, session, if_match, response)
+    return _transition("dispute", payment_id, data, actor, session, if_match, response, notifier)
 
 
 @router.post("/payments/{payment_id}/cancel")
@@ -108,9 +116,10 @@ def cancel_payment(
     session: SessionDep,
     if_match: IfMatchDep,
     response: Response,
+    notifier: NotifierDep,
     data: PaymentNote | None = None,
 ) -> PaymentRead:
     """Payer only, while the payment is sent or disputed."""
     return _transition(
-        "cancel", payment_id, data or PaymentNote(), actor, session, if_match, response
+        "cancel", payment_id, data or PaymentNote(), actor, session, if_match, response, notifier
     )

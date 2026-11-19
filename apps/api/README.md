@@ -9,7 +9,7 @@ src/split_ranch/
 ├── schemas/       strict Pydantic v2 models (extra=forbid, discriminated union on split_type)
 ├── use_cases/     one function per business action (authz, transactions, history)
 ├── repositories/  SQLAlchemy queries, always scoped by household_id
-├── models/        SQLAlchemy 2.0 ORM, schema "app" (9 tables)
+├── models/        SQLAlchemy 2.0 ORM, schema "app" (10 tables)
 ├── api/           thin routers + dependencies (JWT -> Actor, membership -> HouseholdActor)
 └── core/          settings, db, Supabase JWT verification, logging, errors, clock, uuid7
 migrations/        Alembic (owns only the `app` schema)
@@ -37,6 +37,8 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `SUPABASE_JWT_ISSUER` | API | expected `iss`; defaults to `$SUPABASE_URL/auth/v1` |
 | `SUPABASE_SECRET_KEY` | API | account deletion only (not implemented yet) |
 | `SENTRY_DSN` | API | Sentry is initialised only when set (`send_default_pii=False`) |
+| `EXPO_ACCESS_TOKEN` | API | optional bearer token for the Expo Push Service; required once "enhanced security for push notifications" is on for the Expo account. Secret |
+| `PUSH_ENABLED` | API | `false` stops all push notifications (default `true`; tests turn it off) |
 | `APP_ENV` | all | `dev` / `test` / `staging` / `prod` (`/v1/docs` is disabled in prod) |
 | `TEST_DATABASE_URL` | tests | optional, see below |
 
