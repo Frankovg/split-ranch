@@ -71,8 +71,11 @@ def create_app(
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Min-App-Version"] = settings.min_app_version
+        # User and group bound by the auth dependencies (see api.deps.bind_log_context).
+        log_context: dict[str, str] = getattr(request.state, "log_context", {})
         log.info(
             "request",
+            **log_context,
             method=request.method,
             path=request.url.path,
             status=response.status_code,

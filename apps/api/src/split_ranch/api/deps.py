@@ -32,6 +32,18 @@ def get_settings_dep(request: Request) -> Settings:
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 
 
+def bind_log_context(request: Request, **values: str) -> None:
+    """Adds `values` to this request's log lines, the middleware's access log included.
+
+    Sync dependencies run in a worker thread with a copy of the context, so contextvars
+    bound here never reach the middleware; `request.state` (shared through the ASGI scope)
+    carries them there.
+    """
+    structlog.contextvars.bind_contextvars(**values)
+    context: dict[str, str] = getattr(request.state, "log_context", {})
+    request.state.log_context = {**context, **values}
+
+
 def get_actor(
     request: Request,
     session: SessionDep,
@@ -46,7 +58,7 @@ def get_actor(
     limiter: RateLimiter = request.app.state.user_rate_limiter
     limiter.check(claims.user_id)
     actor = ensure_user(session, claims, cache_seconds=settings.ensure_user_cache_seconds)
-    structlog.contextvars.bind_contextvars(user=hash_user_id(actor.user_id))
+    bind_log_context(request, user=hash_user_id(actor.user_id))
     set_sentry_user(actor.user_id)
     return actor
 
@@ -60,13 +72,15 @@ def limit_invitations(request: Request, actor: ActorDep) -> None:
     limiter.check(actor.user_id)
 
 
-def get_group_actor(group_id: UUID, actor: ActorDep, session: SessionDep) -> GroupActor:
+def get_group_actor(
+    request: Request, group_id: UUID, actor: ActorDep, session: SessionDep
+) -> GroupActor:
     """Non-members get 404 so the group's existence does not leak."""
     member = hrepo.get_membership(session, group_id, actor.user_id)
     # Members who left are not members any more: same 404 as for outsiders.
     if member is None or member.status != "active":
         raise NotFound("Group not found")
-    structlog.contextvars.bind_contextvars(group_id=str(group_id))
+    bind_log_context(request, group_id=str(group_id))
     sentry_sdk.set_tag("group_id", str(group_id))
     return GroupActor(
         user_id=actor.user_id,

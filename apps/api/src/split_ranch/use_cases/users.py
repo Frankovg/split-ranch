@@ -18,9 +18,14 @@ from split_ranch.schemas.groups import MembershipRead, MeRead, MeUpdate, UserRea
 
 
 class _EnsureUserCache:
-    """Process-local cache: skip the upsert when the same claims were seen recently."""
+    """Process-local cache: skip the upsert when the same claims were seen recently.
 
-    def __init__(self) -> None:
+    Bounded: past `max_entries`, expired entries are dropped, and if that is not enough the
+    whole cache is cleared (a miss only costs one upsert).
+    """
+
+    def __init__(self, max_entries: int = 10_000) -> None:
+        self._max_entries = max_entries
         self._lock = threading.Lock()
         self._seen: dict[UUID, tuple[float, tuple[object, ...]]] = {}
 
@@ -34,8 +39,16 @@ class _EnsureUserCache:
     def remember(self, user_id: UUID, fingerprint: tuple[object, ...], ttl: float) -> None:
         if ttl <= 0:
             return
+        now = time.monotonic()
         with self._lock:
-            self._seen[user_id] = (time.monotonic() + ttl, fingerprint)
+            if user_id not in self._seen and len(self._seen) >= self._max_entries:
+                self._seen = {k: v for k, v in self._seen.items() if v[0] > now}
+                if len(self._seen) >= self._max_entries:
+                    self._seen.clear()
+            self._seen[user_id] = (now + ttl, fingerprint)
+
+    def __len__(self) -> int:
+        return len(self._seen)
 
 
 ensure_user_cache = _EnsureUserCache()

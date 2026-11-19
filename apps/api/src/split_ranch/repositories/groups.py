@@ -47,6 +47,24 @@ def list_members_with_users(session: Session, group_id: UUID) -> Sequence[tuple[
     return [(m, u) for m, u in rows]
 
 
+def members_with_users_by_group(
+    session: Session, group_ids: Sequence[UUID]
+) -> dict[UUID, list[tuple[GroupMember, User]]]:
+    """`list_members_with_users` for several groups in one query (same order per group)."""
+    result: dict[UUID, list[tuple[GroupMember, User]]] = {gid: [] for gid in group_ids}
+    if not group_ids:
+        return result
+    rows = session.execute(
+        select(GroupMember, User)
+        .join(User, User.id == GroupMember.user_id)
+        .where(GroupMember.group_id.in_(group_ids))
+        .order_by(GroupMember.group_id, GroupMember.sort_key, GroupMember.id)
+    ).all()
+    for m, u in rows:
+        result[m.group_id].append((m, u))
+    return result
+
+
 def get_member(
     session: Session, group_id: UUID, member_id: UUID, *, for_update: bool = False
 ) -> GroupMember | None:
