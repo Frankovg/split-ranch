@@ -150,7 +150,7 @@ function Settings({ group }: { group: Group }) {
         <CardContent>
           <Button
             variant='outline'
-            onPress={() => router.push({ pathname: '/group/[groupId]/split-rule', params: { groupId: group.id } })}>
+            onPress={() => router.navigate({ pathname: '/group/[groupId]/split-rule', params: { groupId: group.id } })}>
             <Icon as={Percent} size={18} />
             <Text>{t('rule.edit')}</Text>
             <Icon as={ChevronRight} size={18} className='ml-auto' />
@@ -166,7 +166,7 @@ function Settings({ group }: { group: Group }) {
         <CardContent>
           <Button
             variant='outline'
-            onPress={() => router.push({ pathname: '/group/[groupId]/category-presets', params: { groupId: group.id } })}>
+            onPress={() => router.navigate({ pathname: '/group/[groupId]/category-presets', params: { groupId: group.id } })}>
             <Icon as={Wand2} size={18} />
             <Text>{t('group.presets')}</Text>
             <Icon as={ChevronRight} size={18} className='ml-auto' />

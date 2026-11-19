@@ -174,7 +174,7 @@ function ExpenseForm({
 
   const addCategory = () => {
     setKnownCategoryIds(categoryList.map((c) => c.id));
-    router.push({ pathname: '/group/[groupId]/category/new', params: { groupId: group.id } });
+    router.navigate({ pathname: '/group/[groupId]/category/new', params: { groupId: group.id } });
   };
 
   const onError = (error: unknown) => {

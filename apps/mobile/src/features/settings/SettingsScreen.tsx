@@ -100,7 +100,7 @@ export function SettingsScreen() {
           <CardTitle>{t('notifications.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Button variant='outline' className='justify-start' onPress={() => router.push('/notifications')}>
+          <Button variant='outline' className='justify-start' onPress={() => router.navigate('/notifications')}>
             <Icon as={Bell} size={18} />
             <Text className='flex-1 text-left'>{t('settings.notifications')}</Text>
             <Icon as={ChevronRight} size={18} className='text-muted-foreground' />
@@ -127,7 +127,7 @@ export function SettingsScreen() {
             <CardTitle>{t('settings.developer')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button variant='secondary' onPress={() => router.push('/dev/gallery')}>
+            <Button variant='secondary' onPress={() => router.navigate('/dev/gallery')}>
               <Icon as={Palette} size={18} />
               <Text>{t('settings.gallery')}</Text>
             </Button>

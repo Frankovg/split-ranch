@@ -18,14 +18,14 @@ export function GroupHeaderActions({ groupId }: { groupId: string }) {
         variant='ghost'
         size='icon'
         accessibilityLabel={t('search.title')}
-        onPress={() => router.push({ pathname: '/group/[groupId]/search', params })}>
+        onPress={() => router.navigate({ pathname: '/group/[groupId]/search', params })}>
         <Icon as={Search} size={22} />
       </Button>
       <Button
         variant='ghost'
         size='icon'
         accessibilityLabel={t('insights.title')}
-        onPress={() => router.push({ pathname: '/group/[groupId]/insights', params })}>
+        onPress={() => router.navigate({ pathname: '/group/[groupId]/insights', params })}>
         <Icon as={ChartPie} size={22} />
       </Button>
       <Button variant='ghost' size='icon' accessibilityLabel={t('group.menu')} onPress={() => setMenuOpen(true)}>
@@ -41,13 +41,13 @@ export function GroupHeaderActions({ groupId }: { groupId: string }) {
             key: 'settle',
             icon: ArrowLeftRight,
             label: t('settle.open'),
-            onPress: () => router.push({ pathname: '/group/[groupId]/settle', params }),
+            onPress: () => router.navigate({ pathname: '/group/[groupId]/settle', params }),
           },
           {
             key: 'settings',
             icon: Settings,
             label: t('group.settings'),
-            onPress: () => router.push({ pathname: '/group/[groupId]/settings', params }),
+            onPress: () => router.navigate({ pathname: '/group/[groupId]/settings', params }),
           },
         ]}
       />
