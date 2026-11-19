@@ -16,6 +16,7 @@ from split_ranch.core.db import create_db_engine, create_session_factory
 from split_ranch.core.errors import install_error_handlers
 from split_ranch.core.logging import configure_logging
 from split_ranch.core.observability import init_sentry
+from split_ranch.core.rate_limit import RateLimiter
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings, get_settings
 
@@ -51,6 +52,9 @@ def create_app(
         leeway_seconds=settings.jwt_leeway_seconds,
         cache_seconds=settings.jwks_cache_seconds,
     )
+
+    app.state.user_rate_limiter = RateLimiter(settings.rate_limit_per_minute)
+    app.state.invite_rate_limiter = RateLimiter(settings.invite_rate_limit_per_minute)
 
     install_error_handlers(app)
 

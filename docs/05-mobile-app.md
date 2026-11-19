@@ -71,7 +71,7 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 
 | Kind | Tool |
 |---|---|
-| Server state | **TanStack Query v5**: query keys `['group', gid, 'expenses', filters]` (everything of a group under `['group', gid]`, invalidated after any expense or payment change), etc. `staleTime` 30 s for lists, invalidation after mutations |
+| Server state | **TanStack Query v5**: query keys `['group', gid, 'expenses', filters]` (everything of a group under `['group', gid]`; group tabs stay mounted, so mutations invalidate only what they change: an expense change → balance, expense lists, summaries, expense details; a payment change → balance, payments; see `features/groups/invalidation.ts`), etc. `staleTime` 30 s for lists, invalidation after mutations |
 | Persistence | `@tanstack/query-async-storage-persister` + `PersistQueryClientProvider`, backed by an encrypted MMKV instance (`split-ranch.query-cache`, same SecureStore key as the session) so the last data is shown offline. `maxAge` = `gcTime` = 24 h; bump `CACHE_BUSTER` (`src/lib/query/client.ts`) when response shapes or query keys change. Sign-out clears the cache and deletes the disk copy |
 | Session | **`supabase-js`** auth client: persists and auto-refreshes the session. Storage adapter = encrypted MMKV whose encryption key lives in `expo-secure-store` (SecureStore alone has a ~2 KB value limit, too small for a Supabase session) |
 | Client state | **Zustand**: auth status mirrored from `onAuthStateChange`, theme/language preferences, Quick-splits drafts (persisted via MMKV); the open group comes from the route |

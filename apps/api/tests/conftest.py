@@ -190,6 +190,9 @@ def settings() -> Settings:
         app_env="test",
         supabase_url="https://test-project.supabase.co",
         ensure_user_cache_seconds=0,
+        # Off by default so long tests never hit them; test_rate_limit turns them on.
+        rate_limit_per_minute=0,
+        invite_rate_limit_per_minute=0,
         log_json=False,
         log_level="WARNING",
         # apps/api/.env may hold a real DSN; tests must never report to Sentry.

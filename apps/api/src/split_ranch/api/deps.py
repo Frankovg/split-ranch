@@ -15,6 +15,7 @@ from split_ranch.core.db import get_session
 from split_ranch.core.errors import NotFound, Unauthenticated, Unprocessable
 from split_ranch.core.logging import hash_user_id
 from split_ranch.core.observability import set_sentry_user
+from split_ranch.core.rate_limit import RateLimiter
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings
 from split_ranch.repositories import groups as hrepo
@@ -41,6 +42,9 @@ def get_actor(
         raise Unauthenticated("Missing bearer token", headers={"WWW-Authenticate": "Bearer"})
     verifier: TokenVerifier = request.app.state.token_verifier
     claims = verifier.verify(authorization[7:].strip())
+    # Before any DB work, so a flooding client costs no queries.
+    limiter: RateLimiter = request.app.state.user_rate_limiter
+    limiter.check(claims.user_id)
     actor = ensure_user(session, claims, cache_seconds=settings.ensure_user_cache_seconds)
     structlog.contextvars.bind_contextvars(user=hash_user_id(actor.user_id))
     set_sentry_user(actor.user_id)
@@ -48,6 +52,12 @@ def get_actor(
 
 
 ActorDep = Annotated[Actor, Depends(get_actor)]
+
+
+def limit_invitations(request: Request, actor: ActorDep) -> None:
+    """Extra per-user limit on endpoints that take an invite code (guessing attempts)."""
+    limiter: RateLimiter = request.app.state.invite_rate_limiter
+    limiter.check(actor.user_id)
 
 
 def get_group_actor(group_id: UUID, actor: ActorDep, session: SessionDep) -> GroupActor:

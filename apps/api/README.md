@@ -41,7 +41,9 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `TEST_DATABASE_URL` | tests | optional, see below |
 
 Optional tuning: `LOG_LEVEL`, `LOG_JSON`, `MIN_APP_VERSION`, `PUBLIC_WEB_URL`, `JWT_LEEWAY_SECONDS`,
-`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`.
+`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`, `RATE_LIMIT_PER_MINUTE` (per user, default 120),
+`INVITE_RATE_LIMIT_PER_MINUTE` (invitation preview/accept, default 10); `0` disables a limit.
+Limits are kept in process memory, which is correct only while the API runs as a single process.
 
 ## Database and migrations
 
@@ -95,4 +97,4 @@ share-sum violations still fail the test. Parity tests read `../../packages/doma
 ## Not implemented yet
 
 Google Sheets sync and push notifications (no tables and no background jobs yet: each will add what
-it needs), `DELETE /me` (account deletion), rate limiting, recurring expenses.
+it needs), `DELETE /me` (account deletion), recurring expenses.

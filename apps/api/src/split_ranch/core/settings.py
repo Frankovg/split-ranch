@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Process-local cache for ensure_user (seconds); 0 disables it.
     ensure_user_cache_seconds: int = 300
 
+    # Per-user request limits (requests per minute, burst of the same size); 0 disables.
+    rate_limit_per_minute: int = 120
+    # Stricter limit on invitation preview/accept, which take a guessable code.
+    invite_rate_limit_per_minute: int = 10
+
     sentry_dsn: str | None = None
     # Render sets RENDER_GIT_COMMIT on every deploy; SENTRY_RELEASE overrides it.
     sentry_release: str | None = Field(

@@ -3,9 +3,9 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Response
+from fastapi import APIRouter, Body, Depends, Response
 
-from split_ranch.api.deps import ActorDep, GroupActorDep, SessionDep
+from split_ranch.api.deps import ActorDep, GroupActorDep, SessionDep, limit_invitations
 from split_ranch.schemas.groups import (
     CategoryCreate,
     CategoryPresetCreate,
@@ -68,12 +68,12 @@ def revoke_invitation(actor: GroupActorDep, session: SessionDep) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/invitations/{code}")
+@router.get("/invitations/{code}", dependencies=[Depends(limit_invitations)])
 def preview_invitation(code: str, actor: ActorDep, session: SessionDep) -> InvitationPreview:
     return groups.preview_invitation(session, actor, code)
 
 
-@router.post("/invitations/{code}/accept")
+@router.post("/invitations/{code}/accept", dependencies=[Depends(limit_invitations)])
 def accept_invitation(code: str, actor: ActorDep, session: SessionDep) -> GroupRead:
     return groups.accept_invitation(session, actor, code)
 
