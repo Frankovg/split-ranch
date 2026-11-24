@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-export const unstable_settings = { initialRouteName: 'sign-in' };
+export const unstable_settings = { anchor: 'sign-in' };
 
 /** Signed-out area: sign-in plus the Quick splits list (no account needed). */
 export default function AuthLayout() {
