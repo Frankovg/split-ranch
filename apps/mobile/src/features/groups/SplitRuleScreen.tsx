@@ -80,10 +80,7 @@ function RuleEditor({ group, rule }: { group: Group; rule: SplitRule }) {
     setSubmitted(true);
     if (problem !== null || save.isPending) return;
     save.mutate(toRule(state, everyone), {
-      onSuccess: () => {
-        toast.success(t('rule.saved'));
-        router.back();
-      },
+      onSuccess: () => router.back(),
       onError: () => toast.error(t('rule.saveFailed')),
     });
   };

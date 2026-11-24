@@ -61,10 +61,7 @@ export function SignInScreen() {
         </View>
 
         <View className='items-center gap-1'>
-          {/* TODO: link to the published privacy policy URL once it exists. */}
-          <Button variant='link' onPress={() => toast(t('auth.privacy'))}>
-            <Text>{t('auth.privacy')}</Text>
-          </Button>
+          {/* TODO: add a link to the published privacy policy URL (t('auth.privacy')) once it exists. */}
           {__DEV__ ? (
             <Button variant='ghost' onPress={() => router.navigate('/dev/gallery')}>
               <Icon as={Palette} size={18} />

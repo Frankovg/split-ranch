@@ -224,7 +224,6 @@ const en: typeof es = {
     summaryCustom: 'Custom: {{parts}}',
     membersChanged: 'Members have changed since this split was saved: check the percentages.',
     onlyNew: 'Changes apply only to expenses added from now on; existing ones keep their split.',
-    saved: 'Split saved.',
     saveFailed: 'Could not save the split.',
   },
   presets: {

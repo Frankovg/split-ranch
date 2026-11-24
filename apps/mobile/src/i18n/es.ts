@@ -223,7 +223,6 @@ const es = {
     summaryCustom: 'Personalizado: {{parts}}',
     membersChanged: 'Los miembros han cambiado desde que se guardó esta división: revisa los porcentajes.',
     onlyNew: 'Los cambios solo se aplican a los gastos que se añadan a partir de ahora; los existentes mantienen su división.',
-    saved: 'División guardada.',
     saveFailed: 'No se pudo guardar la división.',
   },
   presets: {
