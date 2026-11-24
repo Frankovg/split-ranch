@@ -3,6 +3,7 @@ import {
   getExpoPushTokenAsync,
   getPermissionsAsync,
   requestPermissionsAsync,
+  type DevicePushToken,
   type PermissionStatus,
 } from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -22,18 +23,22 @@ const isSupported = Platform.OS === 'android' || Platform.OS === 'ios';
 /** Last token sent to the API, so sign-out can remove it without asking Expo again. */
 let registeredToken: string | null = null;
 
+/** Last native device token handled by registerChangedToken, to drop repeated events. */
+let lastDeviceToken: string | null = null;
+
 function projectId(): string | undefined {
   const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
   return extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 }
 
-async function expoToken(): Promise<string | null> {
+/** Without devicePushToken, Expo fetches the native token itself (see registerChangedToken). */
+async function expoToken(devicePushToken?: DevicePushToken): Promise<string | null> {
   const id = projectId();
   if (!id) {
     console.warn('Push notifications disabled: the EAS projectId is missing from the app config');
     return null;
   }
-  return (await getExpoPushTokenAsync({ projectId: id })).data;
+  return (await getExpoPushTokenAsync({ projectId: id, devicePushToken })).data;
 }
 
 async function sendToken(token: string): Promise<void> {
@@ -63,6 +68,28 @@ export async function registerIfGranted(): Promise<boolean> {
   if (!token) return false;
   await sendToken(token);
   return true;
+}
+
+/**
+ * Registers the token delivered by the push token listener. On Android every native token
+ * fetch (including the one inside getExpoPushTokenAsync) also fires that listener, so this
+ * reuses the delivered token instead of fetching again (which would loop) and skips tokens
+ * it already handled.
+ */
+export async function registerChangedToken(devicePushToken: DevicePushToken): Promise<void> {
+  if (!isSupported || !isApiConfigured) return;
+  const key =
+    typeof devicePushToken.data === 'string' ? devicePushToken.data : JSON.stringify(devicePushToken.data);
+  if (key === lastDeviceToken) return;
+  lastDeviceToken = key;
+  try {
+    const token = await expoToken(devicePushToken);
+    if (token) await sendToken(token);
+  } catch (error) {
+    // Let a later event for the same token try again.
+    lastDeviceToken = null;
+    throw error;
+  }
 }
 
 /**

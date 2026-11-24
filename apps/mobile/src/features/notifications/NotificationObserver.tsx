@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import { queryClient, queryKeys } from '@/lib/query/client';
 import { useSessionStore } from '@/stores/session';
-import { registerIfGranted } from './register';
+import { registerChangedToken, registerIfGranted } from './register';
 import { notificationTarget, type NotificationTarget } from './routing';
 
 const isSupported = Platform.OS === 'android' || Platform.OS === 'ios';
@@ -57,8 +57,8 @@ export function NotificationObserver() {
 
   useEffect(() => {
     if (!isSupported || !signedIn) return;
-    const subscription = addPushTokenListener(() => {
-      void registerIfGranted().catch(warn('Failed to refresh the push token'));
+    const subscription = addPushTokenListener((token) => {
+      void registerChangedToken(token).catch(warn('Failed to refresh the push token'));
     });
     return () => subscription.remove();
   }, [signedIn]);
