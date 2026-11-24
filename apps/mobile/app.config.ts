@@ -24,6 +24,14 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
+  // EAS Update (OTA): JS/asset-only changes ship with `eas update --channel <channel>`.
+  // The fingerprint policy hashes the native project, so any native change (new native
+  // module, SDK upgrade, plugin or permission change) yields a new runtime version and
+  // needs a new build; updates never reach an incompatible binary.
+  runtimeVersion: { policy: 'fingerprint' },
+  updates: {
+    url: 'https://u.expo.dev/e64b0d63-66af-4d98-b1a0-992d6059e0a9',
+  },
   android: {
     package: 'com.splitranch.app',
     // Firebase app registration for FCM (public identifiers only; safe to commit).
