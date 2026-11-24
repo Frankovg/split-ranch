@@ -35,6 +35,8 @@ const LEGEND_VISIBLE_ROWS = 5;
 const LEGEND_ROW_HEIGHT = 28;
 const PIE_RADIUS = 76;
 const PIE_INNER_RADIUS = 54;
+/** Alpha of the slices that are not selected, so the selected one stands out. */
+const DIMMED_SLICE_ALPHA = 0.35;
 
 function capitalize(text: string): string {
   return text.charAt(0).toLocaleUpperCase() + text.slice(1);
@@ -310,7 +312,11 @@ function Donut({
         extraRadius={6}
         data={pie.slices.map((s) => ({
           value: s.cents,
-          color: tokenColor(scheme, s.color),
+          color: tokenColor(
+            scheme,
+            s.color,
+            selected && s.key !== selected.key ? DIMMED_SLICE_ALPHA : undefined,
+          ),
           focused: s.key === selectedKey,
           onPress: () => onToggle(s.key),
         }))}
@@ -365,7 +371,10 @@ function Legend({
             accessibilityState={{ selected }}
             onPress={() => onToggle(slice.key)}
             style={{ height: LEGEND_ROW_HEIGHT }}
-            className='flex-row items-center gap-2 rounded-sm px-1 active:bg-accent'
+            className={cn(
+              'flex-row items-center gap-2 rounded-sm px-1 active:bg-accent',
+              selectedKey !== undefined && !selected && 'opacity-50',
+            )}
           >
             <Swatch color={tokenColor(scheme, slice.color)} />
             <Text className={cn('flex-1 text-sm', selected && 'font-semibold')} numberOfLines={1}>

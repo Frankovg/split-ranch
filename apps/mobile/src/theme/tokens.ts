@@ -76,7 +76,7 @@ export type ColorScheme = keyof typeof TOKENS;
 export type TokenName = keyof (typeof TOKENS)['light'];
 
 /** Resolve a token to a CSS colour string usable in style props, e.g. "hsl(14 63% 42%)". */
-export function tokenColor(scheme: ColorScheme, name: TokenName): string {
+export function tokenColor(scheme: ColorScheme, name: TokenName, alpha?: number): string {
   const [h, s, l] = TOKENS[scheme][name].split(' ');
-  return `hsl(${h}, ${s}, ${l})`;
+  return alpha === undefined ? `hsl(${h}, ${s}, ${l})` : `hsla(${h}, ${s}, ${l}, ${alpha})`;
 }
