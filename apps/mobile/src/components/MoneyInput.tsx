@@ -20,6 +20,7 @@ type MoneyInputProps = {
   invalid?: boolean;
   onBlur?: () => void;
   nativeID?: string;
+  /** Applied to the outer container so callers can size the whole field (e.g. `w-full`). */
   className?: string;
 };
 
@@ -60,7 +61,7 @@ export function MoneyInput({
   const message = error ?? parseError;
 
   return (
-    <View className='gap-1'>
+    <View className={cn('gap-1', className)}>
       <View className='flex-row items-center'>
         <Input
           nativeID={nativeID}
@@ -83,7 +84,6 @@ export function MoneyInput({
             'tabular-nums flex-1 pr-10 text-right',
             size === 'lg' && 'h-16 text-3xl font-semibold',
             (invalid || message !== undefined) && 'border-destructive',
-            className,
           )}
         />
         <Text
