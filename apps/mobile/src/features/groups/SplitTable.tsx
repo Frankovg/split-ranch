@@ -106,7 +106,9 @@ export function SplitTable({ group, memberIds, state, onChange, amountCents, rea
               <View
                 key={id}
                 className={cn(
-                  'min-h-14 flex-row items-center gap-2 px-2 py-1',
+                  // No vertical padding: min-h-14 (56) already fits the 48dp inputs plus the
+                  // 1px row border, so rows keep the same height in every split mode.
+                  'min-h-14 flex-row items-center gap-2 px-2',
                   index < memberIds.length - 1 && 'border-b border-border',
                 )}>
                 <View className='flex-1 flex-row items-center gap-1'>
@@ -136,7 +138,12 @@ export function SplitTable({ group, memberIds, state, onChange, amountCents, rea
                         editable={!readOnly}
                         invalid={submitted && problem === 'percent_sum'}
                       />
-                      <MoneyText cents={shares[id] ?? 0} size='sm' tone='muted' />
+                      {/* Fixed width: if the share's text width changed while typing, the
+                          input would be resized mid-edit, and Android then restores the
+                          previous text (typing "20" ends up as "2"). */}
+                      <View className='w-20 items-end'>
+                        <MoneyText cents={shares[id] ?? 0} size='sm' tone='muted' />
+                      </View>
                     </View>
                   ) : (
                     <MoneyInput
