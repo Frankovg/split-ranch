@@ -78,66 +78,74 @@ export function GroupHomeScreen() {
         options={{ title: g.name, headerRight: () => <GroupHeaderActions groupId={g.id} /> }}
       />
       <ScreenBackground />
-      <SectionList
-        sections={sections}
-        keyExtractor={(e) => e.id}
-        stickySectionHeadersEnabled={false}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        contentContainerClassName='px-4 pt-4'
-        contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}
-        refreshControl={
-          <RefreshControl refreshing={isRefetchingByUser} onRefresh={() => void refetchByUser()} />
-        }
-        ListHeaderComponent={
-          <View className='gap-4 pb-2'>
-            <BalanceCard group={g} balance={balance.data} />
-            <ExpenseTotals
-              mine={
-                summary.data?.by_payer.find((p) => p.member_id === g.my_member_id)?.total_cents ?? 0
-              }
-              total={summary.data?.total_cents}
+      {/* Unpadded wrapper: the absolute FAB ignores the SafeAreaView's bottom padding,
+          so it must be positioned against a box that already ends above the system nav bar. */}
+      <View className='flex-1'>
+        <SectionList
+          sections={sections}
+          keyExtractor={(e) => e.id}
+          stickySectionHeadersEnabled={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          contentContainerClassName='px-4 pt-4'
+          contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetchingByUser}
+              onRefresh={() => void refetchByUser()}
             />
-          </View>
-        }
-        renderSectionHeader={({ section }) => (
-          <Text
-            className='pt-4 pb-1 text-sm font-semibold capitalize text-muted-foreground'
-            role='heading'
-          >
-            {dayHeader(section.day, locale)}
-          </Text>
-        )}
-        ItemSeparatorComponent={Separator}
-        ListFooterComponent={
-          expenses.isFetchingNextPage ? (
-            <View className='py-4'>
-              <ActivityIndicator />
+          }
+          ListHeaderComponent={
+            <View className='gap-4 pb-2'>
+              <BalanceCard group={g} balance={balance.data} />
+              <ExpenseTotals
+                mine={
+                  summary.data?.by_payer.find((p) => p.member_id === g.my_member_id)?.total_cents ??
+                  0
+                }
+                total={summary.data?.total_cents}
+              />
             </View>
-          ) : undefined
-        }
-        ListEmptyComponent={
-          <EmptyState
-            icon={ReceiptText}
-            title={t('expenses.empty')}
-            body={t('expenses.emptyBody')}
-          />
-        }
-        renderItem={({ item }) => (
-          <ExpenseRow
-            expense={item}
-            group={g}
-            category={item.category_id ? categoryById.get(item.category_id) : undefined}
-            t={t}
-          />
-        )}
-      />
-      <Fab
-        label={t('expenses.add')}
-        onPress={() =>
-          router.navigate({ pathname: '/group/[groupId]/expense/new', params: { groupId: g.id } })
-        }
-      />
+          }
+          renderSectionHeader={({ section }) => (
+            <Text
+              className='pt-4 pb-1 text-sm font-semibold capitalize text-muted-foreground'
+              role='heading'
+            >
+              {dayHeader(section.day, locale)}
+            </Text>
+          )}
+          ItemSeparatorComponent={Separator}
+          ListFooterComponent={
+            expenses.isFetchingNextPage ? (
+              <View className='py-4'>
+                <ActivityIndicator />
+              </View>
+            ) : undefined
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon={ReceiptText}
+              title={t('expenses.empty')}
+              body={t('expenses.emptyBody')}
+            />
+          }
+          renderItem={({ item }) => (
+            <ExpenseRow
+              expense={item}
+              group={g}
+              category={item.category_id ? categoryById.get(item.category_id) : undefined}
+              t={t}
+            />
+          )}
+        />
+        <Fab
+          label={t('expenses.add')}
+          onPress={() =>
+            router.navigate({ pathname: '/group/[groupId]/expense/new', params: { groupId: g.id } })
+          }
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -271,7 +279,10 @@ function BalanceCard({ group, balance }: { group: Group; balance: GroupBalance }
           <Button
             variant='outline'
             onPress={() =>
-              router.navigate({ pathname: '/group/[groupId]/settle', params: { groupId: group.id } })
+              router.navigate({
+                pathname: '/group/[groupId]/settle',
+                params: { groupId: group.id },
+              })
             }
           >
             <Icon as={ArrowLeftRight} size={18} />

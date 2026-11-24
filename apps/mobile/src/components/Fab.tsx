@@ -7,7 +7,10 @@ export const FAB_CLEARANCE = 96;
 
 /**
  * The primary "+" action, centred at the bottom of the screen (mint, as the portfolio's
- * accent). Place it as the last child of a `flex-1` container.
+ * accent). Place it as the last child of a `flex-1` container that has no bottom padding:
+ * absolute children ignore the parent's padding, so a SafeAreaView's bottom inset does not
+ * lift it above the Android navigation bar. Wrap it in a plain `flex-1` View inside the
+ * SafeAreaView instead.
  */
 export function Fab({ label, onPress }: { label: string; onPress: () => void }) {
   return (
