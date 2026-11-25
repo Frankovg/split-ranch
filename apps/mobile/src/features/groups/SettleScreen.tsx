@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import { MoneyInput } from '@/components/MoneyInput';
 import { MoneyText } from '@/components/MoneyText';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { ScreenBackground } from '@/components/ScreenBackground';
 import { currentMoneyLocale } from '@/i18n';
 import { apiErrorCode } from '@/lib/api';
+import { displayMoney } from '@/lib/money';
 import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
 import { cn } from '@/lib/utils';
 import {
@@ -31,6 +33,7 @@ import {
 import { ErrorScreen, LoadingScreen, memberName } from './components';
 import { instantLabel } from './dates';
 import { useGroupId } from './route';
+import { checkPartialAmount, halfOf } from './settle-amount';
 import type { Group, Payment, PaymentMethod, Suggestion } from './types';
 
 // Order shown in the selector; mirrors the API's PaymentMethod.
@@ -114,9 +117,20 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
   const [note, setNote] = useState('');
   // Deselected rather than selected keys: suggestions arriving after a refresh start included.
   const [deselected, setDeselected] = useState<ReadonlySet<string>>(() => new Set());
+  // Suggestions paid only in part, keyed like `suggestionKey`; absent means "pay it all" (the default).
+  // The value is the typed amount, null while empty or unparseable.
+  const [partial, setPartial] = useState<ReadonlyMap<string, number | null>>(() => new Map());
   const [submitting, setSubmitting] = useState(false);
   // Stable id per suggestion and amount: a retry reuses it, so a payment is never recorded twice.
   const paymentIds = useRef(new Map<string, string>());
+
+  const setPartialAmount = (key: string, cents: number | null | undefined) =>
+    setPartial((prev) => {
+      const next = new Map(prev);
+      if (cents === undefined) next.delete(key);
+      else next.set(key, cents);
+      return next;
+    });
 
   if (suggestions.length === 0) {
     return (
@@ -134,6 +148,14 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
   const isSelected = (s: Suggestion) => isMine(s) && (!showCheckboxes || !deselected.has(suggestionKey(s)));
   const actionable = suggestions.filter(isMine);
   const selected = suggestions.filter(isSelected);
+  // What each selected suggestion records: the full amount unless a valid partial one was typed.
+  const amountFor = (s: Suggestion): number | null => {
+    const key = suggestionKey(s);
+    if (!partial.has(key)) return s.amount_cents;
+    const check = checkPartialAmount(partial.get(key) ?? null, s.amount_cents);
+    return check.ok ? check.amountCents : null;
+  };
+  const allValid = selected.every((s) => amountFor(s) !== null);
 
   const toggle = (s: Suggestion) =>
     setDeselected((prev) => {
@@ -149,7 +171,9 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
     const trimmed = note.trim() || undefined;
     const results = await Promise.allSettled(
       selected.map(async (s) => {
-        const key = `${suggestionKey(s)}-${s.amount_cents}`;
+        // Validated by `allValid` before the button is enabled.
+        const amount = amountFor(s) ?? s.amount_cents;
+        const key = `${suggestionKey(s)}-${s.amount_cents}-${amount}`;
         let id = paymentIds.current.get(key);
         if (id === undefined) {
           id = Crypto.randomUUID();
@@ -159,12 +183,14 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
           id,
           from_member_id: s.from_member_id,
           to_member_id: s.to_member_id,
-          amount_cents: s.amount_cents,
+          amount_cents: amount,
           method,
           note: trimmed,
         });
         // Recorded: an identical suggestion later on (e.g. after a cancel) is a new payment.
         paymentIds.current.delete(key);
+        // The next suggestion for this pair (what is still owed) starts again as "pay it all".
+        setPartialAmount(suggestionKey(s), undefined);
       }),
     );
     setSubmitting(false);
@@ -173,11 +199,18 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
   };
 
   const only = selected.length === 1 ? selected[0] : undefined;
+  // The single-payment label names the amount, so a partial payment is explicit before recording it.
+  const onlyAmount = only !== undefined ? amountFor(only) : null;
+  const amountText = onlyAmount !== null ? displayMoney(onlyAmount, currentMoneyLocale()) : '';
   const buttonLabel =
     only?.from_member_id === me
-      ? t('settle.iPaid')
+      ? onlyAmount !== null
+        ? t('settle.iPaidAmount', { amount: amountText })
+        : t('settle.iPaid')
       : only?.to_member_id === me
-        ? t('settle.iReceived')
+        ? onlyAmount !== null
+          ? t('settle.iReceivedAmount', { amount: amountText })
+          : t('settle.iReceived')
         : t('settle.recordSelected', { count: selected.length });
 
   return (
@@ -193,6 +226,8 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
               mine={isMine(s)}
               checked={isSelected(s)}
               onToggle={() => toggle(s)}
+              partialCents={partial.has(suggestionKey(s)) ? (partial.get(suggestionKey(s)) ?? null) : undefined}
+              onPartialChange={(cents) => setPartialAmount(suggestionKey(s), cents)}
             />
           </View>
         ))}
@@ -227,7 +262,7 @@ function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Su
                 maxLength={280}
               />
             </View>
-            <Button disabled={submitting || selected.length === 0} onPress={() => void submit()}>
+            <Button disabled={submitting || selected.length === 0 || !allValid} onPress={() => void submit()}>
               <Text>{buttonLabel}</Text>
             </Button>
           </View>
@@ -244,6 +279,8 @@ function SuggestionRow({
   mine,
   checked,
   onToggle,
+  partialCents,
+  onPartialChange,
 }: {
   group: Group;
   suggestion: Suggestion;
@@ -251,6 +288,10 @@ function SuggestionRow({
   mine: boolean;
   checked: boolean;
   onToggle: () => void;
+  /** undefined: paying it all (default); number or null: the partial amount being typed. */
+  partialCents: number | null | undefined;
+  /** undefined goes back to paying it all. */
+  onPartialChange: (cents: number | null | undefined) => void;
 }) {
   const { t } = useTranslation();
   const me = group.my_member_id;
@@ -258,6 +299,8 @@ function SuggestionRow({
   const to = memberName(group, suggestion.to_member_id, t);
   // Coloured from the caller's side: what I owe is negative, what I am owed is positive.
   const tone = suggestion.from_member_id === me ? 'negative' : suggestion.to_member_id === me ? 'positive' : 'muted';
+  const canPayPart = mine && checked;
+  const iPay = suggestion.from_member_id === me;
 
   const content = (
     <View className={cn('flex-row items-center gap-3 py-4', showCheckbox && !mine && 'opacity-60')}>
@@ -274,16 +317,109 @@ function SuggestionRow({
     </View>
   );
 
-  if (!showCheckbox || !mine) return content;
+  const row =
+    !showCheckbox || !mine ? (
+      content
+    ) : (
+      <Pressable
+        role='checkbox'
+        aria-checked={checked}
+        aria-label={t('settle.selectSuggestion', { from, to })}
+        onPress={onToggle}
+        className='active:opacity-70'>
+        {content}
+      </Pressable>
+    );
+
+  if (!canPayPart) return row;
   return (
-    <Pressable
-      role='checkbox'
-      aria-checked={checked}
-      aria-label={t('settle.selectSuggestion', { from, to })}
-      onPress={onToggle}
-      className='active:opacity-70'>
-      {content}
-    </Pressable>
+    <View>
+      {row}
+      {partialCents === undefined ? (
+        <Button
+          variant='link'
+          size='sm'
+          className='-mt-3 mb-1 self-start px-0'
+          onPress={() => onPartialChange(suggestion.amount_cents)}>
+          <Text>{iPay ? t('settle.payPart') : t('settle.receivePart')}</Text>
+        </Button>
+      ) : (
+        <PartialAmountEditor
+          group={group}
+          suggestion={suggestion}
+          iPay={iPay}
+          valueCents={partialCents}
+          onChange={onPartialChange}
+        />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Inline editor for paying only part of a suggestion: the amount (prefilled with all of it),
+ * what will still be owed afterwards, and shortcuts for half or going back to all of it.
+ */
+function PartialAmountEditor({
+  group,
+  suggestion,
+  iPay,
+  valueCents,
+  onChange,
+}: {
+  group: Group;
+  suggestion: Suggestion;
+  iPay: boolean;
+  valueCents: number | null;
+  onChange: (cents: number | null | undefined) => void;
+}) {
+  const { t } = useTranslation();
+  const locale = currentMoneyLocale();
+  const owed = suggestion.amount_cents;
+  const check = checkPartialAmount(valueCents, owed);
+  const debtor = memberName(group, suggestion.from_member_id, t);
+  const inputId = `settle-partial-${suggestionKey(suggestion)}`;
+
+  const error = check.ok
+    ? undefined
+    : check.error === 'tooMuch'
+      ? t('settle.amountTooMuch', { amount: displayMoney(owed, locale) })
+      : t('settle.amountEmpty');
+  const remaining = check.ok
+    ? check.remainingCents === 0
+      ? t('settle.settlesAll')
+      : iPay
+        ? t('settle.remainingIOwe', { amount: displayMoney(check.remainingCents, locale) })
+        : t('settle.remainingOwedToMe', { name: debtor, amount: displayMoney(check.remainingCents, locale) })
+    : undefined;
+
+  return (
+    <View className='mb-4 gap-2 rounded-md bg-muted/50 p-3'>
+      <Label nativeID={inputId}>{iPay ? t('settle.amountToPay') : t('settle.amountReceived')}</Label>
+      <MoneyInput
+        nativeID={inputId}
+        size='lg'
+        valueCents={valueCents}
+        onChangeCents={(cents) => onChange(cents)}
+        accessibilityLabel={iPay ? t('settle.amountToPay') : t('settle.amountReceived')}
+        error={error}
+      />
+      {remaining ? (
+        <Text className='text-sm text-muted-foreground' accessibilityLiveRegion='polite'>
+          {remaining}
+        </Text>
+      ) : null}
+      <View className='flex-row flex-wrap gap-2'>
+        {owed >= 2 ? (
+          <Button size='sm' variant='outline' onPress={() => onChange(halfOf(owed))}>
+            <Text>{t('settle.half')}</Text>
+          </Button>
+        ) : null}
+        <Button size='sm' variant='ghost' onPress={() => onChange(undefined)}>
+          <Text>{t('settle.allOfIt', { amount: displayMoney(owed, locale) })}</Text>
+        </Button>
+      </View>
+    </View>
   );
 }
 
