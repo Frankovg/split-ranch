@@ -114,7 +114,6 @@ const es = {
   settle: {
     title: 'Saldar cuentas',
     open: 'Saldar cuentas',
-    suggestions: 'Pagos para quedar en paz',
     nothingToPay: 'Nadie debe nada.',
     suggestion: '{{from}} → {{to}}: {{amount}}',
     pendingConfirmation: '{{amount}} pendientes de confirmar',
@@ -127,6 +126,10 @@ const es = {
     notePlaceholder: 'Concepto, referencia…',
     iPaid: 'Ya lo he pagado',
     iReceived: 'Lo he recibido',
+    recordSelected_one: 'Registrar {{count}} pago',
+    recordSelected_other: 'Registrar {{count}} pagos',
+    selectSuggestion: 'Incluir {{from}} → {{to}}',
+    notYours: 'Solo lo pueden registrar ellos',
     payments: 'Pagos',
     noPayments: 'Aún no hay pagos.',
     pays: '{{from}} → {{to}}',

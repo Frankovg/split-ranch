@@ -1,23 +1,25 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
+import { ArrowRight, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { MoneyText } from '@/components/MoneyText';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScreenBackground } from '@/components/ScreenBackground';
 import { currentMoneyLocale } from '@/i18n';
 import { apiErrorCode } from '@/lib/api';
-import { displayMoney } from '@/lib/money';
 import { useRefreshByUser, useRefreshOnFocus } from '@/lib/query/refresh';
+import { cn } from '@/lib/utils';
 import {
   type PaymentAction,
   useBalance,
@@ -33,14 +35,20 @@ import type { Group, Payment, PaymentMethod, Suggestion } from './types';
 
 // Order shown in the selector; mirrors the API's PaymentMethod.
 const PAYMENT_METHODS: readonly PaymentMethod[] = ['bizum', 'bank_transfer', 'cash', 'other'];
+const DEFAULT_METHOD: PaymentMethod = 'bizum';
 
 function isPaymentMethod(value: string): value is PaymentMethod {
   return (PAYMENT_METHODS as readonly string[]).includes(value);
 }
 
+function suggestionKey(s: Suggestion): string {
+  return `${s.from_member_id}-${s.to_member_id}`;
+}
+
 /**
- * Settle up: suggested payments (greedy, after counting payments already sent), record one,
- * and the payment list where the receiver confirms or disputes and the payer cancels.
+ * Settle up: suggested payments (greedy, after counting payments already sent), recorded in bulk
+ * from the selected ones the caller is part of, and the payment list where the receiver confirms
+ * or disputes and the payer cancels.
  */
 export function SettleScreen() {
   const { t } = useTranslation();
@@ -71,24 +79,9 @@ export function SettleScreen() {
       <ScreenBackground />
       <ScrollView
         contentContainerClassName='gap-4 px-4 py-4'
+        keyboardShouldPersistTaps='handled'
         refreshControl={<RefreshControl refreshing={isRefetchingByUser} onRefresh={() => void refetchByUser()} />}>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settle.suggestions')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {balance.data.suggestions.length === 0 ? (
-              <Text className='text-muted-foreground'>{t('settle.nothingToPay')}</Text>
-            ) : (
-              balance.data.suggestions.map((s, i) => (
-                <View key={`${s.from_member_id}-${s.to_member_id}`}>
-                  {i > 0 ? <Separator /> : null}
-                  <SuggestionRow group={g} suggestion={s} />
-                </View>
-              ))
-            )}
-          </CardContent>
-        </Card>
+        <SuggestionsCard group={g} suggestions={balance.data.suggestions} />
 
         <Card>
           <CardHeader>
@@ -109,74 +102,199 @@ export function SettleScreen() {
   );
 }
 
-function SuggestionRow({ group, suggestion }: { group: Group; suggestion: Suggestion }) {
+/**
+ * Who owes whom, plus one shared form (method + note) that records every selected suggestion.
+ * Only suggestions the caller pays or receives can be recorded (the API rejects the rest).
+ * In a two-person group there is a single suggestion, so no checkbox: it is always included.
+ */
+function SuggestionsCard({ group, suggestions }: { group: Group; suggestions: Suggestion[] }) {
   const { t } = useTranslation();
-  const locale = currentMoneyLocale();
   const record = useRecordPayment(group.id);
-  const [method, setMethod] = useState<PaymentMethod | undefined>();
+  const [method, setMethod] = useState<PaymentMethod>(DEFAULT_METHOD);
   const [note, setNote] = useState('');
-  // Stable per suggestion: a retry reuses the id, so the payment is never recorded twice.
-  const [paymentId] = useState(() => Crypto.randomUUID());
+  // Deselected rather than selected keys: suggestions arriving after a refresh start included.
+  const [deselected, setDeselected] = useState<ReadonlySet<string>>(() => new Set());
+  const [submitting, setSubmitting] = useState(false);
+  // Stable id per suggestion and amount: a retry reuses it, so a payment is never recorded twice.
+  const paymentIds = useRef(new Map<string, string>());
+
+  if (suggestions.length === 0) {
+    return (
+      <Card>
+        <CardContent className='py-6'>
+          <Text className='text-center text-muted-foreground'>{t('settle.nothingToPay')}</Text>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const me = group.my_member_id;
-  const iPay = suggestion.from_member_id === me;
-  const iReceive = suggestion.to_member_id === me;
-  const label = t('settle.suggestion', {
-    from: memberName(group, suggestion.from_member_id, t),
-    to: memberName(group, suggestion.to_member_id, t),
-    amount: displayMoney(suggestion.amount_cents, locale),
-  });
+  const showCheckboxes = group.members.filter((m) => m.status !== 'left').length > 2;
+  const isMine = (s: Suggestion) => s.from_member_id === me || s.to_member_id === me;
+  const isSelected = (s: Suggestion) => isMine(s) && (!showCheckboxes || !deselected.has(suggestionKey(s)));
+  const actionable = suggestions.filter(isMine);
+  const selected = suggestions.filter(isSelected);
+
+  const toggle = (s: Suggestion) =>
+    setDeselected((prev) => {
+      const next = new Set(prev);
+      const key = suggestionKey(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const submit = async () => {
+    setSubmitting(true);
+    const trimmed = note.trim() || undefined;
+    const results = await Promise.allSettled(
+      selected.map(async (s) => {
+        const key = `${suggestionKey(s)}-${s.amount_cents}`;
+        let id = paymentIds.current.get(key);
+        if (id === undefined) {
+          id = Crypto.randomUUID();
+          paymentIds.current.set(key, id);
+        }
+        await record.mutateAsync({
+          id,
+          from_member_id: s.from_member_id,
+          to_member_id: s.to_member_id,
+          amount_cents: s.amount_cents,
+          method,
+          note: trimmed,
+        });
+        // Recorded: an identical suggestion later on (e.g. after a cancel) is a new payment.
+        paymentIds.current.delete(key);
+      }),
+    );
+    setSubmitting(false);
+    if (results.some((r) => r.status === 'rejected')) toast.error(t('settle.actionFailed'));
+    else setNote('');
+  };
+
+  const only = selected.length === 1 ? selected[0] : undefined;
+  const buttonLabel =
+    only?.from_member_id === me
+      ? t('settle.iPaid')
+      : only?.to_member_id === me
+        ? t('settle.iReceived')
+        : t('settle.recordSelected', { count: selected.length });
+
   return (
-    <View className='gap-2 py-3'>
-      <Text className='font-medium'>{label}</Text>
-      {iPay || iReceive ? (
-        <>
-          <View className='gap-1.5'>
-            <Label>{t('settle.method')}</Label>
-            <ToggleGroup
-              type='single'
-              variant='outline'
-              value={method}
-              onValueChange={(v) => v && isPaymentMethod(v) && setMethod(v)}
-              className='flex-wrap justify-start gap-2'>
-              {PAYMENT_METHODS.map((m) => (
-                <ToggleGroupItem key={m} value={m} className='rounded-sm border-l'>
-                  <Text>{t(`settle.method_${m}`)}</Text>
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </View>
-          <View className='gap-1.5'>
-            <Label>{t('settle.note')}</Label>
-            <Input
-              aria-label={t('settle.note')}
-              placeholder={t('settle.notePlaceholder')}
-              value={note}
-              onChangeText={setNote}
-              maxLength={280}
+    <Card>
+      <CardContent className='pt-2'>
+        {suggestions.map((s, i) => (
+          <View key={suggestionKey(s)}>
+            {i > 0 ? <Separator /> : null}
+            <SuggestionRow
+              group={group}
+              suggestion={s}
+              showCheckbox={showCheckboxes}
+              mine={isMine(s)}
+              checked={isSelected(s)}
+              onToggle={() => toggle(s)}
             />
           </View>
-          <Button
-            disabled={record.isPending || method === undefined}
-            onPress={() =>
-              method &&
-              record.mutate(
-                {
-                  id: paymentId,
-                  from_member_id: suggestion.from_member_id,
-                  to_member_id: suggestion.to_member_id,
-                  amount_cents: suggestion.amount_cents,
-                  method,
-                  note: note.trim() || undefined,
-                },
-                {
-                  onError: () => toast.error(t('settle.actionFailed')),
-                },
-              )
-            }>
-            <Text>{t(iPay ? 'settle.iPaid' : 'settle.iReceived')}</Text>
-          </Button>
-        </>
-      ) : null}
+        ))}
+
+        {actionable.length > 0 ? (
+          <View className='gap-4'>
+            <Separator />
+            <View className='gap-1.5'>
+              <Label nativeID='settle-method'>{t('settle.method')}</Label>
+              <Select
+                value={{ value: method, label: t(`settle.method_${method}`) }}
+                onValueChange={(option) => {
+                  if (option && isPaymentMethod(option.value)) setMethod(option.value);
+                }}>
+                <SelectTrigger aria-labelledby='settle-method'>
+                  <SelectValue placeholder={t('settle.method')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m} value={m} label={t(`settle.method_${m}`)} />
+                  ))}
+                </SelectContent>
+              </Select>
+            </View>
+            <View className='gap-1.5'>
+              <Label>{t('settle.note')}</Label>
+              <Input
+                aria-label={t('settle.note')}
+                placeholder={t('settle.notePlaceholder')}
+                value={note}
+                onChangeText={setNote}
+                maxLength={280}
+              />
+            </View>
+            <Button disabled={submitting || selected.length === 0} onPress={() => void submit()}>
+              <Text>{buttonLabel}</Text>
+            </Button>
+          </View>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SuggestionRow({
+  group,
+  suggestion,
+  showCheckbox,
+  mine,
+  checked,
+  onToggle,
+}: {
+  group: Group;
+  suggestion: Suggestion;
+  showCheckbox: boolean;
+  mine: boolean;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const me = group.my_member_id;
+  const from = memberName(group, suggestion.from_member_id, t);
+  const to = memberName(group, suggestion.to_member_id, t);
+  // Coloured from the caller's side: what I owe is negative, what I am owed is positive.
+  const tone = suggestion.from_member_id === me ? 'negative' : suggestion.to_member_id === me ? 'positive' : 'muted';
+
+  const content = (
+    <View className={cn('flex-row items-center gap-3 py-4', showCheckbox && !mine && 'opacity-60')}>
+      {showCheckbox ? <CheckboxBox checked={checked} /> : null}
+      <View className='flex-1 gap-1'>
+        <View className='flex-row flex-wrap items-center gap-x-2'>
+          <Text className='text-lg font-semibold'>{from}</Text>
+          <Icon as={ArrowRight} size={18} className='text-muted-foreground' />
+          <Text className='text-lg font-semibold'>{to}</Text>
+        </View>
+        {showCheckbox && !mine ? <Text className='text-sm text-muted-foreground'>{t('settle.notYours')}</Text> : null}
+      </View>
+      <MoneyText cents={suggestion.amount_cents} tone={tone} size='3xl' accessibilityPrefix={`${from} → ${to}`} />
+    </View>
+  );
+
+  if (!showCheckbox || !mine) return content;
+  return (
+    <Pressable
+      role='checkbox'
+      aria-checked={checked}
+      aria-label={t('settle.selectSuggestion', { from, to })}
+      onPress={onToggle}
+      className='active:opacity-70'>
+      {content}
+    </Pressable>
+  );
+}
+
+function CheckboxBox({ checked }: { checked: boolean }) {
+  return (
+    <View
+      className={cn(
+        'h-6 w-6 items-center justify-center rounded-md border-2',
+        checked ? 'border-primary bg-primary' : 'border-input',
+      )}>
+      {checked ? <Icon as={Check} size={16} className='text-primary-foreground' /> : null}
     </View>
   );
 }

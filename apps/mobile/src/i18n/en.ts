@@ -116,7 +116,6 @@ const en: typeof es = {
   settle: {
     title: 'Settle up',
     open: 'Settle up',
-    suggestions: 'Payments to settle up',
     nothingToPay: 'Nobody owes anything.',
     suggestion: '{{from}} → {{to}}: {{amount}}',
     pendingConfirmation: '{{amount}} waiting for confirmation',
@@ -129,6 +128,10 @@ const en: typeof es = {
     notePlaceholder: 'Reference, concept…',
     iPaid: 'I have paid',
     iReceived: 'I have received it',
+    recordSelected_one: 'Record {{count}} payment',
+    recordSelected_other: 'Record {{count}} payments',
+    selectSuggestion: 'Include {{from}} → {{to}}',
+    notYours: 'Only they can record it',
     payments: 'Payments',
     noPayments: 'No payments yet.',
     pays: '{{from}} → {{to}}',
