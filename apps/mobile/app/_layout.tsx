@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
+import { useApiWarmUpOnForeground, warmUpApi } from '@/lib/api/warm-up';
 import { AuthListener } from '@/features/auth/AuthListener';
 import { NotificationObserver } from '@/features/notifications/NotificationObserver';
 import { LanguageSync } from '@/i18n/LanguageSync';
@@ -24,12 +25,15 @@ import { tokenColor } from '@/theme/tokens';
 export { ErrorBoundary } from 'expo-router';
 
 void SplashScreen.preventAutoHideAsync();
+// Start waking the API (Render free plan sleeps when idle) while the splash is still up.
+warmUpApi();
 
 export default function RootLayout() {
   const scheme = useAppColorScheme();
   const status = useSessionStore((s) => s.status);
   const { t } = useTranslation();
   useAppStateFocus();
+  useApiWarmUpOnForeground();
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hide();
