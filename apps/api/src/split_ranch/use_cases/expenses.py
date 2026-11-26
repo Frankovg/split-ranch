@@ -13,7 +13,7 @@ import base64
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -374,6 +374,8 @@ def create_expense(
         created_by_user_id=actor.user_id,
         updated_by_user_id=actor.user_id,
         version=1,
+        # Set here (not by the DB default) so it orders expenses within a day by creation.
+        created_at=clock.now(),
     )
     if data.id is not None:
         expense.id = data.id
@@ -401,16 +403,16 @@ def get_expense(session: Session, actor: GroupActor, expense_id: UUID) -> Expens
     return to_read(session, actor, _load(session, actor, expense_id))
 
 
-def _encode_cursor(d: date, i: UUID) -> str:
-    raw = json.dumps({"d": d.isoformat(), "i": str(i)}).encode()
+def _encode_cursor(d: date, c: datetime, i: UUID) -> str:
+    raw = json.dumps({"d": d.isoformat(), "c": c.isoformat(), "i": str(i)}).encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
-def _decode_cursor(cursor: str) -> tuple[date, UUID]:
+def _decode_cursor(cursor: str) -> tuple[date, datetime, UUID]:
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        return date.fromisoformat(data["d"]), UUID(data["i"])
+        return date.fromisoformat(data["d"]), datetime.fromisoformat(data["c"]), UUID(data["i"])
     except (ValueError, KeyError, TypeError) as exc:
         raise Unprocessable("Invalid cursor") from exc
 
@@ -441,7 +443,7 @@ def list_expenses(
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.expense_date, last.id)
+        next_cursor = _encode_cursor(last.expense_date, last.created_at, last.id)
     return items, next_cursor
 
 

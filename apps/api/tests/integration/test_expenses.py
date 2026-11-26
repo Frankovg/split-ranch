@@ -167,6 +167,35 @@ def test_delete_soft(client: TestClient, house: House) -> None:
     assert revs[-1]["action"] == "delete"
 
 
+def test_list_puts_latest_expense_of_a_day_first(
+    client: TestClient, house: House, frozen_clock: FrozenClock
+) -> None:
+    # Client ids are random, so pick them in the opposite order to creation.
+    ids = sorted((uuid.uuid4() for _ in range(3)), reverse=True)
+    for n, expense_id in enumerate(ids):
+        frozen_clock.set(datetime(2026, 3, 5, 10, n, tzinfo=UTC))
+        add_expense(
+            client,
+            house,
+            "Juli",
+            amount=100,
+            payer="Juli",
+            date="2026-03-05",
+            description=f"Gasto {n}",
+            id=str(expense_id),
+        )
+    seen: list[str] = []
+    cursor = None
+    while True:
+        q = "/expenses?limit=2" + (f"&cursor={cursor}" if cursor else "")
+        page = ok(client.get(house.url(q), headers=house.h("Ana")))
+        seen += [i["description"] for i in page["items"]]
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert seen == ["Gasto 2", "Gasto 1", "Gasto 0"]
+
+
 def test_list_pagination_and_filters(client: TestClient, house: House) -> None:
     for day in range(1, 8):
         add_expense(

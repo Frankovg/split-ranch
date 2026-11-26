@@ -91,7 +91,7 @@ Pydantic models use a **discriminated union on `split_type`** (`EqualSplit`, `We
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/groups/{gid}/expenses` | filters + cursor; newest `expense_date` first (the app groups by day) |
+| GET | `/groups/{gid}/expenses` | filters + cursor; newest `expense_date` first, latest created first within a day (the app groups by day) |
 | GET | `/groups/{gid}/summary` | same filters → `{count, total_cents, by_category: [{category_id, total_cents}], by_payer: [{member_id, total_cents}]}` over live, non-personal expenses; `mine=true` sums only the caller's shares instead (their personal expenses included) |
 | POST | `/groups/{gid}/expenses` | create; idempotent by `id`; payer must be an active member |
 | GET | `/groups/{gid}/expenses/{eid}` | includes shares, `split_origin`, `rule_fallback`, `created_by_user_id`, `updated_by_user_id`, `can_edit` |
