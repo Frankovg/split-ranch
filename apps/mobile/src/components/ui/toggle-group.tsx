@@ -1,4 +1,4 @@
-// Source: react-native-reusables toggle-group (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: selected item uses the portfolio tab style (card surface, primary border, semibold text).
+// Source: react-native-reusables toggle-group (CLI 0.7.1, nativewind) @ 2026-11-07. Local changes: selected item uses the portfolio tab style (card surface, primary border, semibold text); selected non-first outline item keeps its left border (overlapping the neighbour by 1px).
 import { type ComponentProps, createContext, useContext } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { TextClassContext } from '@/components/ui/text';
@@ -59,12 +59,14 @@ function ToggleGroupItem({
   }) {
   const context = useToggleGroupContext();
   const { value } = ToggleGroupPrimitive.useRootContext();
+  const isSelected = ToggleGroupPrimitive.utils.getIsSelected(value, props.value);
+  const isOutline = context.variant === 'outline' || variant === 'outline';
 
   return (
     <TextClassContext.Provider
       value={cn(
         'text-sm text-foreground font-sans font-medium',
-        ToggleGroupPrimitive.utils.getIsSelected(value, props.value)
+        isSelected
           ? 'text-foreground font-semibold'
           : Platform.select({ web: 'group-hover:text-muted-foreground' })
       )}>
@@ -75,12 +77,15 @@ function ToggleGroupItem({
             size: context.size || size,
           }),
           props.disabled && 'opacity-50',
-          ToggleGroupPrimitive.utils.getIsSelected(value, props.value) && 'bg-card border-primary',
+          isSelected && 'bg-card border-primary',
           'min-w-0 shrink-0 rounded-none shadow-none',
           isFirst && 'rounded-l-sm',
           isLast && 'rounded-r-sm',
-          (context.variant === 'outline' || variant === 'outline') && 'border-l-0',
-          (context.variant === 'outline' || variant === 'outline') && isFirst && 'border-l',
+          isOutline && 'border-l-0',
+          isOutline && isFirst && 'border-l',
+          // Selected non-first item: restore its own left border and overlap the previous
+          // item's right border by 1px, so the primary border shows on all four sides.
+          isOutline && isSelected && !isFirst && 'border-l -ml-px',
           Platform.select({
             web: 'flex-1 focus:z-10 focus-visible:z-10',
           }),
