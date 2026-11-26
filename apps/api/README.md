@@ -1,4 +1,4 @@
-# Split Ranch API
+# Splitranch API
 
 FastAPI service (one package, `split_ranch`, one process; no background worker).
 Spec: `docs/01-architecture.md`, `docs/02-data-model.md`, `docs/03-business-rules.md`, `docs/04-api.md`.

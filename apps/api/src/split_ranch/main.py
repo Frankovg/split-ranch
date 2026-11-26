@@ -38,7 +38,7 @@ def create_app(
     init_sentry(settings)
 
     app = FastAPI(
-        title="Split Ranch",
+        title="Splitranch",
         version="0.1.0",
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,

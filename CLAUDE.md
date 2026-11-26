@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## What this is
 
-Split Ranch: Android-first app for shared expenses in groups (flat, trip, couple…) with one running balance per group and no periods, plus an offline "Quick splits" tool. Monorepo: pnpm workspaces (JS/TS) + uv (Python). Design docs live in `docs/00`–`13` (the root README still says "planning only", but the API and mobile app are implemented; docs are the spec for business rules, data model and API). Code comments and log messages must be in English; UI strings go through i18n keys only.
+Splitranch: Android-first app for shared expenses in groups (flat, trip, couple…) with one running balance per group and no periods, plus an offline "Quick splits" tool. Monorepo: pnpm workspaces (JS/TS) + uv (Python). Design docs live in `docs/00`–`13` (the root README still says "planning only", but the API and mobile app are implemented; docs are the spec for business rules, data model and API). Code comments and log messages must be in English; UI strings go through i18n keys only.
 
 - `apps/api` — FastAPI API (Python package `split_ranch`, one process, no background worker). Python 3.12.
 - `apps/mobile` — Expo SDK 58 / React Native dev-client app (not Expo Go), Expo Router, NativeWind, Zustand, i18next (Spanish default, English).

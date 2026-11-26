@@ -25,7 +25,7 @@ Design consequence: one tab sync = **2–3 requests** (structure batchUpdate + v
 
 ## Spreadsheet layout
 
-One spreadsheet per group: `Split Ranch — <Group name>`.
+One spreadsheet per group: `Splitranch — <Group name>`.
 
 | Tab | Content |
 |---|---|

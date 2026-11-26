@@ -3,7 +3,7 @@ import type es from './es';
 /** English UI strings; typed against the Spanish source so keys never drift. */
 const en: typeof es = {
   common: {
-    appName: 'Split Ranch',
+    appName: 'Splitranch',
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
@@ -37,7 +37,7 @@ const en: typeof es = {
   },
   backend: {
     title: 'Not connected yet',
-    body: 'This screen needs the Split Ranch server, which is not connected in this build yet.',
+    body: 'This screen needs the Splitranch server, which is not connected in this build yet.',
   },
   home: {
     yourBalance: 'Your balance in the group',
@@ -77,7 +77,7 @@ const en: typeof es = {
     invite: 'Invite',
     inviteSomeone: 'Invite someone to share expenses',
     inviteHint: 'Anyone in the group can invite. The code expires after 7 days.',
-    inviteMessage: 'Join my group "{{name}}" on Split Ranch with this code: {{code}}',
+    inviteMessage: 'Join my group "{{name}}" on Splitranch with this code: {{code}}',
     inviteFailed: 'Could not create the invitation.',
     leave: 'Leave the group',
     leaveTitle: 'Leave "{{name}}"?',
@@ -302,7 +302,7 @@ const en: typeof es = {
     memberJoined: 'New member',
     memberJoinedHint: 'Someone joins one of your groups.',
     blockedTitle: 'Notifications are blocked',
-    blockedBody: 'Allow them for Split Ranch in the system settings to get alerts.',
+    blockedBody: 'Allow them for Splitranch in the system settings to get alerts.',
     openSettings: 'Open settings',
     footer: 'We never notify you about what you do yourself. You can also mute each type in the Android settings.',
     saveError: 'Could not save. Please try again.',

@@ -2,7 +2,7 @@
 
 Everything here needs accounts owned by the project, so it is done by a person, once.
 
-**Cost target: €0/month.** Split Ranch is used by one household (two people), so there is a single
+**Cost target: €0/month.** Splitranch is used by one household (two people), so there is a single
 cloud environment (`prod`) on free tiers only. Development runs against the local Supabase stack
 (`pnpm db:up`). The free-tier limits and what each one means for us are listed in
 [Free-tier limits](#free-tier-limits).

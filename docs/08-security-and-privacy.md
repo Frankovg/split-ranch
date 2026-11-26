@@ -57,7 +57,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 
 ## GDPR (EU personal data)
 
-**Roles:** the operator of Split Ranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
+**Roles:** the operator of Splitranch is the **data controller**. Processors: Supabase (database + authentication, Frankfurt), Render (API hosting, Frankfurt), Google (Sign-In, Sheets), GitHub (encrypted backups), Expo (push tokens), Sentry (EU region). Sign DPAs with each; list them in the privacy policy.
 
 **Personal data processed:** name, email, avatar URL (Google), group membership, expenses (amounts, descriptions — may reveal lifestyle), push tokens, device/crash metadata, auth logs (IP, user agent — kept by Supabase). Quick-split data (including names of **non-users**) never reaches the server: it stays on the user's phone.
 

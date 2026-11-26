@@ -12,7 +12,7 @@ describe('invitationCode', () => {
 
   it('reads the code from the share message', () => {
     expect(
-      invitationCode('Únete a mi grupo «Rancholandia» en Split Ranch con este código: H5NK66UH'),
+      invitationCode('Únete a mi grupo «Rancholandia» en Splitranch con este código: H5NK66UH'),
     ).toBe('H5NK66UH');
   });
 

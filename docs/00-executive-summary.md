@@ -4,7 +4,7 @@
 
 ## Vision
 
-Split Ranch makes shared money boring: people in a group (a flat, a trip, a couple) log what they pay, the app knows how each expense is split, and at any time it shows each person's running balance and who should pay whom, with as few payments as possible. There are no periods: "how much did we spend last month" is a date filter.
+Splitranch makes shared money boring: people in a group (a flat, a trip, a couple) log what they pay, the app knows how each expense is split, and at any time it shows each person's running balance and who should pay whom, with as few payments as possible. There are no periods: "how much did we spend last month" is a date filter.
 
 A second, independent tool — **Quick splits** — solves the dinner/trip case: split a bill with people who don't have the app, offline, without logging in.
 

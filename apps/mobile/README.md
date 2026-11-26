@@ -1,6 +1,6 @@
 # @split-ranch/mobile
 
-Android app of Split Ranch (Expo SDK 58, React Native 0.88, Expo Router, NativeWind 4.2 + Tailwind CSS 3.4, React Native Reusables). Spec: `docs/05-mobile-app.md`, `docs/13-design-system.md`, `docs/03-business-rules.md` §6–7.
+Android app of Splitranch (Expo SDK 58, React Native 0.88, Expo Router, NativeWind 4.2 + Tailwind CSS 3.4, React Native Reusables). Spec: `docs/05-mobile-app.md`, `docs/13-design-system.md`, `docs/03-business-rules.md` §6–7.
 
 ## Run it (development build, not Expo Go)
 

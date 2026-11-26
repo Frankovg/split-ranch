@@ -8,7 +8,7 @@
 
 ## Overview
 
-Split Ranch today organises a household's shared expenses into numbered
+Splitranch today organises a household's shared expenses into numbered
 **periods**: a member closes the open period, the server turns the balances
 into transfers, people mark them sent and confirmed, and someone starts the
 next period. Editing an expense of a closed period needs a reason; once a

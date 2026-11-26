@@ -92,7 +92,7 @@ describe('mode 1: split a total', () => {
     const text = buildShareText('Cena', r);
     expect(text).not.toContain('Pagado por');
     expect(text).not.toContain('Quién paga a quién');
-    expect(text).not.toContain('Split Ranch');
+    expect(text).not.toContain('Splitranch');
   });
 
   it('variant: 120,00 € with Dani excluded, then weights 2/1/1', () => {

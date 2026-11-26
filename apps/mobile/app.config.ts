@@ -17,7 +17,7 @@ const READEX_WEIGHTS = [
 // Static app config. EXPO_PUBLIC_* variables are read at bundle time from process.env,
 // so they do not need to be forwarded through `extra`.
 const config: ExpoConfig = {
-  name: 'Split Ranch',
+  name: 'Splitranch',
   slug: 'split-ranch',
   scheme: 'splitranch',
   version: '0.1.0',

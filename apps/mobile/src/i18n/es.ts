@@ -1,7 +1,7 @@
 /** Spanish (default) UI strings. English mirrors this shape (see en.ts). */
 const es = {
   common: {
-    appName: 'Split Ranch',
+    appName: 'Splitranch',
     cancel: 'Cancelar',
     save: 'Guardar',
     delete: 'Eliminar',
@@ -35,7 +35,7 @@ const es = {
   },
   backend: {
     title: 'Pendiente de conectar',
-    body: 'Esta pantalla necesita el servidor de Split Ranch, que aún no está conectado en esta versión.',
+    body: 'Esta pantalla necesita el servidor de Splitranch, que aún no está conectado en esta versión.',
   },
   home: {
     yourBalance: 'Tu balance en el grupo',
@@ -75,7 +75,7 @@ const es = {
     invite: 'Invitar',
     inviteSomeone: 'Invita a alguien para compartir gastos',
     inviteHint: 'Cualquiera del grupo puede invitar. El código caduca a los 7 días.',
-    inviteMessage: 'Únete a mi grupo «{{name}}» en Split Ranch con este código: {{code}}',
+    inviteMessage: 'Únete a mi grupo «{{name}}» en Splitranch con este código: {{code}}',
     inviteFailed: 'No se pudo crear la invitación.',
     leave: 'Salir del grupo',
     leaveTitle: '¿Salir de «{{name}}»?',
@@ -301,7 +301,7 @@ const es = {
     memberJoined: 'Miembro nuevo',
     memberJoinedHint: 'Alguien se une a uno de tus grupos.',
     blockedTitle: 'Las notificaciones están bloqueadas',
-    blockedBody: 'Actívalas para Split Ranch en los ajustes del sistema para recibir avisos.',
+    blockedBody: 'Actívalas para Splitranch en los ajustes del sistema para recibir avisos.',
     openSettings: 'Abrir ajustes',
     footer: 'Nunca te avisamos de lo que haces tú. Puedes silenciar cada tipo también desde los ajustes de Android.',
     saveError: 'No se pudo guardar. Inténtalo de nuevo.',

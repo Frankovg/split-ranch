@@ -1,4 +1,4 @@
-# Split Ranch
+# Splitranch
 
 Mobile app (Android first) to share expenses in groups with one running balance, plus an independent
 "Quick splits" tool to split one-off bills with friends who don't use the app.
