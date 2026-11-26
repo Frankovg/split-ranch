@@ -269,12 +269,22 @@ Mode 1 is literally mode 2 with a single expense; the UI just hides the list.
 ### Sharing
 - Text for WhatsApp (built on device), e.g.:
   ```
-  🧾 Cena viernes — 87,50 €
-  Cada uno: Ana 21,88 · Bea 21,88 · Carlos 21,87 · Dani 21,87
-  Pagos: Ana → Carlos 21,88 €; Bea → Carlos 21,88 €; Dani → Carlos 21,87 €
-  Hecho con Split Ranch
+  🧾 *Cena viernes*
+  Total: 87,50 €
+  Pagado por: Carlos
+
+  👥 *Lo que le toca a cada uno*
+  • Ana: 21,88 €
+  • Bea: 21,88 €
+  • Carlos: 21,87 €
+  • Dani: 21,87 €
+
+  💸 *Quién paga a quién*
+  • Ana → Carlos: 21,88 €
+  • Bea → Carlos: 21,88 € ✅ pagado
+  • Dani → Carlos: 21,87 €
   ```
-  People marked "has paid" get a ✓ after their payment (or after their share when there is no payer).
+  `*…*` is WhatsApp bold. People marked "has paid" get "✅ pagado" after their payment (or after their share when there is no payer). Without a payer the "Pagado por" line and the payments section are left out; with several payers, "Pagado por" lists how much each one paid. No app branding or footer.
 - Image: render the result card with `react-native-view-shot` and share via `expo-sharing` (post-MVP polish).
 - No share links: the server never holds Quick-split data.
 

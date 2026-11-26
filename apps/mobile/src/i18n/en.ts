@@ -384,10 +384,12 @@ const en: typeof es = {
     editParticipant: 'Edit {{name}}',
   },
   share: {
-    each: 'Each',
-    payments: 'Payments',
-    noPayments: 'nobody owes anything',
-    footer: 'Made with Split Ranch',
+    total: 'Total',
+    paidBy: 'Paid by',
+    each: "Each person's share",
+    payments: 'Who pays whom',
+    noPayments: 'All square, nobody owes anything',
+    paid: 'paid',
   },
   money: {
     spoken: '{{euros}} euros and {{cents}} cents',

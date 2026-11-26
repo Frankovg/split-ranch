@@ -65,10 +65,12 @@ export function ResultCard({ event, result }: ResultCardProps) {
       title,
       result,
       {
+        total: t('share.total'),
+        paidBy: t('share.paidBy'),
         each: t('share.each'),
         payments: t('share.payments'),
         noPayments: t('share.noPayments'),
-        footer: t('share.footer'),
+        paid: t('share.paid'),
       },
       currentMoneyLocale(),
       event.paidIds,

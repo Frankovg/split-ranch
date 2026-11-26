@@ -383,10 +383,12 @@ const es = {
     editParticipant: 'Editar a {{name}}',
   },
   share: {
-    each: 'Cada uno',
-    payments: 'Pagos',
-    noPayments: 'nadie debe nada',
-    footer: 'Hecho con Split Ranch',
+    total: 'Total',
+    paidBy: 'Pagado por',
+    each: 'Lo que le toca a cada uno',
+    payments: 'Quién paga a quién',
+    noPayments: 'Están a mano, nadie debe nada',
+    paid: 'pagado',
   },
   money: {
     spoken: '{{euros}} euros con {{cents}} céntimos',

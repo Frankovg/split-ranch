@@ -63,19 +63,32 @@ describe('mode 1: split a total', () => {
   it('builds the WhatsApp text exactly as documented', () => {
     expect(buildShareText('Cena viernes', ok(dinner()))).toBe(
       [
-        '🧾 Cena viernes — 87,50 €',
-        'Cada uno: Ana 21,88 · Bea 21,88 · Carlos 21,87 · Dani 21,87',
-        'Pagos: Ana → Carlos 21,88 €; Bea → Carlos 21,88 €; Dani → Carlos 21,87 €',
-        'Hecho con Split Ranch',
+        '🧾 *Cena viernes*',
+        'Total: 87,50 €',
+        'Pagado por: Carlos',
+        '',
+        '👥 *Lo que le toca a cada uno*',
+        '• Ana: 21,88 €',
+        '• Bea: 21,88 €',
+        '• Carlos: 21,87 €',
+        '• Dani: 21,87 €',
+        '',
+        '💸 *Quién paga a quién*',
+        '• Ana → Carlos: 21,88 €',
+        '• Bea → Carlos: 21,88 €',
+        '• Dani → Carlos: 21,87 €',
       ].join('\n'),
     );
   });
 
-  it('without payer: amounts only, no transfers and no "Pagos" line', () => {
+  it('without payer: shares only, no "paid by" and no payments section', () => {
     const r = ok(setTotalPayer(dinner(), null, NOW));
     expect(r.balances).toBeNull();
     expect(r.transfers).toEqual([]);
-    expect(buildShareText('Cena', r)).not.toContain('Pagos');
+    const text = buildShareText('Cena', r);
+    expect(text).not.toContain('Pagado por');
+    expect(text).not.toContain('Quién paga a quién');
+    expect(text).not.toContain('Split Ranch');
   });
 
   it('variant: 120,00 € with Dani excluded, then weights 2/1/1', () => {
@@ -176,7 +189,15 @@ describe('me and paid status', () => {
     let e = setTotalPayer(setTotalAmount(withPeople('Cena', ['Ana', 'Bea', 'Carlos']), 3000, NOW), 'ana', NOW);
     e = togglePaid(e, 'bea', NOW);
     const text = buildShareText(e.title, ok(e), undefined, 'es-ES', e.paidIds);
-    expect(text.split('\n')[2]).toMatch(/^Pagos: Bea → Ana 10,00\s€ ✓; Carlos → Ana 10,00\s€$/);
+    expect(text.split('\n').slice(-2)).toEqual(['• Bea → Ana: 10,00 € ✅ pagado', '• Carlos → Ana: 10,00 €']);
+  });
+
+  it('lists what each payer paid when there are several', () => {
+    let e = setMode(withPeople('Viaje', ['Ana', 'Bea']), 'itemised', NOW);
+    e = upsertExpense(e, { id: 'h', description: 'Hotel', amountCents: 3000, payerId: 'ana', participantIds: ['ana', 'bea'] }, NOW);
+    e = upsertExpense(e, { id: 'c', description: 'Cena', amountCents: 1000, payerId: 'bea', participantIds: ['ana', 'bea'] }, NOW);
+    const text = buildShareText(e.title, ok(e));
+    expect(text.split('\n')[2]).toBe('Pagado por: Ana (30,00 €), Bea (10,00 €)');
   });
 
   it('migrates v1 events: adds me/paid and drops payment handles', () => {
