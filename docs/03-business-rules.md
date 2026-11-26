@@ -231,7 +231,7 @@ In March, Franco paid *Supermercado* 100.00 split equally (33.34/33.33/33.33), a
 Independent of groups: no server, no payments, no Sheets. Same domain functions (`allocate`, `settle`). Computed on device, offline, without login. **Stored only on the user's phone**: never saved, synced or shared through the server (decided 2026-11-10). Everything stays editable at any time: event name, participant names, the total, weights, exclusions, payer, and every itemised expense.
 
 ### Mode 1 — split a total
-Input: total, participants (names), optional weights/exclusions, optional payer.
+Input: total, participants (names), optional weights/exclusions, optional payer — or several payers, each with the amount they put in.
 Engine: one quick expense with `participants = included`, `ratios = weights (default 1)`, `payer = payer or none`.
 Output: amount per person; if there is a payer, transfers from `settle`.
 
@@ -245,8 +245,10 @@ Output: amount per person; if there is a payer, transfers from `settle`.
 
 Without payer: just "each pays X" (no transfers).
 
+**Several payers:** the amounts entered must add up to the total; until they do there is no result ("what each person paid must add up to the total"). Shares do not change; each person's paid is what they put in, and transfers come from `settle` as usual. Example: the same dinner with Ana 50.00 and Carlos 37.50 → nets Ana +28.12, Bea −21.88, Carlos +15.63, Dani −21.87; transfers Bea → Ana 21.88, Dani → Carlos 15.63, Dani → Ana 6.24. Choosing a single payer again drops the amounts; switching to several payers starts with the single payer holding the whole total.
+
 ### Mode 2 — itemised expenses
-Input: several expenses, each with payer and participant subset.
+Input: several expenses, each with payer (or several payers with the amount each put in, which must add up to the expense; otherwise the expense is not counted) and participant subset.
 
 **Example (trip):** Ana, Bea, Carlos.
 

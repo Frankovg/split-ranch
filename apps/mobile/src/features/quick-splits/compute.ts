@@ -4,15 +4,29 @@ import {
   settle,
   type LedgerExpense,
   type ResolveSharesInput,
+  type Share,
 } from '@split-ranch/domain';
 import type { QuickEvent, QuickParticipant } from './types';
 
 /**
  * Build @split-ranch/domain inputs from a Quick split event and run
- * resolveShares -> computeBalances -> settle. No money arithmetic happens here.
+ * resolveShares -> computeBalances -> settle. No money arithmetic happens here beyond
+ * checking that several payers add up to the amount they paid.
  */
 
-export type IncompleteReason = 'no_participants' | 'no_amount' | 'no_included' | 'no_expenses';
+export type IncompleteReason =
+  | 'no_participants'
+  | 'no_amount'
+  | 'no_included'
+  | 'no_expenses'
+  | 'payers_mismatch';
+
+/**
+ * Synthetic ledger id for "several payers": the total is booked as paid by this pot and each
+ * payer pays their part into it, so the pot nets to zero and every person gets paid = what
+ * they put in, owed = their share. It never appears in results.
+ */
+const POT_ID = '__pot__';
 
 export interface PersonAmount {
   id: string;
@@ -74,29 +88,72 @@ export function buildTotalExpense(event: QuickEvent): ResolveSharesInput | Incom
   };
 }
 
+interface PayerPart {
+  id: string;
+  amountCents: number;
+}
+
+/**
+ * What several payers put in: existing participants with an amount > 0, in canonical order.
+ * Null when nobody paid or the parts do not add up to `amountCents`.
+ */
+function payerParts(
+  participants: readonly QuickParticipant[],
+  amounts: Readonly<Record<string, number>>,
+  amountCents: number,
+): PayerPart[] | null {
+  const parts = participants
+    .map((p) => ({ id: p.id, amountCents: amounts[p.id] ?? 0 }))
+    .filter((p) => p.amountCents > 0);
+  const sum = parts.reduce((acc, p) => acc + p.amountCents, 0);
+  return parts.length > 0 && sum === amountCents ? parts : null;
+}
+
+/** Ledger rows of one expense: a plain row for one payer, or the pot rows for several. */
+function ledgerRows(amountCents: number, shares: readonly Share[], payer: string | PayerPart[]): LedgerExpense[] {
+  if (typeof payer === 'string') return [{ payerId: payer, amountCents, shares }];
+  return [
+    { payerId: POT_ID, amountCents, shares },
+    ...payer.map((p) => ({
+      payerId: p.id,
+      amountCents: p.amountCents,
+      shares: [{ id: POT_ID, amountCents: p.amountCents }],
+    })),
+  ];
+}
+
 /** Build the ledger of mode 2 ("itemised"): one equal split per valid expense. */
 export function buildItemisedLedger(event: QuickEvent): {
-  inputs: ResolveSharesInput[];
+  ledger: LedgerExpense[];
+  totalCents: number;
   skippedExpenseIds: string[];
 } {
   const order = event.participants.map((p) => p.id);
-  const inputs: ResolveSharesInput[] = [];
+  const ledger: LedgerExpense[] = [];
   const skippedExpenseIds: string[] = [];
+  let totalCents = 0;
   for (const e of event.expenses) {
     // Keep participants in canonical order and drop ids that no longer exist.
     const ids = order.filter((id) => e.participantIds.includes(id));
-    if (e.amountCents <= 0 || ids.length === 0 || !order.includes(e.payerId)) {
+    const payer = e.payerAmounts
+      ? payerParts(event.participants, e.payerAmounts, e.amountCents)
+      : order.includes(e.payerId)
+        ? e.payerId
+        : null;
+    if (e.amountCents <= 0 || ids.length === 0 || payer === null) {
       skippedExpenseIds.push(e.id);
       continue;
     }
-    inputs.push({
+    const shares = resolveShares({
       amountCents: e.amountCents,
-      payerId: e.payerId,
+      payerId: typeof payer === 'string' ? payer : (payer[0]?.id ?? ''),
       splitType: 'equal',
       participants: ids.map((id) => ({ id })),
     });
+    ledger.push(...ledgerRows(e.amountCents, shares, payer));
+    totalCents += e.amountCents;
   }
-  return { inputs, skippedExpenseIds };
+  return { ledger, totalCents, skippedExpenseIds };
 }
 
 function nameLookup(participants: readonly QuickParticipant[]): (id: string) => string {
@@ -113,29 +170,35 @@ export function computeQuickResult(event: QuickEvent): QuickResult {
   let hasPayer: boolean;
   let skippedExpenseIds: string[] = [];
   let shown: (id: string) => boolean;
+  let totalCents: number;
 
   if (event.mode === 'total') {
     const input = buildTotalExpense(event);
     if (typeof input === 'string') return { status: 'incomplete', reason: input };
-    ledger = [{ payerId: input.payerId, amountCents: input.amountCents, shares: resolveShares(input) }];
-    hasPayer = input.payerId === event.total.payerId;
+    const shares = resolveShares(input);
+    if (event.total.payerAmounts) {
+      const parts = payerParts(event.participants, event.total.payerAmounts, input.amountCents);
+      if (!parts) return { status: 'incomplete', reason: 'payers_mismatch' };
+      ledger = ledgerRows(input.amountCents, shares, parts);
+      hasPayer = true;
+    } else {
+      ledger = ledgerRows(input.amountCents, shares, input.payerId);
+      hasPayer = input.payerId === event.total.payerId;
+    }
+    totalCents = input.amountCents;
     const included = new Set(input.participants.map((p) => p.id));
     shown = (id) => included.has(id);
   } else {
     const built = buildItemisedLedger(event);
     skippedExpenseIds = built.skippedExpenseIds;
-    if (built.inputs.length === 0) return { status: 'incomplete', reason: 'no_expenses' };
-    ledger = built.inputs.map((input) => ({
-      payerId: input.payerId,
-      amountCents: input.amountCents,
-      shares: resolveShares(input),
-    }));
+    if (built.ledger.length === 0) return { status: 'incomplete', reason: 'no_expenses' };
+    ledger = built.ledger;
     hasPayer = true;
+    totalCents = built.totalCents;
     shown = () => true;
   }
 
-  const balances = computeBalances(order, ledger);
-  const totalCents = ledger.reduce((acc, e) => acc + e.amountCents, 0);
+  const balances = computeBalances(order, ledger).filter((b) => b.id !== POT_ID);
   const perPerson: PersonAmount[] = balances
     .filter((b) => shown(b.id))
     .map((b) => ({ id: b.id, name: name(b.id), amountCents: b.owedCents }));

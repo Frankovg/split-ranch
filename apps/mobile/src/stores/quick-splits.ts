@@ -22,6 +22,8 @@ interface QuickSplitsState {
   toggleExcluded: (id: string, participantId: string) => void;
   setWeight: (id: string, participantId: string, weight: number) => void;
   setTotalPayer: (id: string, payerId: string | null) => void;
+  setMultiplePayers: (id: string) => void;
+  setPayerAmount: (id: string, participantId: string, cents: number | null) => void;
   upsertExpense: (id: string, expense: Omit<QuickExpense, 'id'> & { id?: string }) => void;
   removeExpense: (id: string, expenseId: string) => void;
   setMe: (id: string, participantId: string | null) => void;
@@ -69,6 +71,9 @@ export const useQuickSplitsStore = create<QuickSplitsState>()(
         setWeight: (id, participantId, weight) =>
           void update(id, (e) => model.setWeight(e, participantId, weight, now())),
         setTotalPayer: (id, payerId) => void update(id, (e) => model.setTotalPayer(e, payerId, now())),
+        setMultiplePayers: (id) => void update(id, (e) => model.setMultiplePayers(e, now())),
+        setPayerAmount: (id, participantId, cents) =>
+          void update(id, (e) => model.setPayerAmount(e, participantId, cents, now())),
         upsertExpense: (id, expense) =>
           void update(id, (e) =>
             model.upsertExpense(e, { ...expense, id: expense.id ?? Crypto.randomUUID() }, now()),
@@ -83,17 +88,19 @@ export const useQuickSplitsStore = create<QuickSplitsState>()(
       name: 'quick-splits',
       // Debounced: title and amount inputs update the store on every keystroke.
       storage: createDebouncedMMKVStorage<Pick<QuickSplitsState, 'events'>>(),
-      version: 2,
+      version: 3,
       partialize: (s) => ({ events: s.events }),
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as { events?: Record<string, unknown> };
-        if (version < 2) {
-          const events = Object.fromEntries(
-            Object.entries(state.events ?? {}).map(([k, v]) => [k, model.migrateEventV1(v)]),
-          );
-          return { events } as Pick<QuickSplitsState, 'events'>;
-        }
-        return state as Pick<QuickSplitsState, 'events'>;
+        const events = Object.fromEntries(
+          Object.entries(state.events ?? {}).map(([k, v]) => {
+            let e = v;
+            if (version < 2) e = model.migrateEventV1(e);
+            if (version < 3) e = model.migrateEventV2(e);
+            return [k, e];
+          }),
+        );
+        return { events } as Pick<QuickSplitsState, 'events'>;
       },
     },
   ),

@@ -5,9 +5,13 @@ import {
   canRemoveParticipant,
   createQuickEvent,
   migrateEventV1,
+  migrateEventV2,
+  payerAmountsGap,
   removeParticipant,
   setMe,
   setMode,
+  setMultiplePayers,
+  setPayerAmount,
   setTotalAmount,
   setTotalPayer,
   setWeight,
@@ -112,6 +116,62 @@ describe('mode 1: split a total', () => {
   });
 });
 
+describe('mode 1: several payers', () => {
+  const dinner = () => {
+    let e = withPeople('Cena viernes', ['Ana', 'Bea', 'Carlos', 'Dani']);
+    e = setMultiplePayers(setTotalAmount(e, 8750, NOW), NOW);
+    e = setPayerAmount(e, 'ana', 5000, NOW);
+    return setPayerAmount(e, 'carlos', 3750, NOW);
+  };
+
+  it('shares stay the same; paid and transfers follow what each one put in', () => {
+    const r = ok(dinner());
+    expect(r.totalCents).toBe(8750);
+    expect(amounts(r)).toEqual({ Ana: 2188, Bea: 2188, Carlos: 2187, Dani: 2187 });
+    expect(r.balances?.map((b) => [b.name, b.paidCents, b.owedCents, b.netCents])).toEqual([
+      ['Ana', 5000, 2188, 2812],
+      ['Bea', 0, 2188, -2188],
+      ['Carlos', 3750, 2187, 1563],
+      ['Dani', 0, 2187, -2187],
+    ]);
+    expect(transfers(r)).toEqual([
+      ['Bea', 'Ana', 2188],
+      ['Dani', 'Carlos', 1563],
+      ['Dani', 'Ana', 624],
+    ]);
+    expect(buildShareText('Cena viernes', r).split('\n')[2]).toBe('Pagado por: Ana (50,00 €), Carlos (37,50 €)');
+  });
+
+  it('is incomplete until the amounts add up to the total', () => {
+    let e = setPayerAmount(dinner(), 'carlos', 3000, NOW);
+    expect(payerAmountsGap(e)).toBe(750);
+    expect(computeQuickResult(e)).toMatchObject({ reason: 'payers_mismatch' });
+    e = setPayerAmount(e, 'bea', 1000, NOW);
+    expect(payerAmountsGap(e)).toBe(-250);
+    e = setPayerAmount(e, 'bea', 750, NOW);
+    expect(payerAmountsGap(e)).toBe(0);
+    expect(ok(e).balances?.find((b) => b.name === 'Bea')?.paidCents).toBe(750);
+  });
+
+  it('starts from the single payer and goes back to one payer', () => {
+    let e = setTotalPayer(setTotalAmount(withPeople('x', ['Ana', 'Bea']), 1000, NOW), 'bea', NOW);
+    e = setMultiplePayers(e, NOW);
+    expect(e.total).toMatchObject({ payerId: null, payerAmounts: { bea: 1000 } });
+    expect(setPayerAmount(e, 'ghost', 10, NOW)).toBe(e);
+    e = setPayerAmount(e, 'bea', 0, NOW);
+    expect(e.total.payerAmounts).toEqual({});
+    e = setTotalPayer(e, 'ana', NOW);
+    expect(e.total).toMatchObject({ payerId: 'ana', payerAmounts: null });
+    expect(payerAmountsGap(e)).toBeNull();
+  });
+
+  it('migrates v2 events: adds payerAmounts', () => {
+    const v2 = withPeople('x', ['Ana']) as unknown as { total: Record<string, unknown> };
+    delete v2.total.payerAmounts;
+    expect(migrateEventV2(v2).total.payerAmounts).toBeNull();
+  });
+});
+
 describe('mode 2: itemised expenses', () => {
   const trip = () => {
     let e = setMode(withPeople('Viaje', ['Ana', 'Bea', 'Carlos']), 'itemised', NOW);
@@ -142,6 +202,51 @@ describe('mode 2: itemised expenses', () => {
   });
 });
 
+describe('mode 2: several payers in one expense', () => {
+  const trip = () => {
+    let e = setMode(withPeople('Viaje', ['Ana', 'Bea', 'Carlos']), 'itemised', NOW);
+    const all = ['ana', 'bea', 'carlos'];
+    e = upsertExpense(
+      e,
+      { id: 'h', description: 'Hotel', amountCents: 30000, payerId: '', payerAmounts: { ana: 20000, bea: 10000 }, participantIds: all },
+      NOW,
+    );
+    return upsertExpense(e, { id: 'd', description: 'Cena', amountCents: 9000, payerId: 'carlos', participantIds: all }, NOW);
+  };
+
+  it('each payer is credited with their part', () => {
+    const r = ok(trip());
+    expect(r.totalCents).toBe(39000);
+    expect(amounts(r)).toEqual({ Ana: 13000, Bea: 13000, Carlos: 13000 });
+    expect(r.balances?.map((b) => [b.name, b.paidCents, b.netCents])).toEqual([
+      ['Ana', 20000, 7000],
+      ['Bea', 10000, -3000],
+      ['Carlos', 9000, -4000],
+    ]);
+    expect(transfers(r)).toEqual([
+      ['Carlos', 'Ana', 4000],
+      ['Bea', 'Ana', 3000],
+    ]);
+  });
+
+  it('skips the expense when the parts do not add up', () => {
+    const e = upsertExpense(
+      trip(),
+      { id: 'x', description: 'Taxi', amountCents: 2000, payerId: '', payerAmounts: { ana: 500 }, participantIds: ['ana'] },
+      NOW,
+    );
+    const r = ok(e);
+    expect(r.skippedExpenseIds).toEqual(['x']);
+    expect(r.totalCents).toBe(39000);
+  });
+
+  it('protects every payer of the expense from removal', () => {
+    const e = trip();
+    expect(canRemoveParticipant(e, 'bea')).toBe(false);
+    expect(canRemoveParticipant(e, 'ana')).toBe(false);
+  });
+});
+
 describe('participants', () => {
   it('keeps creation order and rejects empty or duplicate names', () => {
     let e = withPeople('x', ['Zoe', 'Ana']);
@@ -154,7 +259,14 @@ describe('participants', () => {
     let e = withPeople('x', ['Ana', 'Bea']);
     e = setTotalPayer(setWeight(toggleExcluded(e, 'bea', NOW), 'bea', 3, NOW), 'bea', NOW);
     e = removeParticipant(e, 'bea', NOW);
-    expect(e.total).toEqual({ amountCents: null, excludedIds: [], weights: {}, payerId: null });
+    expect(e.total).toEqual({ amountCents: null, excludedIds: [], weights: {}, payerId: null, payerAmounts: null });
+  });
+
+  it('removal drops what they paid in "several payers" mode', () => {
+    let e = setMultiplePayers(withPeople('x', ['Ana', 'Bea']), NOW);
+    e = setPayerAmount(setPayerAmount(e, 'ana', 500, NOW), 'bea', 300, NOW);
+    e = removeParticipant(e, 'bea', NOW);
+    expect(e.total.payerAmounts).toEqual({ ana: 500 });
   });
 });
 

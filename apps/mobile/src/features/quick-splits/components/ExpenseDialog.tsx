@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Trash2 } from 'lucide-react-native';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { z } from 'zod';
@@ -20,21 +20,37 @@ import { Text } from '@/components/ui/text';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { MAX_AMOUNT_CENTS } from '@/lib/money';
 import { useQuickSplitsStore } from '@/stores/quick-splits';
-import type { QuickEvent, QuickExpense } from '../types';
+import { payersGap } from '../model';
+import type { QuickEvent, QuickExpense, QuickParticipant } from '../types';
+import { PayerAmountsInput } from './PayerAmountsInput';
 
-function buildSchema(t: (key: 'money.invalid' | 'quick.selectPayer' | 'quick.selectAtLeastOne') => string) {
-  return z.object({
-    description: z.string().trim().max(60),
-    amountCents: z
-      .number({ error: t('money.invalid') })
-      .int()
-      .positive(t('money.invalid'))
-      .max(MAX_AMOUNT_CENTS, t('money.invalid'))
-      .nullable()
-      .refine((v) => v !== null, t('money.invalid')),
-    payerId: z.string().min(1, t('quick.selectPayer')),
-    participantIds: z.array(z.string()).min(1, t('quick.selectAtLeastOne')),
-  });
+/** Payer toggle value for "several payers" (never a participant id). */
+const MULTIPLE_PAYERS = '__multiple__';
+
+type SchemaKey = 'money.invalid' | 'quick.selectPayer' | 'quick.selectAtLeastOne' | 'quick.incomplete.payers_mismatch';
+
+function buildSchema(t: (key: SchemaKey) => string, participants: readonly QuickParticipant[]) {
+  return z
+    .object({
+      description: z.string().trim().max(60),
+      amountCents: z
+        .number({ error: t('money.invalid') })
+        .int()
+        .positive(t('money.invalid'))
+        .max(MAX_AMOUNT_CENTS, t('money.invalid'))
+        .nullable()
+        .refine((v) => v !== null, t('money.invalid')),
+      payerId: z.string().min(1, t('quick.selectPayer')),
+      payerAmounts: z.record(z.string(), z.number()),
+      participantIds: z.array(z.string()).min(1, t('quick.selectAtLeastOne')),
+    })
+    .refine(
+      (v) =>
+        v.payerId !== MULTIPLE_PAYERS ||
+        v.amountCents === null ||
+        payersGap(participants, v.payerAmounts, v.amountCents) === 0,
+      { error: t('quick.incomplete.payers_mismatch'), path: ['payerAmounts'] },
+    );
 }
 
 type ExpenseForm = z.input<ReturnType<typeof buildSchema>>;
@@ -53,15 +69,27 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
   const removeExpense = useQuickSplitsStore((s) => s.removeExpense);
   const everyone = event.participants.map((p) => p.id);
 
-  const { control, handleSubmit } = useForm<ExpenseForm>({
-    resolver: zodResolver(buildSchema(t)),
+  const { control, handleSubmit, getValues, setValue } = useForm<ExpenseForm>({
+    resolver: zodResolver(buildSchema(t, event.participants)),
     defaultValues: {
       description: expense?.description ?? '',
       amountCents: expense?.amountCents ?? null,
-      payerId: expense?.payerId ?? event.participants[0]?.id ?? '',
+      payerId: expense?.payerAmounts ? MULTIPLE_PAYERS : (expense?.payerId ?? event.participants[0]?.id ?? ''),
+      payerAmounts: expense?.payerAmounts ?? {},
       participantIds: expense?.participantIds ?? everyone,
     },
   });
+  const payerId = useWatch({ control, name: 'payerId' });
+  const amountCents = useWatch({ control, name: 'amountCents' });
+
+  /** Pick a payer; switching to "several" starts with the previous payer holding the whole amount. */
+  const onPayerChange = (next: string, onChange: (v: string) => void) => {
+    const { payerId: previous, payerAmounts, amountCents: amount } = getValues();
+    if (next === MULTIPLE_PAYERS && previous !== MULTIPLE_PAYERS && Object.keys(payerAmounts).length === 0) {
+      if (amount !== null && amount > 0 && previous !== '') setValue('payerAmounts', { [previous]: amount });
+    }
+    onChange(next);
+  };
 
   const onSubmit = handleSubmit((values) => {
     if (values.amountCents === null) return;
@@ -69,7 +97,18 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
       id: expense?.id,
       description: values.description.trim(),
       amountCents: values.amountCents,
-      payerId: values.payerId,
+      ...(values.payerId === MULTIPLE_PAYERS
+        ? {
+            payerId: '',
+            // Keep only people who put money in, in canonical order.
+            payerAmounts: Object.fromEntries(
+              everyone.flatMap((id) => {
+                const cents = values.payerAmounts[id] ?? 0;
+                return cents > 0 ? [[id, cents]] : [];
+              }),
+            ),
+          }
+        : { payerId: values.payerId, payerAmounts: null }),
       // Store in canonical (creation) order.
       participantIds: everyone.filter((id) => values.participantIds.includes(id)),
     });
@@ -122,16 +161,39 @@ export function ExpenseDialog({ event, expense, onClose }: ExpenseDialogProps) {
                 type='single'
                 variant='outline'
                 value={field.value}
-                onValueChange={(v) => v && field.onChange(v)}
+                onValueChange={(v) => v && onPayerChange(v, field.onChange)}
                 className='flex-wrap justify-start gap-2'>
                 {event.participants.map((p) => (
                   <ToggleGroupItem key={p.id} value={p.id} className='rounded-md border-l'>
                     <Text>{p.name}</Text>
                   </ToggleGroupItem>
                 ))}
+                {event.participants.length > 1 ? (
+                  <ToggleGroupItem value={MULTIPLE_PAYERS} className='rounded-md border-l'>
+                    <Text>{t('quick.multiplePayers')}</Text>
+                  </ToggleGroupItem>
+                ) : null}
               </ToggleGroup>
             )}
           />
+          {payerId === MULTIPLE_PAYERS ? (
+            <FormField
+              control={control}
+              name='payerAmounts'
+              label={t('quick.payerAmounts')}
+              render={({ field }) => (
+                <PayerAmountsInput
+                  participants={event.participants}
+                  amounts={field.value}
+                  totalCents={amountCents}
+                  onChange={(participantId, cents) => {
+                    const { [participantId]: _old, ...rest } = field.value;
+                    field.onChange(cents !== null && cents > 0 ? { ...rest, [participantId]: cents } : rest);
+                  }}
+                />
+              )}
+            />
+          ) : null}
           <FormField
             control={control}
             name='participantIds'

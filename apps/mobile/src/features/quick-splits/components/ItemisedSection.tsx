@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import type { QuickEvent, QuickExpense } from '../types';
 import { ExpenseDialog } from './ExpenseDialog';
 
-/** Mode 2 inputs: list of expenses, each with payer and participant subset. */
+/** Mode 2 inputs: list of expenses, each with payer(s) and participant subset. */
 export function ItemisedSection({ event }: { event: QuickEvent }) {
   const { t } = useTranslation();
   // undefined = closed, null = new expense, object = editing
@@ -36,10 +36,17 @@ export function ItemisedSection({ event }: { event: QuickEvent }) {
               <View className='flex-1'>
                 <Text className='font-medium'>{e.description || t('quick.expenses')}</Text>
                 <Text className='text-sm text-muted-foreground'>
-                  {t('quick.expenseSummary', {
-                    payer: names.get(e.payerId) ?? '?',
-                    count: e.participantIds.length,
-                  })}
+                  {e.payerAmounts
+                    ? t('quick.expenseSummaryMultiple', {
+                        payers: Object.keys(e.payerAmounts)
+                          .map((id) => names.get(id) ?? '?')
+                          .join(', '),
+                        count: e.participantIds.length,
+                      })
+                    : t('quick.expenseSummary', {
+                        payer: names.get(e.payerId) ?? '?',
+                        count: e.participantIds.length,
+                      })}
                 </Text>
               </View>
               <MoneyText cents={e.amountCents} />

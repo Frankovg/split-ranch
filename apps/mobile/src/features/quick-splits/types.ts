@@ -15,13 +15,24 @@ export interface QuickTotal {
   weights: Record<string, number>;
   /** Who paid the total, if known. Without a payer there are no transfers. */
   payerId: string | null;
+  /**
+   * Several payers: cents each participant put in (missing means 0). When set, `payerId` is
+   * null and the amounts must add up to the total before there is a result.
+   */
+  payerAmounts: Record<string, number> | null;
 }
 
 export interface QuickExpense {
   id: string;
   description: string;
   amountCents: number;
+  /** The one payer; ignored (empty) when `payerAmounts` is set. */
   payerId: string;
+  /**
+   * Several payers: cents each participant put in. They must add up to `amountCents`, or the
+   * expense is skipped. Missing or null means `payerId` paid it all.
+   */
+  payerAmounts?: Record<string, number> | null;
   /** Subset of participant ids sharing this expense equally. */
   participantIds: string[];
 }

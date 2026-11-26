@@ -18,21 +18,29 @@ import { Text } from '@/components/ui/text';
 import { useQuickSplitsStore } from '@/stores/quick-splits';
 import { MAX_WEIGHT } from '../model';
 import type { QuickEvent } from '../types';
+import { PayerAmountsInput } from './PayerAmountsInput';
 
 const NO_PAYER = '__none__';
+const MULTIPLE_PAYERS = '__multiple__';
 
-/** Mode 1 inputs: total, payer, include/exclude and optional weights per person. */
+/** Mode 1 inputs: total, payer(s), include/exclude and optional weights per person. */
 export function TotalModeSection({ event }: { event: QuickEvent }) {
   const { t } = useTranslation();
   const setTotalAmount = useQuickSplitsStore((s) => s.setTotalAmount);
   const setTotalPayer = useQuickSplitsStore((s) => s.setTotalPayer);
+  const setMultiplePayers = useQuickSplitsStore((s) => s.setMultiplePayers);
+  const setPayerAmount = useQuickSplitsStore((s) => s.setPayerAmount);
   const toggleExcluded = useQuickSplitsStore((s) => s.toggleExcluded);
   const setWeight = useQuickSplitsStore((s) => s.setWeight);
 
+  const payerAmounts = event.total.payerAmounts;
+  const multiple = payerAmounts !== null;
   const payer = event.participants.find((p) => p.id === event.total.payerId);
-  const payerOption = payer
-    ? { value: payer.id, label: payer.name }
-    : { value: NO_PAYER, label: t('quick.noPayer') };
+  const payerOption = multiple
+    ? { value: MULTIPLE_PAYERS, label: t('quick.multiplePayers') }
+    : payer
+      ? { value: payer.id, label: payer.name }
+      : { value: NO_PAYER, label: t('quick.noPayer') };
 
   return (
     <Card>
@@ -51,9 +59,10 @@ export function TotalModeSection({ event }: { event: QuickEvent }) {
           <Label nativeID='total-payer'>{t('quick.payer')}</Label>
           <Select
             value={payerOption}
-            onValueChange={(option) =>
-              setTotalPayer(event.id, !option || option.value === NO_PAYER ? null : option.value)
-            }>
+            onValueChange={(option) => {
+              if (option?.value === MULTIPLE_PAYERS) setMultiplePayers(event.id);
+              else setTotalPayer(event.id, !option || option.value === NO_PAYER ? null : option.value);
+            }}>
             <SelectTrigger aria-labelledby='total-payer'>
               <SelectValue placeholder={t('quick.noPayer')} />
             </SelectTrigger>
@@ -62,8 +71,19 @@ export function TotalModeSection({ event }: { event: QuickEvent }) {
               {event.participants.map((p) => (
                 <SelectItem key={p.id} value={p.id} label={p.name} />
               ))}
+              {event.participants.length > 1 ? (
+                <SelectItem value={MULTIPLE_PAYERS} label={t('quick.multiplePayers')} />
+              ) : null}
             </SelectContent>
           </Select>
+          {payerAmounts ? (
+            <PayerAmountsInput
+              participants={event.participants}
+              amounts={payerAmounts}
+              totalCents={event.total.amountCents}
+              onChange={(participantId, cents) => setPayerAmount(event.id, participantId, cents)}
+            />
+          ) : null}
         </View>
 
         <View className='gap-2'>
