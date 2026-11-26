@@ -16,6 +16,15 @@ const es = {
     error: 'Algo ha fallado',
     retry: 'Reintentar',
   },
+  boot: {
+    preparing: 'Preparando tus ranchs…',
+    waking: 'Despertando el servidor…',
+    wakingHint: 'Tras un rato sin uso puede tardar hasta un minuto.',
+    slow: 'Está tardando más de lo normal.',
+    unreachable: 'No hemos podido conectar con el servidor.',
+    unreachableHint: 'Revisa tu conexión e inténtalo de nuevo.',
+    quickSplits: 'Ir a Cuentas rápidas',
+  },
   tabs: {
     ranchs: 'Ranchs',
     quick: 'Cuentas rápidas',

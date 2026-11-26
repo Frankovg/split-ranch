@@ -5,13 +5,13 @@ import { PortalHost } from '@rn-primitives/portal';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { SplashScreen, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useApiWarmUpOnForeground, warmUpApi } from '@/lib/api/warm-up';
 import { AuthListener } from '@/features/auth/AuthListener';
+import { BootGate } from '@/features/boot/BootGate';
 import { NotificationObserver } from '@/features/notifications/NotificationObserver';
 import { LanguageSync } from '@/i18n/LanguageSync';
 import { CACHE_BUSTER, CACHE_MAX_AGE, queryClient } from '@/lib/query/client';
@@ -34,10 +34,6 @@ export default function RootLayout() {
   const { t } = useTranslation();
   useAppStateFocus();
   useApiWarmUpOnForeground();
-
-  useEffect(() => {
-    if (status !== 'loading') SplashScreen.hide();
-  }, [status]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -80,6 +76,8 @@ export default function RootLayout() {
                 </Stack.Protected>
               </Stack>
             )}
+            {/* Hides the native splash and overlays the animated boot screen while the API wakes. */}
+            <BootGate />
             <Toaster
               position='bottom-center'
               theme={scheme}

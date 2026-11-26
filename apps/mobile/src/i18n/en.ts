@@ -18,6 +18,15 @@ const en: typeof es = {
     error: 'Something went wrong',
     retry: 'Retry',
   },
+  boot: {
+    preparing: 'Getting your ranchs ready…',
+    waking: 'Waking up the server…',
+    wakingHint: 'After a while unused it can take up to a minute.',
+    slow: 'This is taking longer than usual.',
+    unreachable: 'We could not reach the server.',
+    unreachableHint: 'Check your connection and try again.',
+    quickSplits: 'Go to Quick splits',
+  },
   tabs: {
     ranchs: 'Ranchs',
     quick: 'Quick splits',
