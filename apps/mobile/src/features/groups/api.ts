@@ -4,6 +4,7 @@ import { queryKeys } from '@/lib/query/client';
 import { invalidateExpenseChange, invalidatePaymentChange } from './invalidation';
 import type {
   CategoryCreateInput,
+  CategoryUpdateInput,
   CategoryPresetCreateInput,
   ExpenseListFilters,
   Expense,
@@ -259,6 +260,42 @@ export function useCreateCategory(groupId: string) {
     mutationFn: (input: CategoryCreateInput) =>
       unwrap(api.POST('/v1/groups/{group_id}/categories', { params: { path: { group_id: groupId } }, body: input })),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories(groupId) }),
+  });
+}
+
+/** Rename a category or change its icon; expenses keep it, so only the list refetches. */
+export function useUpdateCategory(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ categoryId, input }: { categoryId: string; input: CategoryUpdateInput }) =>
+      unwrap(
+        api.PATCH('/v1/groups/{group_id}/categories/{category_id}', {
+          params: { path: { group_id: groupId, category_id: categoryId } },
+          body: input,
+        }),
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.categories(groupId) }),
+  });
+}
+
+/**
+ * "Delete" a category: the API archives it, so old expenses still show it but pickers no
+ * longer offer it. Its presets are deleted with it.
+ */
+export function useArchiveCategory(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: string) =>
+      unwrap(
+        api.DELETE('/v1/groups/{group_id}/categories/{category_id}', {
+          params: { path: { group_id: groupId, category_id: categoryId } },
+        }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.categories(groupId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.categoryPresets(groupId) }),
+      ]),
   });
 }
 

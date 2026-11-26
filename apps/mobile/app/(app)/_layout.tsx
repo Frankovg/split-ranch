@@ -23,6 +23,11 @@ export default function AppLayout() {
       <Stack.Screen name='group/[groupId]/settle' options={{ headerShown: true, title: t('settle.title') }} />
       <Stack.Screen name='group/[groupId]/settings' options={{ headerShown: true, title: t('group.settings') }} />
       <Stack.Screen name='group/[groupId]/split-rule' options={{ headerShown: true, title: t('rule.title') }} />
+      <Stack.Screen name='group/[groupId]/categories' options={{ headerShown: true, title: t('categories.title') }} />
+      <Stack.Screen
+        name='group/[groupId]/category/[categoryId]'
+        options={{ headerShown: true, title: t('categories.editTitle') }}
+      />
       <Stack.Screen
         name='group/[groupId]/category-presets'
         options={{ headerShown: true, title: t('presets.title') }}

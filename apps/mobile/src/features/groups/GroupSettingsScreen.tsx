@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { ChevronRight, Percent, Share2, UserMinus, Wand2 } from 'lucide-react-native';
+import { ChevronRight, Percent, Share2, Tags, UserMinus, Wand2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Alert, Share, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -153,6 +153,22 @@ function Settings({ group }: { group: Group }) {
             onPress={() => router.navigate({ pathname: '/group/[groupId]/split-rule', params: { groupId: group.id } })}>
             <Icon as={Percent} size={18} />
             <Text>{t('rule.edit')}</Text>
+            <Icon as={ChevronRight} size={18} className='ml-auto' />
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('categories.title')}</CardTitle>
+          <CardDescription>{t('categories.settingsHint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant='outline'
+            onPress={() => router.navigate({ pathname: '/group/[groupId]/categories', params: { groupId: group.id } })}>
+            <Icon as={Tags} size={18} />
+            <Text>{t('categories.listTitle')}</Text>
             <Icon as={ChevronRight} size={18} className='ml-auto' />
           </Button>
         </CardContent>
