@@ -66,7 +66,9 @@ export function MoneyInput({
         <Input
           nativeID={nativeID}
           value={text}
-          onChangeText={(value) => {
+          onChangeText={(raw) => {
+            // Only digits and decimal/group separators can be typed or pasted; anything else is dropped.
+            const value = raw.replace(/[^\d.,]/g, '');
             setText(value);
             onChangeCents(value.trim() === '' ? null : parseMoney(value));
           }}
