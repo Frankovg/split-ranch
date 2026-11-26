@@ -47,7 +47,8 @@ export function QuickListScreen() {
 
   if (events.length === 0) {
     return (
-      <Screen>
+      // No bottom safe-area edge: the tab bar below already covers the system inset.
+      <Screen edges={[]}>
         <EmptyState
           icon={Calculator}
           title={t('quick.emptyTitle')}
@@ -59,7 +60,7 @@ export function QuickListScreen() {
   }
 
   return (
-    <Screen>
+    <Screen edges={[]}>
       <Button onPress={onNew}>
         <Icon as={Plus} size={18} />
         <Text>{t('quick.new')}</Text>

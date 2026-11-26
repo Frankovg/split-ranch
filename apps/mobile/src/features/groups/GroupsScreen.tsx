@@ -28,7 +28,8 @@ export function GroupsScreen() {
   if (groups.isError) return <ErrorScreen t={t} onRetry={() => void groups.refetch()} />;
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className='flex-1 bg-background'>
+    // Top edge only: the tab bar below already covers the bottom system inset.
+    <SafeAreaView edges={['top']} className='flex-1 bg-background'>
       <ScreenBackground />
       {/* No navigation header on this tab: the wordmark is the top bar. */}
       <View className='items-center px-4 pt-4 pb-4' accessibilityRole='header'>

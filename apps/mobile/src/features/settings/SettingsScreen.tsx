@@ -58,7 +58,8 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen>
+    // No bottom safe-area edge: the tab bar below already covers the system inset.
+    <Screen edges={[]}>
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.appearance')}</CardTitle>
