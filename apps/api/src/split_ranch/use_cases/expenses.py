@@ -9,8 +9,6 @@ existing expenses.
 
 from __future__ import annotations
 
-import base64
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -47,6 +45,7 @@ from split_ranch.use_cases.common import (
     require_active,
 )
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
+from split_ranch.use_cases.pagination import DEFAULT_PAGE, clamp_limit, decode_cursor, encode_cursor
 from split_ranch.use_cases.split_resolution import (
     Resolution,
     ResolvedShare,
@@ -57,9 +56,6 @@ from split_ranch.use_cases.split_resolution import (
 )
 
 _NO_NOTIFIER = NullNotifier()
-
-DEFAULT_PAGE = 50
-MAX_PAGE = 200
 
 
 # ---------------------------------------------------------------- helpers
@@ -430,18 +426,8 @@ def get_expense(session: Session, actor: GroupActor, expense_id: UUID) -> Expens
     return to_read(session, actor, _load(session, actor, expense_id))
 
 
-def _encode_cursor(d: date, c: datetime, i: UUID) -> str:
-    raw = json.dumps({"d": d.isoformat(), "c": c.isoformat(), "i": str(i)}).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> tuple[date, datetime, UUID]:
-    try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        return date.fromisoformat(data["d"]), datetime.fromisoformat(data["c"]), UUID(data["i"])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise Unprocessable("Invalid cursor") from exc
+def _parse_cursor(data: dict[str, Any]) -> tuple[date, datetime, UUID]:
+    return date.fromisoformat(data["d"]), datetime.fromisoformat(data["c"]), UUID(data["i"])
 
 
 def _check_range(filters: ExpenseFilters) -> None:
@@ -458,13 +444,13 @@ def list_expenses(
     cursor: str | None = None,
 ) -> tuple[list[ExpenseRead], str | None]:
     _check_range(filters)
-    limit = max(1, min(limit, MAX_PAGE))
+    limit = clamp_limit(limit)
     rows = erepo.list_expenses(
         session,
         actor.group_id,
         filters,
         limit=limit + 1,
-        after=_decode_cursor(cursor) if cursor else None,
+        after=decode_cursor(cursor, _parse_cursor) if cursor else None,
     )
     page = rows[:limit]
     shares = erepo.shares_for(session, actor.group_id, [e.id for e in page])
@@ -472,7 +458,13 @@ def list_expenses(
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.expense_date, last.created_at, last.id)
+        next_cursor = encode_cursor(
+            {
+                "d": last.expense_date.isoformat(),
+                "c": last.created_at.isoformat(),
+                "i": str(last.id),
+            }
+        )
     return items, next_cursor
 
 

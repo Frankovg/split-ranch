@@ -237,14 +237,12 @@ def resolve_expense_split(
     default_rule: RuleData | None,
     members: Sequence[UUID],
     canonical_order: Sequence[UUID],
-    allowed_members: set[UUID] | None = None,
 ) -> Resolution:
     """Resolve the split of one expense following the precedence chain.
 
-    `members` are in canonical order; `allowed_members` widens who may appear in an
-    explicit override (used by edits that keep the stored participants).
+    `members` are in canonical order.
     """
-    allowed = set(members) | (allowed_members or set())
+    allowed = set(members)
 
     if override is not None:
         plan = _plan_from_override(override, participants, members, allowed, canonical_order)

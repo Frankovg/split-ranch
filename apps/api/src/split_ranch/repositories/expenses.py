@@ -189,28 +189,6 @@ def all_shares(session: Session, group_id: UUID) -> dict[UUID, list[ExpenseShare
     return out
 
 
-def member_has_live_expenses(session: Session, group_id: UUID, member_id: UUID) -> bool:
-    """Whether a member pays or takes part in any live expense of the group."""
-    paid = select(Expense.id).where(
-        Expense.group_id == group_id,
-        Expense.deleted_at.is_(None),
-        Expense.payer_member_id == member_id,
-    )
-    shared = (
-        select(ExpenseShare.expense_id)
-        .join(
-            Expense,
-            and_(Expense.id == ExpenseShare.expense_id, Expense.group_id == ExpenseShare.group_id),
-        )
-        .where(
-            ExpenseShare.group_id == group_id,
-            ExpenseShare.member_id == member_id,
-            Expense.deleted_at.is_(None),
-        )
-    )
-    return bool(session.scalar(select(paid.exists())) or session.scalar(select(shared.exists())))
-
-
 def revisions(session: Session, group_id: UUID, expense_id: UUID) -> Sequence[History]:
     return session.scalars(
         select(History)

@@ -455,3 +455,11 @@ def test_list_loads_shares_in_one_query(
     assert len(page["items"]) == 6
     assert all(len(i["shares"]) == 3 for i in page["items"])
     assert _count_list_queries(client, house, db_session) == small
+
+
+@pytest.mark.parametrize("path", ["/expenses", "/payments"])
+@pytest.mark.parametrize("cursor", ["not-base64!", "e30", "eyJ0IjoxfQ"])
+def test_invalid_cursor_is_422(client: TestClient, house: House, path: str, cursor: str) -> None:
+    """Garbage, `{}` and `{"t": 1}` are all rejected by the shared cursor decoder."""
+    r = client.get(house.url(f"{path}?cursor={cursor}"), headers=house.h("Ana"))
+    assert r.status_code == 422, r.text

@@ -10,9 +10,8 @@ is fixed with a payment in the opposite direction.
 
 from __future__ import annotations
 
-import base64
-import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -37,9 +36,7 @@ from split_ranch.use_cases.notifications import (
     Notifier,
     NullNotifier,
 )
-
-DEFAULT_PAGE = 50
-MAX_PAGE = 200
+from split_ranch.use_cases.pagination import DEFAULT_PAGE, clamp_limit, decode_cursor, encode_cursor
 
 # Allowed transitions: action -> (who, from statuses, to status)
 _TRANSITIONS: dict[str, tuple[str, tuple[str, ...], str]] = {
@@ -222,18 +219,8 @@ def get_payment(session: Session, actor: GroupActor, payment_id: UUID) -> Paymen
     return PaymentRead.model_validate(payment)
 
 
-def _encode_cursor(ts: datetime, i: UUID) -> str:
-    raw = json.dumps({"t": ts.isoformat(), "i": str(i)}).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
-    try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        return datetime.fromisoformat(data["t"]), UUID(data["i"])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise Unprocessable("Invalid cursor") from exc
+def _parse_cursor(data: dict[str, Any]) -> tuple[datetime, UUID]:
+    return datetime.fromisoformat(data["t"]), UUID(data["i"])
 
 
 def list_payments(
@@ -244,17 +231,17 @@ def list_payments(
     cursor: str | None = None,
     status: list[str] | None = None,
 ) -> tuple[list[PaymentRead], str | None]:
-    limit = max(1, min(limit, MAX_PAGE))
+    limit = clamp_limit(limit)
     rows = prepo.list_payments(
         session,
         actor.group_id,
         limit=limit + 1,
-        after=_decode_cursor(cursor) if cursor else None,
+        after=decode_cursor(cursor, _parse_cursor) if cursor else None,
         statuses=status,
     )
     items = [PaymentRead.model_validate(p) for p in rows[:limit]]
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.created_at, last.id)
+        next_cursor = encode_cursor({"t": last.created_at.isoformat(), "i": str(last.id)})
     return items, next_cursor

@@ -13,7 +13,7 @@ younger than 24 h, Expo's retention) is checked first. Tokens Expo reports as
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal, Protocol
@@ -272,11 +272,3 @@ def dispatch_safely(
     except Exception as exc:
         log.exception("push_dispatch_failed", kind=event.kind)
         sentry_sdk.capture_exception(exc)
-
-
-def members_of(*groups: Collection[UUID]) -> frozenset[UUID]:
-    """Union of member id collections (payer, shares before and after an edit...)."""
-    out: set[UUID] = set()
-    for g in groups:
-        out.update(g)
-    return frozenset(out)

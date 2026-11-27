@@ -1,6 +1,6 @@
 """Running balance, payment suggestions and payments."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query, Response
@@ -14,13 +14,12 @@ from split_ranch.schemas.payments import (
     PaymentDispute,
     PaymentNote,
     PaymentRead,
+    PaymentStatus,
 )
 from split_ranch.use_cases import balance, payments
 from split_ranch.use_cases.notifications import Notifier
 
 router = APIRouter(prefix="/groups/{group_id}", tags=["payments"])
-
-PaymentStatus = Literal["sent", "confirmed", "disputed", "cancelled"]
 
 
 @router.get("/balance")
