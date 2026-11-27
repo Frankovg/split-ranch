@@ -38,6 +38,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     verifier: TokenVerifier = app.state.token_verifier
     await run_in_threadpool(verifier.preload)
     yield
+    # Uvicorn has finished the in-flight requests (and their background pushes) by now.
+    closers: list[tuple[str, Callable[[], None]]] = app.state.shutdown_closers
+    for name, close in closers:
+        try:
+            await run_in_threadpool(close)
+        except Exception:
+            log.exception("shutdown_close_failed", resource=name)
 
 
 def create_app(
@@ -61,7 +68,14 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.engine = engine or create_db_engine(settings)
+    # Only what the app creates itself is closed on shutdown; injected objects (tests share
+    # one engine across apps) belong to the caller.
+    closers: list[tuple[str, Callable[[], None]]] = []
+    app.state.shutdown_closers = closers
+    if engine is None:
+        engine = create_db_engine(settings)
+        closers.append(("db_engine", engine.dispose))
+    app.state.engine = engine
     app.state.session_factory = create_session_factory(app.state.engine)
     app.state.token_verifier = token_verifier or TokenVerifier(
         jwks_url=settings.jwks_url,
@@ -78,6 +92,7 @@ def create_app(
             access_token=settings.expo_access_token,
             timeout_seconds=settings.push_timeout_seconds,
         )
+        closers.append(("expo_push_client", push_client.close))
     app.state.push_client = push_client
 
     # Account deletion needs the secret key; without it DELETE /me answers 503.
