@@ -8,7 +8,6 @@ import { useAppColorScheme } from '@/theme/ThemeSync';
 
 /** Tab bar content height (icon + label) and the gap kept above the system navigation bar. */
 const TAB_BAR_CONTENT_HEIGHT = 60;
-const TAB_BAR_BOTTOM_GAP = 8;
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -20,8 +19,8 @@ export default function TabsLayout() {
         // The default bar (49dp + inset, padding = inset) leaves the labels touching the
         // Android navigation buttons; add a gap on top of the system inset.
         tabBarStyle: {
-          height: TAB_BAR_CONTENT_HEIGHT + TAB_BAR_BOTTOM_GAP + insets.bottom,
-          paddingBottom: TAB_BAR_BOTTOM_GAP + insets.bottom,
+          height: TAB_BAR_CONTENT_HEIGHT + +insets.bottom,
+          paddingBottom: insets.bottom,
         },
         tabBarActiveTintColor: tokenColor(scheme, 'primary'),
         tabBarInactiveTintColor: tokenColor(scheme, 'muted-foreground'),
