@@ -68,6 +68,11 @@ export default function RootLayout() {
                   name='quick/[id]'
                   options={{ headerShown: true, title: t('quick.title') }}
                 />
+                {/* Privacy policy: linked from sign-in and from Settings. */}
+                <Stack.Screen
+                  name='privacy'
+                  options={{ headerShown: true, title: t('privacy.title') }}
+                />
                 <Stack.Protected guard={__DEV__}>
                   <Stack.Screen
                     name='dev/gallery'

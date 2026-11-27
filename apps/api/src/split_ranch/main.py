@@ -20,6 +20,7 @@ from split_ranch.core.rate_limit import RateLimiter
 from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings, get_settings
 from split_ranch.integrations.expo_push import ExpoPushClient
+from split_ranch.integrations.supabase_admin import AuthAdmin, SupabaseAuthAdmin
 
 log = structlog.get_logger(__name__)
 
@@ -32,6 +33,7 @@ def create_app(
     engine: Engine | None = None,
     token_verifier: TokenVerifier | None = None,
     push_client: ExpoPushClient | None = None,
+    auth_admin: AuthAdmin | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_json)
@@ -62,6 +64,13 @@ def create_app(
             timeout_seconds=settings.push_timeout_seconds,
         )
     app.state.push_client = push_client
+
+    # Account deletion needs the secret key; without it DELETE /me answers 503.
+    if auth_admin is None and settings.supabase_secret_key:
+        auth_admin = SupabaseAuthAdmin(
+            supabase_url=settings.supabase_url, secret_key=settings.supabase_secret_key
+        )
+    app.state.auth_admin = auth_admin
 
     app.state.user_rate_limiter = RateLimiter(settings.rate_limit_per_minute)
     app.state.invite_rate_limiter = RateLimiter(settings.invite_rate_limit_per_minute)

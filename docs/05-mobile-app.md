@@ -64,7 +64,8 @@ Routes stay thin: a route file renders a feature screen component from `src/feat
 | Group settings | Rename, members (admin badge), invite (share the code), leave; admin: remove member, delete group (type the name) |
 | Categories & rules | Group settings → "How expenses are split": the default rule, *Equal parts* (`equal` without shares: every active member, later joiners included) or *Custom* (`percentages` naming every active member, 0 % allowed, live 100 % check). Saved rules apply only to new expenses. Planned: per-category rules. Any member may edit them |
 | Quick splits | List of local events; editor with mode toggle (total vs itemised), participants chips (tap to rename, mark "Soy yo" or remove), result card with a manual "Debe / Ha pagado" button per debtor, Share |
-| Settings | Theme (system/light/dark), language, **Notifications** (opens the switches screen), sign out. Planned: profile, delete account |
+| Settings | Theme (system/light/dark), language, **Notifications** (opens the switches screen), sign out, privacy policy, **delete account** (type BORRAR/DELETE; lists the groups to settle first). Planned: profile |
+| Privacy (`/privacy`) | Signed in or out: a five-line summary, then the legal detail in folded sections and a "write to us" email button |
 | Notifications (`/notifications`) | Master switch plus one switch per event type (new expense, expense edited/deleted, payments, new member), saved on the server (`/v1/me`). Shows a notice with a button to the system settings when the OS permission is denied |
 
 ## State and data

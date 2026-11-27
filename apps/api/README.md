@@ -35,7 +35,7 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `DATABASE_URL_SESSION` | migrations | session pooler (IPv4 on Supabase Free). Falls back to `DATABASE_URL` |
 | `SUPABASE_URL` | API | JWKS is fetched from `$SUPABASE_URL/auth/v1/.well-known/jwks.json` (cached 10 min) |
 | `SUPABASE_JWT_ISSUER` | API | expected `iss`; defaults to `$SUPABASE_URL/auth/v1` |
-| `SUPABASE_SECRET_KEY` | API | account deletion only (not implemented yet) |
+| `SUPABASE_SECRET_KEY` | API | account deletion only (`DELETE /v1/me` answers 503 without it) |
 | `SENTRY_DSN` | API | Sentry is initialised only when set (`send_default_pii=False`) |
 | `EXPO_ACCESS_TOKEN` | API | optional bearer token for the Expo Push Service; required once "enhanced security for push notifications" is on for the Expo account. Secret |
 | `PUSH_ENABLED` | API | `false` stops all push notifications (default `true`; tests turn it off) |

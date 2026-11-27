@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Calculator, LogIn, Palette } from 'lucide-react-native';
+import { Calculator, LogIn, Palette, ShieldCheck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,7 +61,10 @@ export function SignInScreen() {
         </View>
 
         <View className='items-center gap-1'>
-          {/* TODO: add a link to the published privacy policy URL (t('auth.privacy')) once it exists. */}
+          <Button variant='ghost' size='sm' onPress={() => router.navigate('/privacy')}>
+            <Icon as={ShieldCheck} size={16} className='text-muted-foreground' />
+            <Text className='text-muted-foreground'>{t('auth.privacy')}</Text>
+          </Button>
           {__DEV__ ? (
             <Button variant='ghost' onPress={() => router.navigate('/dev/gallery')}>
               <Icon as={Palette} size={18} />

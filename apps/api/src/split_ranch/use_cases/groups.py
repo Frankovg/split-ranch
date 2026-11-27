@@ -84,6 +84,7 @@ def _group_read(
                 id=m.id,
                 user_id=m.user_id,
                 display_name=u.display_name,
+                account_deleted=u.deleted_at is not None,
                 role=m.role,
                 status=m.status,
                 sort_key=m.sort_key,
@@ -364,8 +365,8 @@ def accept_invitation(
 # ---------------------------------------------------------------- members
 
 
-def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> None:
-    """D2: leaving needs a zero net and no payment of the member waiting for confirmation."""
+def _open_position(session: Session, group_id: UUID, member: GroupMember) -> tuple[int, int]:
+    """The member's net and how many of their payments wait for confirmation."""
     result = compute_group_balance(session, group_id)
     net = next((b.net_cents for b in result.balances if b.id == str(member.id)), 0)
     waiting = session.scalar(
@@ -377,11 +378,17 @@ def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> N
             (Payment.from_member_id == member.id) | (Payment.to_member_id == member.id),
         )
     )
+    return net, int(waiting or 0)
+
+
+def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> None:
+    """D2: leaving needs a zero net and no payment of the member waiting for confirmation."""
+    net, waiting = _open_position(session, group_id, member)
     if net != 0 or waiting:
         raise Conflict(
             "The member's balance must be settled first",
             code="member_has_open_balance",
-            extra={"net_cents": net, "pending_payments": int(waiting or 0)},
+            extra={"net_cents": net, "pending_payments": waiting},
         )
 
 
@@ -445,3 +452,49 @@ def remove_member(session: Session, actor: GroupActor, member_id: UUID) -> Group
     _leave(session, group, member, actor.user_id)
     session.commit()
     return get_group(session, actor)
+
+
+def leave_every_group(session: Session, user_id: UUID) -> None:
+    """Account deletion: the user leaves each live group they are active in (no commit).
+
+    All or nothing: if any group still has an open position for them, nothing changes and
+    `409 account_has_open_balances` lists those groups. Groups are locked in id order so two
+    concurrent deletions cannot deadlock.
+    """
+    group_ids = session.scalars(
+        select(GroupMember.group_id)
+        .join(Group, Group.id == GroupMember.group_id)
+        .where(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "active",
+            Group.deleted_at.is_(None),
+        )
+        .order_by(GroupMember.group_id)
+    ).all()
+    leaving: list[tuple[Group, GroupMember]] = []
+    unsettled: list[dict[str, object]] = []
+    for group_id in group_ids:
+        group = _locked_group(session, group_id)
+        member = repo.get_membership(session, group.id, user_id)
+        if member is None or member.status != "active":
+            continue  # left meanwhile
+        net, waiting = _open_position(session, group.id, member)
+        if net != 0 or waiting:
+            unsettled.append(
+                {
+                    "group_id": str(group.id),
+                    "group_name": group.name,
+                    "net_cents": net,
+                    "pending_payments": waiting,
+                }
+            )
+        else:
+            leaving.append((group, member))
+    if unsettled:
+        raise Conflict(
+            "Settle every group before deleting the account",
+            code="account_has_open_balances",
+            extra={"groups": unsettled},
+        )
+    for group, member in leaving:
+        _leave(session, group, member, user_id)

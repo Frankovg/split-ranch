@@ -66,7 +66,11 @@ export interface paths {
         get: operations["get_me_v1_me_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Me
+         * @description Delete the account: needs every group settled (`409 account_has_open_balances`).
+         */
+        delete: operations["delete_me_v1_me_delete"];
         options?: never;
         head?: never;
         /**
@@ -966,6 +970,14 @@ export interface components {
              */
             expires_at: string;
         };
+        /** MeDeleteIn */
+        MeDeleteIn: {
+            /**
+             * Confirm
+             * @constant
+             */
+            confirm: "DELETE";
+        };
         /** MeRead */
         MeRead: {
             /**
@@ -1007,6 +1019,8 @@ export interface components {
             user_id: string;
             /** Display Name */
             display_name: string | null;
+            /** Account Deleted */
+            account_deleted: boolean;
             /** Role */
             role: string;
             /** Status */
@@ -1422,6 +1436,7 @@ export type GroupUpdate = components['schemas']['GroupUpdate'];
 export type HttpValidationError = components['schemas']['HTTPValidationError'];
 export type InvitationPreview = components['schemas']['InvitationPreview'];
 export type InvitationRead = components['schemas']['InvitationRead'];
+export type MeDeleteIn = components['schemas']['MeDeleteIn'];
 export type MeRead = components['schemas']['MeRead'];
 export type MeUpdate = components['schemas']['MeUpdate'];
 export type MemberRead = components['schemas']['MemberRead'];
@@ -1535,6 +1550,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MeRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_me_v1_me_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeDeleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -66,7 +66,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).
 - Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the group admin's personal Google Drive (no data-region guarantee; disclosed).
-- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared groups (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and finally deletes the Supabase auth user (which removes sessions and identities).
+- Rights: **delete account** in Settings → Account (`DELETE /v1/me`, rules in [03 §5](03-business-rules.md#5-groups-and-membership)): it anonymises the member in shared groups (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and deletes the Supabase auth user (which removes sessions and identities). Every other right (access, a portable copy, rectification, restriction, objection) is exercised by email to contact@franamoroso.com, answered within a month; there is no in-app export. Google Play also needs a web URL for deletion requests: not built yet (see the TODO in `PrivacyScreen.tsx`).
 - Sharing to Google Sheets: explained at group creation; per-user opt-out of being shared.
 
 **Retention (defaults):**
@@ -81,7 +81,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 | Logs | 30 days; Sentry 90 days |
 | AI transcripts (future) | With the expense; raw audio not stored |
 
-**Privacy policy** (Phase 7 deliverable): plain-language Spanish + English, linked in the store listing, sign-in screen and settings. Include a Records of Processing Activities (RoPA) entry and a lightweight DPIA note (financial-ish data, small scale → DPIA likely not mandatory, but document the assessment).
+**Privacy policy**: the in-app screen `/privacy` (`features/legal/PrivacyScreen.tsx`, text in the i18n files, Spanish + English), linked from sign-in and Settings → Account. Controller: Franco Gabriel Amoroso, contact@franamoroso.com. The public URL for the store listing is not published yet (TODO in `PrivacyScreen.tsx`). Include a Records of Processing Activities (RoPA) entry and a lightweight DPIA note (financial-ish data, small scale → DPIA likely not mandatory, but document the assessment).
 
 ## Security checklist per release
 - [ ] Tenant-isolation suite green

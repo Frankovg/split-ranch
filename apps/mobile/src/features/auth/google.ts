@@ -166,9 +166,12 @@ async function runSignIn(): Promise<void> {
   if (error) throw error;
 }
 
-/** Sign out of Supabase and of the Google library so the account picker shows again. */
-export async function signOut(): Promise<void> {
-  await supabase?.auth.signOut();
+/**
+ * Sign out of Supabase and of the Google library so the account picker shows again.
+ * `local` clears only this device without depending on the server (e.g. a deleted account).
+ */
+export async function signOut(scope: 'global' | 'local' = 'global'): Promise<void> {
+  await supabase?.auth.signOut({ scope });
   try {
     await provider.signOut();
   } catch (error) {

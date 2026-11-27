@@ -23,7 +23,7 @@ Groups replaced households and periods in migration 0006 (design: [egm/design_dr
 | Rate limits | Per user (token bucket, process memory): 120 req/min on every authenticated route, checked right after the JWT and before any DB work; 10 req/min extra on `GET /invitations/{code}` and `POST /invitations/{code}/accept`. Over the limit: `429 rate_limited` + `Retry-After` (seconds). Tunable with `RATE_LIMIT_PER_MINUTE` / `INVITE_RATE_LIMIT_PER_MINUTE`. There are no public (unauthenticated) endpoints, so no per-IP limit |
 
 ### Error codes (`code`)
-`unauthenticated`, `token_expired`, `forbidden_role` (403), `not_found`, `validation_error`, `split_mismatch`, `invalid_split`, `invalid_ratios`, `invalid_payer`, `invalid_category`, `invalid_source`, `invalid_payment`, `version_conflict` (412), `precondition_required` (428), `id_conflict` (409), `invitation_expired` (410), `already_member` (409), `category_exists` (409), `category_archived` (409), `preset_exists` (409), `invalid_keyword` (422), `member_has_open_balance` (409), `group_has_open_balances` (409), `member_left` (409), `cannot_remove_self` (409), `confirm_name` (422), `payment_state_changed` (409), `rate_limited`.
+`unauthenticated`, `token_expired`, `forbidden_role` (403), `not_found`, `validation_error`, `split_mismatch`, `invalid_split`, `invalid_ratios`, `invalid_payer`, `invalid_category`, `invalid_source`, `invalid_payment`, `version_conflict` (412), `precondition_required` (428), `id_conflict` (409), `invitation_expired` (410), `already_member` (409), `category_exists` (409), `category_archived` (409), `preset_exists` (409), `invalid_keyword` (422), `member_has_open_balance` (409), `group_has_open_balances` (409), `account_has_open_balances` (409, with `groups: [{group_id, group_name, net_cents, pending_payments}]`), `account_deleted` (401), `account_deletion_failed` (502), `account_deletion_unavailable` (503), `member_left` (409), `cannot_remove_self` (409), `confirm_name` (422), `payment_state_changed` (409), `rate_limited`.
 
 Removed with periods: `period_locked`, `reason_required`, `period_state_changed`, `no_open_period`, `period_open`, `period_not_latest`, `last_admin`.
 
@@ -33,13 +33,13 @@ Token verification (FastAPI dependency `get_actor`):
 1. Read the bearer token; decode the header, pick the key by `kid` from the project **JWKS** (`https://<project>.supabase.co/auth/v1/.well-known/jwks.json`, cached ~10 min, refetched on unknown `kid`). Library: `PyJWT` with `PyJWKClient`.
 2. Verify signature with the asymmetric algorithm the project uses (ES256 by default; reject `HS256` and `none`), `iss = https://<project>.supabase.co/auth/v1`, `aud = authenticated`, `exp` (30 s leeway).
 3. `role` claim must be `authenticated` (reject `anon` and `service_role` tokens).
-4. `user_id = sub`. Call `ensure_user` (cheap upsert, cached per process for a few minutes).
+4. `user_id = sub`. Call `ensure_user` (cheap upsert, cached per process for a few minutes). It never rewrites a deleted account: `401 account_deleted`.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/me` | — | user + active memberships `[ {group_id, group_name, member_id, role, status} ]`; creates `app.users` on first call |
 | PATCH | `/me` | `{display_name?, locale?}` | user |
-| DELETE | `/me` | `{confirm: "DELETE"}` | *Not built yet.* Anonymise memberships (with admin hand-over), delete own data, then delete the Supabase auth user |
+| DELETE | `/me` | `{confirm: "DELETE"}` | `204`. Rules in [03 §5](03-business-rules.md#5-groups-and-membership). `409 account_has_open_balances`; `502 account_deletion_failed` if Supabase refuses (nothing changed, retry); `503 account_deletion_unavailable` without `SUPABASE_SECRET_KEY`. Afterwards the still-valid token gets `401 account_deleted` |
 
 No group in the token (a user has several groups; membership is checked per request). We do not add custom claims to Supabase tokens.
 

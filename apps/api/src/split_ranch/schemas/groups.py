@@ -41,6 +41,11 @@ class MeUpdate(StrictModel):
     notifications: NotificationPrefsUpdate | None = None
 
 
+class MeDeleteIn(StrictModel):
+    # Typed by the client to make an accidental call impossible.
+    confirm: Literal["DELETE"]
+
+
 # ------------------------------------------------------------- groups
 
 
@@ -58,6 +63,8 @@ class MemberRead(ReadModel):
     id: Id
     user_id: Id
     display_name: str | None
+    # The user deleted their account: no name any more, shown as "Former member".
+    account_deleted: bool
     role: str
     status: str
     sort_key: int

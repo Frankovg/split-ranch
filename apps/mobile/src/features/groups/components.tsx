@@ -18,10 +18,14 @@ export function activeMembers(group: Group): Member[] {
   return group.members.filter((m) => m.status === 'active');
 }
 
-/** Display name of a member, "You" for the current user, "(left)" for former members. */
+/**
+ * Display name of a member: "You" for the current user, "(left)" for members who left and
+ * "Former member" for those who deleted their account (they have no name any more).
+ */
 export function memberName(group: Group, memberId: string, t: TFunction): string {
   if (memberId === group.my_member_id) return t('home.you');
   const member = group.members.find((m) => m.id === memberId);
+  if (member?.account_deleted) return t('group.formerMember');
   const name = member?.display_name ?? t('home.unnamed');
   return member?.status === 'left' ? t('group.leftName', { name }) : name;
 }

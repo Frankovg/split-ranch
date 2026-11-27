@@ -197,6 +197,9 @@ def settings() -> Settings:
         log_level="WARNING",
         # apps/api/.env may hold a real DSN; tests must never report to Sentry.
         sentry_dsn=None,
+        # apps/api/.env may hold the real secret key: tests never reach Supabase Auth
+        # (test_account_deletion injects a fake admin client).
+        supabase_secret_key=None,
         # Tests never reach Expo; test_notifications injects its own notifier.
         push_enabled=False,
         expo_access_token=None,
