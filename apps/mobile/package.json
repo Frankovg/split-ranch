@@ -1,6 +1,6 @@
 {
   "name": "@split-ranch/mobile",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -11,7 +11,8 @@
     "doctor": "expo-doctor",
     "export:android": "expo export --platform android",
     "build:preview": "eas build --profile preview --platform android",
-    "update:preview": "eas update --channel preview --environment production --platform android",
+    "update:preview": "eas update --channel preview --environment production --platform android && pnpm sentry:sourcemaps",
+    "sentry:sourcemaps": "eas env:exec production --non-interactive \"pnpm exec sentry-expo-upload-sourcemaps dist\"",
     "fingerprint": "eas fingerprint:compare --environment production",
     "lint": "eslint ."
   },
@@ -30,6 +31,7 @@
     "@rn-primitives/tabs": "^1.5.2",
     "@rn-primitives/toggle": "^1.5.2",
     "@rn-primitives/toggle-group": "^1.5.2",
+    "@sentry/react-native": "~8.28.1",
     "@split-ranch/api-client": "workspace:*",
     "@split-ranch/domain": "workspace:*",
     "@supabase/supabase-js": "^2.119.0",

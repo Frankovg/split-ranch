@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { queryClient } from '@/lib/query/client';
 import { queryPersister } from '@/lib/query/persister';
+import { setSentryUser } from '@/lib/sentry';
 import { bindAuthAutoRefresh, supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
 
@@ -11,6 +12,10 @@ import { useSessionStore } from '@/stores/session';
  */
 export function AuthListener() {
   const setSession = useSessionStore((s) => s.setSession);
+  const userId = useSessionStore((s) => s.session?.user.id ?? null);
+
+  // Error reports carry the pseudonymised user id while signed in.
+  useEffect(() => setSentryUser(userId), [userId]);
 
   useEffect(() => {
     const client = supabase;

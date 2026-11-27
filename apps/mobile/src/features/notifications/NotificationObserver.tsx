@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import { queryClient, queryKeys } from '@/lib/query/client';
+import { reportError } from '@/lib/sentry';
 import { useSessionStore } from '@/stores/session';
 import { registerChangedToken, registerIfGranted } from './register';
 import { notificationTarget, type NotificationTarget } from './routing';
@@ -35,8 +36,13 @@ function refresh(target: NotificationTarget) {
   if (target.type === 'member_joined') void queryClient.invalidateQueries({ queryKey: queryKeys.groups() });
 }
 
+// Registration runs in the background, so a failure is otherwise invisible: the device
+// just stops getting pushes.
 function warn(message: string) {
-  return (error: unknown) => console.warn(message, error);
+  return (error: unknown) => {
+    console.warn(message, error);
+    reportError(error, 'notifications.register');
+  };
 }
 
 /**

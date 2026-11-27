@@ -3,7 +3,7 @@ import '@/i18n';
 
 import { PortalHost } from '@rn-primitives/portal';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { SplashScreen, Stack, ThemeProvider } from 'expo-router';
+import { ErrorBoundary as ExpoErrorBoundary, SplashScreen, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,18 +17,25 @@ import { LanguageSync } from '@/i18n/LanguageSync';
 import { CACHE_BUSTER, CACHE_MAX_AGE, queryClient } from '@/lib/query/client';
 import { queryPersister } from '@/lib/query/persister';
 import { useAppStateFocus } from '@/lib/query/refresh';
+import { initSentry, wrapErrorBoundary, wrapRoot } from '@/lib/sentry';
 import { useSessionStore } from '@/stores/session';
 import { FONT_FAMILY, NAV_THEME } from '@/theme/navigation';
 import { ThemeSync, useAppColorScheme } from '@/theme/ThemeSync';
 import { tokenColor } from '@/theme/tokens';
 
-export { ErrorBoundary } from 'expo-router';
+// Before anything renders, so startup errors are reported too.
+initSentry();
+
+// Expo Router's default fallback screen, also reporting the render error it catches.
+export const ErrorBoundary = wrapErrorBoundary(ExpoErrorBoundary);
 
 void SplashScreen.preventAutoHideAsync();
 // Start waking the API (Render free plan sleeps when idle) while the splash is still up.
 warmUpApi();
 
-export default function RootLayout() {
+export default wrapRoot(RootLayout);
+
+function RootLayout() {
   const scheme = useAppColorScheme();
   const status = useSessionStore((s) => s.status);
   const { t } = useTranslation();

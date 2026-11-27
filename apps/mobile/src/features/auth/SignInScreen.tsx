@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { ScreenBackground } from '@/components/ScreenBackground';
+import { reportError } from '@/lib/sentry';
 import { isGoogleSignInAvailable, signInWithGoogle, SignInCancelledError } from './google';
 
 export function SignInScreen() {
@@ -28,6 +29,7 @@ export function SignInScreen() {
     } catch (error) {
       if (!(error instanceof SignInCancelledError)) {
         console.warn('Google sign-in failed', error);
+        reportError(error, 'auth.google-sign-in');
         toast.error(t('auth.failed'));
       }
     } finally {

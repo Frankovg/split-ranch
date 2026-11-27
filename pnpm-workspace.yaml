@@ -3,6 +3,8 @@ packages:
   - "packages/*"
 allowBuilds:
   esbuild: true
+  # The binary comes from @sentry/cli's per-platform optional packages; its postinstall is not needed.
+  "@sentry/cli": false
 minimumReleaseAgeExclude:
   - "@expo/cli@58.1.21"
   - "@expo/metro-config@58.0.23"
