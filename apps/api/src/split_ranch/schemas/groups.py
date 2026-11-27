@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from split_ranch.schemas.common import Id, ReadModel, StrictModel
+from split_ranch.schemas.common import Id, NonBlank, ReadModel, StrictModel
 from split_ranch.schemas.notifications import NotificationPrefs, NotificationPrefsUpdate
 
 Role = Literal["admin", "member"]
@@ -36,7 +36,7 @@ class MeRead(UserRead):
 
 
 class MeUpdate(StrictModel):
-    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    display_name: NonBlank | None = Field(default=None, max_length=80)
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
     notifications: NotificationPrefsUpdate | None = None
 
@@ -50,12 +50,12 @@ class MeDeleteIn(StrictModel):
 
 
 class GroupCreate(StrictModel):
-    name: str = Field(min_length=1, max_length=80)
+    name: NonBlank = Field(max_length=80)
     timezone: str = Field(default="Europe/Madrid", max_length=64)
 
 
 class GroupUpdate(StrictModel):
-    name: str | None = Field(default=None, min_length=1, max_length=80)
+    name: NonBlank | None = Field(default=None, max_length=80)
     timezone: str | None = Field(default=None, max_length=64)
 
 
@@ -84,7 +84,7 @@ class GroupRead(ReadModel):
 
 class GroupDeleteIn(StrictModel):
     # The admin types the group's name to confirm.
-    confirm_name: str = Field(min_length=1, max_length=80)
+    confirm_name: NonBlank = Field(max_length=80)
 
 
 # ------------------------------------------------------------ invitations
@@ -107,14 +107,14 @@ class InvitationPreview(ReadModel):
 
 
 class CategoryCreate(StrictModel):
-    name: str = Field(min_length=1, max_length=40)
+    name: NonBlank = Field(max_length=40)
     icon: str | None = Field(default=None, max_length=40)
     color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     sort_key: int | None = Field(default=None, ge=0, le=10_000)
 
 
 class CategoryUpdate(StrictModel):
-    name: str | None = Field(default=None, min_length=1, max_length=40)
+    name: NonBlank | None = Field(default=None, max_length=40)
     icon: str | None = Field(default=None, max_length=40)
     color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     sort_key: int | None = Field(default=None, ge=0, le=10_000)
@@ -136,7 +136,7 @@ class CategoryRead(ReadModel):
 class CategoryPresetCreate(StrictModel):
     """New expenses whose description contains `keyword` get `category_id`."""
 
-    keyword: str = Field(min_length=1, max_length=40)
+    keyword: NonBlank = Field(max_length=40)
     category_id: Id
 
 

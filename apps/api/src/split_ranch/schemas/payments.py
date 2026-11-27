@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from split_ranch.schemas.common import AmountCents, Id, ReadModel, StrictModel
+from split_ranch.schemas.common import AmountCents, Id, NonBlank, ReadModel, StrictModel
 
 # Mirrors models.payments.PAYMENT_STATUSES (the DB check constraint).
 PaymentStatus = Literal["sent", "confirmed", "disputed", "cancelled"]
@@ -50,7 +50,7 @@ class PaymentNote(StrictModel):
 
 
 class PaymentDispute(StrictModel):
-    note: str = Field(min_length=1, max_length=280)
+    note: NonBlank = Field(max_length=280)
 
 
 class PaymentRead(ReadModel):

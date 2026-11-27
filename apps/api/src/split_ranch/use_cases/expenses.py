@@ -302,7 +302,7 @@ def _same_create(
         existing.created_by_user_id == actor.user_id
         and existing.deleted_at is None
         and existing.amount_cents == data.amount_cents
-        and existing.description == data.description.strip()
+        and existing.description == data.description
         and existing.notes == data.notes
         and existing.category_id == data.category_id
         and existing.payer_member_id == data.payer_member_id
@@ -370,7 +370,7 @@ def create_expense(
         category_id=data.category_id,
         payer_member_id=data.payer_member_id,
         amount_cents=data.amount_cents,
-        description=data.description.strip(),
+        description=data.description,
         notes=data.notes,
         expense_date=data.expense_date,
         split_type=resolution.split_type,
@@ -557,7 +557,7 @@ def update_expense(
     expense.category_id = category_id
     expense.expense_date = data.expense_date or expense.expense_date
     if data.description is not None:
-        expense.description = data.description.strip()
+        expense.description = data.description
     if "notes" in fields:
         expense.notes = data.notes
     if resolution is not None:

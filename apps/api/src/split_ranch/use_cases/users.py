@@ -141,7 +141,7 @@ def get_me(session: Session, actor: Actor) -> MeRead:
 def update_profile(session: Session, actor: Actor, data: MeUpdate) -> MeRead:
     user = _user(session, actor.user_id)
     if data.display_name is not None:
-        user.display_name = data.display_name.strip()
+        user.display_name = data.display_name
     if data.locale is not None:
         user.locale = data.locale
     if data.notifications is not None:

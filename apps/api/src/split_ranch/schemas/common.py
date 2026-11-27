@@ -4,13 +4,16 @@ from datetime import date
 from typing import Annotated, Generic, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 # UUIDs and dates arrive as JSON strings: allow that coercion, keep everything else strict.
 Id = Annotated[UUID, Field(strict=False)]
 Day = Annotated[date, Field(strict=False)]
 AmountCents = Annotated[int, Field(ge=1, le=100_000_000)]
 Reason = Annotated[str, Field(min_length=5, max_length=280)]
+# Trimmed before the length checks, so "   " is a 422 instead of failing the DB's
+# char_length CHECK (a 500). Give each field its own `max_length` with Field().
+NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class StrictModel(BaseModel):

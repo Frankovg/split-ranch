@@ -61,7 +61,7 @@ def list_categories(
 
 def create_category(session: Session, actor: GroupActor, data: CategoryCreate) -> CategoryRead:
     require_active(actor)
-    name = data.name.strip()
+    name = data.name
     if hrepo.category_name_taken(session, actor.group_id, name):
         raise Conflict("A category with this name already exists", code="category_exists")
     sort_key = data.sort_key
@@ -105,10 +105,10 @@ def update_category(
     require_active(actor)
     category = _category(session, actor, category_id)
     changes = data.model_dump(exclude_unset=True)
-    if changes.get("name"):
-        changes["name"] = changes["name"].strip()
-        if hrepo.category_name_taken(session, actor.group_id, changes["name"], category.id):
-            raise Conflict("A category with this name already exists", code="category_exists")
+    if changes.get("name") and hrepo.category_name_taken(
+        session, actor.group_id, changes["name"], category.id
+    ):
+        raise Conflict("A category with this name already exists", code="category_exists")
     diff = {}
     for key, value in changes.items():
         if key in ("name", "sort_key") and value is None:
@@ -172,9 +172,7 @@ def create_category_preset(
     session: Session, actor: GroupActor, data: CategoryPresetCreate
 ) -> CategoryPresetRead:
     require_active(actor)
-    keyword = data.keyword.strip()
-    if not keyword:
-        raise Unprocessable("keyword must not be blank", code="invalid_keyword")
+    keyword = data.keyword
     category = hrepo.get_category(session, actor.group_id, data.category_id, include_archived=False)
     if category is None:
         raise Unprocessable("Category is not active in this group", code="invalid_category")

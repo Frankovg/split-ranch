@@ -109,7 +109,7 @@ def _locked_group(session: Session, group_id: UUID) -> Group:
 def create_group(session: Session, actor: Actor, data: GroupCreate) -> GroupRead:
     _validate_timezone(data.timezone)
     group = Group(
-        name=data.name.strip(),
+        name=data.name,
         timezone=data.timezone,
         created_by=actor.user_id,
         split_rule=dict(DEFAULT_SPLIT_RULE),
@@ -217,7 +217,8 @@ def delete_group(session: Session, actor: GroupActor, data: GroupDeleteIn) -> No
     """Soft delete by the admin, confirmed with the group's name, only with zero balances."""
     require_admin(actor)
     group = _locked_group(session, actor.group_id)
-    if data.confirm_name.strip() != group.name:
+    # Names are stored trimmed; strip anyway for rows saved before that ("Piso ").
+    if data.confirm_name != group.name.strip():
         raise Unprocessable("The confirmation does not match the group name", code="confirm_name")
     if _open_balances(session, group.id):
         raise Conflict(
