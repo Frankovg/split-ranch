@@ -193,9 +193,31 @@ def update_group(session: Session, actor: GroupActor, data: GroupUpdate) -> Grou
     return get_group(session, actor)
 
 
+# Payments waiting for the receiver: a `sent` one may still be confirmed, and a `disputed`
+# one confirmed or cancelled, so either can still move the balance.
+WAITING_PAYMENT_STATUSES = ("sent", "disputed")
+
+
+def _waiting_payments(session: Session, group_id: UUID, member_id: UUID | None = None) -> int:
+    """Payments of the group (or of one member, either side) waiting for confirmation."""
+    stmt = (
+        select(func.count())
+        .select_from(Payment)
+        .where(Payment.group_id == group_id, Payment.status.in_(WAITING_PAYMENT_STATUSES))
+    )
+    if member_id is not None:
+        stmt = stmt.where(
+            (Payment.from_member_id == member_id) | (Payment.to_member_id == member_id)
+        )
+    return int(session.scalar(stmt) or 0)
+
+
 def _open_balances(session: Session, group_id: UUID) -> bool:
+    """Deleting the group needs every net at zero and no payment waiting (sent or disputed)."""
     result = compute_group_balance(session, group_id)
-    return any(b.net_cents != 0 for b in result.balances) or bool(result.pending)
+    return (
+        any(b.net_cents != 0 for b in result.balances) or _waiting_payments(session, group_id) > 0
+    )
 
 
 def _soft_delete(session: Session, group: Group, actor_user_id: UUID) -> None:
@@ -370,16 +392,7 @@ def _open_position(session: Session, group_id: UUID, member: GroupMember) -> tup
     """The member's net and how many of their payments wait for confirmation."""
     result = compute_group_balance(session, group_id)
     net = next((b.net_cents for b in result.balances if b.id == str(member.id)), 0)
-    waiting = session.scalar(
-        select(func.count())
-        .select_from(Payment)
-        .where(
-            Payment.group_id == group_id,
-            Payment.status.in_(("sent", "disputed")),
-            (Payment.from_member_id == member.id) | (Payment.to_member_id == member.id),
-        )
-    )
-    return net, int(waiting or 0)
+    return net, _waiting_payments(session, group_id, member.id)
 
 
 def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> None:

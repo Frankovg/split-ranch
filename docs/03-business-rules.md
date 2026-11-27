@@ -222,7 +222,7 @@ In March, Franco paid *Supermercado* 100.00 split equally (33.34/33.33/33.33), a
 | Permissions | Every active member has the same rights (expenses, categories, rules, group name, invitations). Only the admin **removes members** and **deletes the group** |
 | Leave / removed | Only with a zero net and no `sent`/`disputed` payment involving the member (`409 member_has_open_balance`). The member becomes `left` and loses access (404 like an outsider); their (zero) balance and history stay |
 | Admin leaves | The admin role passes to the next active member in canonical order (`sort_key, id`). The last member leaving deletes the group |
-| Delete the group | Admin only, confirmed by typing the group name, and only when every net is zero and no payment is waiting (`409 group_has_open_balances`). Soft delete: it disappears for everyone |
+| Delete the group | Admin only, confirmed by typing the group name, and only when every net is zero and no payment is waiting (`sent` or `disputed`; `409 group_has_open_balances`). Soft delete: it disappears for everyone |
 | Account deletion | Only when the user could leave every live group (zero net, no `sent`/`disputed` payment in each; `409 account_has_open_balances` lists the others). In one transaction they leave each group (admin hand-over; the last member deletes the group), the `users` row is anonymised (email, name, avatar NULL, `deleted_at` set), push tokens are deleted, and then the Supabase auth user is deleted (if that fails, nothing changes). Expenses, payments and history stay and show the member as "Former member" (`account_deleted`). Signing in again with the same Google account is a new user |
 
 ## 6. Quick splits

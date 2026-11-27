@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -201,6 +202,38 @@ def test_delete_group(
     ok(client.request("DELETE", house.url(), json=body, headers=house.h("Juli")), 204)
     assert client.get(house.url(), headers=house.h("Franco")).status_code == 404
     assert ok(client.get("/v1/groups", headers=house.h("Franco"))) == []
+
+
+def test_delete_group_waits_for_sent_and_disputed_payments(
+    client: TestClient, make_user: Callable[[str], TestUser]
+) -> None:
+    """C4: a disputed payment can still be confirmed, so it blocks deletion like a sent one."""
+    house = make_house(client, make_user, ("Juli", "Franco"))
+    body = {"confirm_name": "Casa"}
+
+    def delete() -> Any:
+        return client.request("DELETE", house.url(), json=body, headers=house.h("Juli"))
+
+    payment = pay(client, house, "Franco", payer="Franco", to="Juli", amount=100)  # sent
+    r = delete()
+    assert r.status_code == 409 and r.json()["code"] == "group_has_open_balances"
+    ok(
+        client.post(
+            house.url(f"/payments/{payment['id']}/dispute"),
+            json={"note": "No me llegó"},
+            headers=house.h("Juli", **{"If-Match": '"1"'}),
+        )
+    )
+    r = delete()
+    assert r.status_code == 409 and r.json()["code"] == "group_has_open_balances"
+    ok(
+        client.post(
+            house.url(f"/payments/{payment['id']}/cancel"),
+            json={},
+            headers=house.h("Franco", **{"If-Match": '"2"'}),
+        )
+    )
+    ok(delete(), 204)
 
 
 def test_categories_crud(client: TestClient, make_user: Callable[[str], TestUser]) -> None:
