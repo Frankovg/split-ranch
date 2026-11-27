@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -27,6 +28,8 @@ from split_ranch.integrations.supabase_admin import AuthAdmin, SupabaseAuthAdmin
 log = structlog.get_logger(__name__)
 
 API_PREFIX = "/v1"
+# A client request id is echoed in the response, the logs and Sentry: keep it short and plain.
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
 @asynccontextmanager
@@ -93,7 +96,9 @@ def create_app(
     async def request_context(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request_id = request.headers.get("X-Request-ID", "")
+        if not REQUEST_ID_PATTERN.fullmatch(request_id):
+            request_id = uuid.uuid4().hex
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
         # Lets a Sentry event be matched with the request's log lines.

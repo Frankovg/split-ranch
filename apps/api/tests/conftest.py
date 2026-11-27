@@ -169,9 +169,10 @@ def make_token(
     role: str = "authenticated",
     exp_in: int = 3600,
     kid: str | None = None,
+    extra: dict[str, object] | None = None,
 ) -> str:
     now = int(time.time())
-    claims = {
+    claims: dict[str, object] = {
         "sub": str(sub),
         "iss": iss,
         "aud": aud,
@@ -180,6 +181,7 @@ def make_token(
         "exp": now + exp_in,
         "email": email or f"{sub}@example.com",
         "user_metadata": {"full_name": name or "Test User"},
+        **(extra or {}),
     }
     return jwt.encode(claims, key.private, algorithm="ES256", headers={"kid": kid or key.kid})
 

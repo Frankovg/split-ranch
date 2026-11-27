@@ -3,7 +3,7 @@
 ## Authentication
 - **Supabase Auth** owns identities and sessions: it verifies the Google ID token (with nonce) and issues access tokens (default 1 h) and refresh tokens (rotated, with reuse detection, handled by Supabase).
 - Supabase project settings to apply: Google as the only enabled provider (email/password, magic link and anonymous sign-ins **disabled**), asymmetric JWT signing keys, access-token lifetime 1 h (shorten to 15–30 min if needed), refresh-token reuse interval default, "Confirm email" irrelevant for Google.
-- FastAPI verifies every request token locally against the JWKS (asymmetric algorithm only, `iss`, `aud=authenticated`, `exp`, `role=authenticated`). Key rotation in Supabase is picked up automatically through `kid`.
+- FastAPI verifies every request token locally against the JWKS (asymmetric algorithm only, `iss`, `aud=authenticated`, `exp`, `role=authenticated`, and `is_anonymous` missing or `false`, so anonymous accounts are refused even if they were turned on in the project). Key rotation in Supabase is picked up automatically through `kid`.
 - Mobile: session persisted by `supabase-js` in encrypted MMKV, key in `expo-secure-store` (Android Keystore-backed).
 - Logout → `supabase.auth.signOut()`; "sign out everywhere" → `signOut({ scope: 'global' })`. Note: an already-issued access token remains valid until it expires (≤ 1 h). Acceptable for this app; if instant revocation is ever needed, the API can check a `sessions_revoked_after` timestamp per user.
 - **Keys**: the publishable (anon) key is public by design and grants nothing on our data (private `app` schema + RLS with no policies). The secret/service-role key is reserved for account deletion on the server and never leaves the server.

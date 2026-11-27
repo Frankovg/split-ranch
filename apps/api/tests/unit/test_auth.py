@@ -99,3 +99,21 @@ def test_signed_by_other_key(verifier: TokenVerifier) -> None:
 def test_garbage_token(verifier: TokenVerifier) -> None:
     with pytest.raises(Unauthenticated):
         verifier.verify("not-a-jwt")
+
+
+@pytest.mark.parametrize("value", [True, "true", 1, None])
+def test_anonymous_account_rejected(
+    verifier: TokenVerifier, signing_key: SigningKey, value: object
+) -> None:
+    """S4: anonymous Supabase users have role `authenticated`; only `is_anonymous` differs."""
+    token = make_token(signing_key, uuid.uuid4(), extra={"is_anonymous": value})
+    with pytest.raises(Unauthenticated):
+        verifier.verify(token)
+
+
+def test_permanent_account_with_is_anonymous_false(
+    verifier: TokenVerifier, signing_key: SigningKey
+) -> None:
+    uid = uuid.uuid4()
+    claims = verifier.verify(make_token(signing_key, uid, extra={"is_anonymous": False}))
+    assert claims.user_id == uid

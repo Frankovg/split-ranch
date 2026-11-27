@@ -63,7 +63,7 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
 
 - **Clave de MMKV** ([storage.ts](../apps/mobile/src/lib/storage.ts)): se generan 16 bytes aleatorios convertidos a 32 caracteres hex. Son 128 bits de entropía, no 256 como dice el comentario. Es suficiente, pero el comentario confunde.
 - **`kid` y algoritmo**: se podría comprobar además que `signing_key.algorithm_name == alg`. Es una defensa extra; no se encontró una vía de explotación.
-- **`X-Request-ID`** ([main.py](../apps/api/src/split_ranch/main.py)): se toma tal cual del cliente y va a los logs y a Sentry. Convendría validar su longitud y formato.
+- **`X-Request-ID`** ([main.py](../apps/api/src/split_ranch/main.py)): se toma tal cual del cliente y va a los logs y a Sentry. Convendría validar su longitud y formato. **Hecho:** solo se acepta `^[A-Za-z0-9-]{1,64}$`; si no cumple, se genera uno nuevo.
 
 ## Prioridad sugerida
 

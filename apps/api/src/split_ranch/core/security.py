@@ -167,6 +167,11 @@ class TokenVerifier:
 
         if claims.get("role") != "authenticated":
             raise Unauthenticated("Token role not allowed")
+        # Anonymous users also get the `authenticated` role; only this claim tells them apart.
+        # Rejected here too, not only by `enable_anonymous_sign_ins = false` in Supabase.
+        # Fails closed: only a missing claim or a literal `false` is a permanent account.
+        if claims.get("is_anonymous", False) is not False:
+            raise Unauthenticated("Anonymous accounts are not allowed")
         try:
             user_id = UUID(str(claims["sub"]))
         except ValueError as exc:

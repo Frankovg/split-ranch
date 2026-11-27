@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Callable
 
 import jwt
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -74,3 +75,19 @@ def test_unreachable_jwks_is_503_not_401(
     assert r.headers["content-type"].startswith("application/problem+json")
     assert r.headers["Retry-After"] == "30"
     assert r.json()["code"] == "auth_unavailable"
+
+
+def test_valid_request_id_is_echoed(client: TestClient) -> None:
+    rid = "0f8b2c3e-app-retry-1"
+    assert client.get("/healthz", headers={"X-Request-ID": rid}).headers["X-Request-ID"] == rid
+
+
+@pytest.mark.parametrize(
+    "rid",
+    ["x" * 65, "abc def", "a_b.c", "<script>", "a;b", ""],
+)
+def test_invalid_request_id_is_replaced(client: TestClient, rid: str) -> None:
+    """S3: an unusual id is never echoed into the response, the logs or Sentry."""
+    echoed = client.get("/healthz", headers={"X-Request-ID": rid}).headers["X-Request-ID"]
+    assert echoed != rid
+    assert len(echoed) == 32 and echoed.isalnum()
