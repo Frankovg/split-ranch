@@ -40,7 +40,6 @@ apps/mobile/
 │   ├── lib/money/                    # re-export of @split-ranch/domain + parse/format
 │   ├── stores/                       # Zustand: session, preferences (theme, language), quick splits
 │   ├── i18n/                         # es, en
-│   ├── platform/                     # android-specific code (payment intents, widget later)
 │   └── theme/                        # tokens bridge (see 13-design-system)
 ├── global.css  tailwind.config.js  app.config.ts  eas.json
 ```

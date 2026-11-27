@@ -104,7 +104,6 @@ Other tokens:
 | EmptyState | custom | icon + text + action |
 | ListRow / ExpenseRow | custom | |
 | SplitEditor | custom | equal/weights/percentages/exact with live total check |
-| ProgressBar | Reusables (Progress) | budgets |
 | Popover, Tooltip, DropdownMenu | Reusables | |
 
 **Complementary libraries**
@@ -114,11 +113,10 @@ Other tokens:
 | Virtualised lists | `@shopify/flash-list` (v2, New Arch) |
 | Icons | `lucide-react-native` (shadcn default) + `react-native-svg` |
 | Animations / gestures | `react-native-reanimated` 4 + `react-native-gesture-handler` |
-| Charts | `victory-native` (Skia) — post-MVP |
+| Charts | `react-native-gifted-charts` (the category pie chart in Insights) |
 | Bottom sheets | `@gorhom/bottom-sheet` |
 | Toasts | `sonner-native` |
 | Storage | `react-native-mmkv`, `expo-secure-store` |
-| Share/screenshot | `expo-sharing`, `react-native-view-shot` |
 | Haptics | `expo-haptics` |
 
 ## 5. Conventions for copied components

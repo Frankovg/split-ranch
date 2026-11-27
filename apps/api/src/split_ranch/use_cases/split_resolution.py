@@ -1,4 +1,4 @@
-"""Rule precedence (docs/03 §2): override -> recurring -> category -> default -> equal.
+"""Rule precedence (docs/03 §2): override -> category -> default -> equal.
 
 Pure functions over already-loaded data; the domain does the arithmetic.
 """
@@ -268,7 +268,6 @@ def resolve_expense_split(
         )
 
     fallback = False
-    # Recurring rules come with recurring expenses (post-MVP).
     for origin, rule in (("category", category_rule), ("group_default", default_rule)):
         if rule is None:
             continue

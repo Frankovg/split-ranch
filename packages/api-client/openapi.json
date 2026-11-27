@@ -3757,8 +3757,7 @@
             "enum": [
               "manual",
               "ai_text",
-              "ai_voice",
-              "recurring"
+              "ai_voice"
             ],
             "title": "Source",
             "default": "manual"

@@ -43,7 +43,7 @@ Superseded by the above: the 2026-11-07/09 decisions on closing periods and whol
 8. ~~Lock trigger.~~ Obsolete: no periods, no locks.
 9. ~~Grace days default~~ — obsolete: there is no automatic close.
 10. ~~Expense date in a locked period.~~ Obsolete: any expense can be added with any date.
-11. **Approval flow** (post-MVP): when enabled, do unapproved expenses count in the live balance? **Default:** no; they count once approved.
+11. ~~Approval flow.~~ Obsolete: dropped 2026-11-26, there is no approval flow.
 
 ## Settlement and payments
 12. **Disputed payments at long durations** — escalate to admins after N days? **Default:** reminder to both after 7 days, no escalation.
@@ -64,7 +64,7 @@ Superseded by the above: the 2026-11-07/09 decisions on closing periods and whol
 ## Technical
 22. ~~Google Sign-In library~~ **Decided 2026-11-12:** `react-native-nitro-google-signin` (MIT, free, Credential Manager on Android), because it embeds our nonce in the ID token. Paid Universal Sign-In stays the fallback behind the same abstraction in `src/features/auth/google.ts`.
 23. **NativeWind 4.2 (Tailwind 3) now vs wait for v5 / use Uniwind (Tailwind 4).** **Default:** NativeWind 4.2 now; migrate when v5 is stable (est. small effort thanks to tokens in CSS variables).
-24. **Job queue**: **Decided 2026-11-11:** none until a feature needs background work. Push notifications should first try Expo's own APIs or sending within the request.
+24. **Job queue**: **Decided 2026-11-11:** none until a feature needs background work. Push notifications are sent to the Expo Push Service as a FastAPI background task right after the response, so they did not need one.
 25. **SQLAlchemy 2.1** just reached release-candidate/final. **Default:** pin 2.0.x for MVP; upgrade in a dedicated task.
 26. **Analytics** (product usage). **Default:** none in MVP; if needed, a privacy-friendly EU tool with consent.
 27. **App name/domain/package id** (`com.splitranch.app`?). **Default:** placeholder until branding; must be fixed before the first Play upload (package id is permanent).

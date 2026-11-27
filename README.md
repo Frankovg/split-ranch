@@ -3,8 +3,9 @@
 Mobile app (Android first) to share expenses in groups with one running balance, plus an independent
 "Quick splits" tool to split one-off bills with friends who don't use the app.
 
-This repository currently contains **planning documentation only**. Start at
-[docs/00-executive-summary.md](docs/00-executive-summary.md).
+The repository holds the FastAPI API (`apps/api`), the Expo mobile app (`apps/mobile`), the shared
+money domain (`packages/domain`) and the design docs below, which are the spec for business rules,
+data model and API. Start at [docs/00-executive-summary.md](docs/00-executive-summary.md).
 
 | Doc | Topic |
 |---|---|

@@ -90,17 +90,16 @@ Parity is enforced by `packages/domain-vectors/allocate.json` (see [09](09-testi
 | `percentages` | basis points per participant, **must sum to 10 000** | `allocate(T, bps)` |
 | `exact` | cents per participant, **must sum to T** | as given (validation error otherwise) |
 | `single` | one member | that member owes `T` (not split; may differ from payer: "Internet is paid by Franco, owed by Franco") |
-| `personal` | — | payer owes `T`; **excluded from balances, settlement, shared totals and Sheets "Resumen"**; visible to others only as "private expense" (post-MVP: fully hidden) |
+| `personal` | — | payer owes `T`; **excluded from balances, settlement, shared totals and Sheets "Resumen"**; other members still see it in the expense list |
 
 ### Rule precedence
 
 ```
 resolve_rule(expense):
   1. expense.override present          → use it                (split_origin = 'override')
-  2. expense.recurring_expense rule     → use it                (split_origin = 'recurring')
-  3. category rule present              → use it                (split_origin = 'category')
-  4. group default rule             → use it                (split_origin = 'group_default')
-  5. no default configured              → equal among active members
+  2. category rule present              → use it                (split_origin = 'category')
+  3. group default rule                 → use it                (split_origin = 'group_default')
+  4. no default configured              → equal among active members
 ```
 
 **Participant subset.** For `equal` and `weights`, the user may restrict participants when creating the expense. A restricted subset **is an override** (origin 1) even if the type is the same as the rule's. For a category/group weights rule with a subset, weights of the excluded members are dropped and the rest are used as-is (re-normalisation is implicit in `allocate`). A percentages rule with a subset is converted to weights (`bps` as weights) for the same reason.
@@ -287,7 +286,6 @@ Mode 1 is literally mode 2 with a single expense; the UI just hides the list.
   • Dani → Carlos: 21,87 €
   ```
   `*…*` is WhatsApp bold. People marked "has paid" get "✅ pagado" after their payment (or after their share when there is no payer). Without a payer the "Pagado por" line and the payments section are left out; with several payers, "Pagado por" lists how much each one paid. No app branding or footer.
-- Image: render the result card with `react-native-view-shot` and share via `expo-sharing` (post-MVP polish).
 - No share links: the server never holds Quick-split data.
 
 ### Payment status (manual)

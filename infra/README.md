@@ -34,7 +34,7 @@ cloud environment (`prod`) on free tiers only. Development runs against the loca
 - [ ] `eas init` in `apps/mobile`, profiles `development` / `preview` / `production`.
 - [ ] Distribution: install the **APK** directly from the EAS build page on both phones (`preview` profile with `buildType: apk`). That skips Google Play and its one-time $25 developer fee. If the monthly free cloud builds ever run out, `eas build --local` builds on your own machine for free.
 - [ ] Register the keystores' SHA-1 in Google Cloud (step 1).
-- [ ] Push (post-MVP): Expo Push + FCM v1 are free; upload the FCM service account when that phase starts.
+- [ ] Push: Expo Push + FCM v1 are free; upload the FCM V1 service-account key to EAS (never to the repo). The app already sends pushes, so without the key Android devices get none.
 
 ## 5. Sentry (free Developer plan, EU region, optional)
 - [ ] Projects `split-ranch-api` and `split-ranch-mobile`; DSNs into Render and EAS env. If unset, Sentry stays off.

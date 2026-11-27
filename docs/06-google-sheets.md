@@ -32,7 +32,7 @@ One spreadsheet per group: `Splitranch — <Group name>`.
 | `Léeme` | Explanation, "this file is generated, edits will be overwritten", last sync time, link to the app |
 | `2026-03 Resumen` | Status (abierto/cerrado/liquidado), totals, total per member paid/owed/net, closed_at |
 | `2026-03 Detalle` | One row per expense: date, description, category, payer, amount, split type, origin, one column per member with their share, source, last edited, flags (adjustment / edited after close) |
-| `2026-03 Por categoría` | Category × member matrix + totals; budget vs actual when budgets exist |
+| `2026-03 Por categoría` | Category × member matrix + totals |
 | `2026-03 Liquidación` | Live transfers: from, to, amount, status, sent_at, confirmed_at |
 
 The brief asked for "one tab per month with four sections". Four sections in one tab are hard to keep idempotent and to read on a phone; **four tabs per period** (prefixed by the period number, e.g. `P3`; periods are started by hand, not calendar months) is the recommended layout. A single tab with four stacked blocks is the fallback if the group prefers fewer tabs (it only changes the renderer).

@@ -30,7 +30,7 @@ gantt
 | T-0.3 **UI stack spike** on Expo SDK 58: NativeWind 4.2 + Tailwind 3 + React Native Reusables (Button, Dialog, Select, Tabs), dark mode, font scaling | Dev build on a real Android device; decision recorded (go / fallback SDK 57 / Uniwind) in [13](13-design-system.md) |
 | T-0.4 **Google sign-in spike** (Universal Sign-In vs free Credential Manager lib) → `supabase.auth.signInWithIdToken` + FastAPI JWKS verification | Real device signs in to the Supabase project; a FastAPI endpoint accepts the Supabase token and rejects anon/expired ones; library choice + licence cost recorded (2026-11-12: `react-native-nitro-google-signin`, MIT, €0; nonce enforced; sign-in verified on the Android emulator dev client, physical phone pending) |
 | T-0.5 FastAPI skeleton: settings, structlog, Sentry, `/healthz` `/readyz`, SQLAlchemy 2 async session, Alembic init | Tests green |
-| T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API + in-process worker) + EAS project (`development`/`preview`) + weekly backup workflow | URL responds and reaches the DB via the shared pooler; in-process worker receives NOTIFY via session mode; preview APK installs; backup artifact produced |
+| T-0.6 Supabase prod project (Frankfurt, **Free plan**; Google provider; `app` schema, `split_api` role, Data API not exposing `app`) + Render Free web service (`render.yaml`: API only, no background worker; migrations run in the build) + EAS project (`development`/`preview`) + weekly backup workflow | URL responds and reaches the DB via the shared pooler; preview APK installs; backup artifact produced |
 
 Risks: version incompatibilities (mitigated by spikes and pinning).
 
@@ -98,7 +98,7 @@ Decided 2026-11-16; design and review in [egm/design_draft.md](egm/design_draft.
 | T-5.15 Expense edit rule (only `split`/`participants` re-split; amount re-allocates over stored participants; `member_left`) | CUJ 6 example: +20,00 / −10,00 / −10,00 | Done |
 | T-5.16 Date filters + `/summary` (same filters) | Last month = inclusive date range in the group time zone | Done |
 | T-5.17 Mobile: group list/switcher, home balance, settle up, expense list by day with month chips and totals, edit/delete expense, group settings | Typecheck + unit tests; manual CUJ 1 → 7 on two phones | Done (manual check pending) |
-| T-5.18 Mobile: date picker, weights/percentages/exact split editor, categories & rules screens | Preview equals server shares | Not started |
+| T-5.18 Mobile: date picker, weights/percentages/exact split editor, categories & rules screens | Preview equals server shares | Done |
 
 ## P6 — Google Sheets (1.5 w) — pending redesign: one tab per calendar month instead of per period ([06](06-google-sheets.md))
 
@@ -126,22 +126,22 @@ Decided 2026-11-16; design and review in [egm/design_draft.md](egm/design_draft.
 
 | # | Feature | Value | Effort | Notes / dependencies |
 |---|---|---|---|---|
-| 1 | **Push notifications** (new/edited expense, payment sent/pending) | High | S (1 w) | Needed by several features below |
-| 2 | **Recurring expenses** with own split rules | High | M (1.5 w) | Daily job creates expenses on `day_of_month`, `source='recurring'`; skip if already created (unique `(recurring_id, month)`) |
+| 1 | ~~Push notifications~~ | — | — | **Done**: expense created/edited/deleted and payment events, per-type switches in Settings ([05](05-mobile-app.md#push-notifications)) |
+| 2 | ~~Recurring expenses~~ | — | — | **Dropped 2026-11-26**: not going to be built |
 | 3 | ~~Payment button~~ | — | — | **Dropped 2026-11-10**: the app never links to payment platforms |
-| 4 | **Private expenses visibility** (fully hidden from others) | Medium | S (0.5 w) | Split type already exists |
-| 5 | **Multi-group UI** (switcher) | Medium | S (0.5–1 w) | Data model ready |
-| 6 | **Budgets** per category + alerts | Medium | M (1.5 w) | Needs push |
-| 7 | **Charts, month-over-month, CSV/PDF export** | Medium | M (1.5 w) | victory-native; PDF server-side (WeasyPrint) or `expo-print` |
-| 8 | **Quick-split result as image** | Low | S (0.5 w) | Shared from the phone; no server link |
-| 9 | **Comments/reactions + optional approval flow** | Low-Med | M (1.5 w) | Approval = expense `status='pending_approval'` before entering balance |
+| 4 | ~~Private expenses visibility~~ | — | — | **Dropped 2026-11-26**: `personal` expenses stay visible to every member |
+| 5 | ~~Multi-group UI~~ | — | — | **Done** in T-5.17 (group list, open a group from the route) |
+| 6 | ~~Budgets per category + alerts~~ | — | — | **Dropped 2026-11-26**: not going to be built |
+| 7 | ~~Charts, month-over-month, CSV/PDF export~~ | — | — | **Dropped 2026-11-26**: the Insights screen stays as it is; a later export goes through Google Sheets ([06](06-google-sheets.md)) |
+| 8 | ~~Quick-split result as image~~ | — | — | **Dropped 2026-11-26**: the result is shared as text only |
+| 9 | ~~Comments/reactions + optional approval flow~~ | — | — | **Dropped 2026-11-26**: not going to be built |
 | 10 | **Full offline sync** | Medium | L (3 w) | Outbox, change feed, conflict UI |
-| 11 | **Home-screen widget / quick add** | Low-Med | M (1.5 w) | Android widget via `react-native-android-widget`; App Shortcuts (long-press icon → "Nuevo gasto") is a cheap first step |
-| 12 | **AI phase** | High (differentiator) | L | See [07](07-future-ai.md); after recurring + push |
+| 11 | ~~Home-screen widget / quick add~~ | — | — | **Dropped 2026-11-26**: no widget and no "Nuevo gasto" app shortcut |
+| 12 | **AI phase** | High (differentiator) | L | See [07](07-future-ai.md); after push |
 | — | iOS | — | M | Sign in with Apple, APNs via Expo, store review |
 
 ## Dependencies summary
-P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, reminders · Recurring → AI (common use case).
+P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push (done) → reminders.
 
 ## Main risks
 
@@ -150,7 +150,7 @@ P1 → P2, P3 · P3 → P4 → P5 → P6 → P7 · Push → Budgets alerts, remi
 | UI library churn (NativeWind v5 RC, SDK 58 new) | Medium | Medium | Spike T-0.3, pin versions, Reusables supports NativeWind and Uniwind |
 | Google Sign-In library/licensing | Medium | Medium | Spike T-0.4, abstraction layer |
 | Sheets quotas/ownership | Low | Low (non-blocking) | User-owned file shared with the service account, monthly tabs, hashes |
-| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | No background work (nothing to lose on a spin-down), weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
+| Free-tier limits (Render cold start, Supabase pause, no managed backups) | Medium | Medium | No worker or queue (pushes go out right after the response, so a spin-down after 15 min idle loses nothing), weekly backup job as a safety net against pausing, resume runbook (`infra/README.md`) |
 | Rules complexity confuses users | Medium | High | Show "why this split" (`split_origin`) everywhere; sensible defaults |
 | Edits after close / adjustments misunderstood | Medium | Medium | Diff UI, clear copy, E2E tests |
 | Solo developer bandwidth | High | High | Strict phase gates; Quick splits as early release to validate UI stack |

@@ -10,6 +10,9 @@
     "test": "vitest run",
     "doctor": "expo-doctor",
     "export:android": "expo export --platform android",
+    "build:preview": "eas build --profile preview --platform android",
+    "update:preview": "eas update --channel preview --environment production --platform android",
+    "fingerprint": "eas fingerprint:compare --environment production",
     "lint": "eslint ."
   },
   "dependencies": {

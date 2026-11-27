@@ -8,7 +8,7 @@ from pydantic import Field
 from split_ranch.schemas.common import AmountCents, Day, Id, ReadModel, Reason, StrictModel
 from split_ranch.schemas.split import ShareRead, SplitSpec
 
-ExpenseSource = Literal["manual", "ai_text", "ai_voice", "recurring"]
+ExpenseSource = Literal["manual", "ai_text", "ai_voice"]
 
 
 class ExpenseCreate(StrictModel):

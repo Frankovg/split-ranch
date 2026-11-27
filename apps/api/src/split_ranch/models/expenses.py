@@ -23,8 +23,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from split_ranch.models.base import Base, created_at_col, in_check, updated_at_col, uuid_pk
 from split_ranch.models.groups import SPLIT_TYPES
 
-SPLIT_ORIGINS = ("override", "category", "recurring", "group_default")
-EXPENSE_SOURCES = ("manual", "ai_text", "ai_voice", "recurring")
+SPLIT_ORIGINS = ("override", "category", "group_default")
+EXPENSE_SOURCES = ("manual", "ai_text", "ai_voice")
 
 
 class Expense(Base):

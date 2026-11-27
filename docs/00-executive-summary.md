@@ -15,17 +15,17 @@ A second, independent tool — **Quick splits** — solves the dinner/trip case:
 - Groups: a user creates or joins several groups (switcher in the app), one invitation code per group typed by hand. All members have the same rights; the admin (the creator) is the only one who removes members and deletes the group.
 - Categories (defaults + custom).
 - Expense CRUD with split rules: equal, weights/percentages, exact amounts, single person (not split), personal (excluded from settlement). Subset of members per expense.
-- Rule precedence: expense override → category/recurring rule → group default.
+- Rule precedence: expense override → category rule → group default.
 - One running balance per group (no periods, decided 2026-11-16), suggested payments with the greedy settle, payments recorded by the debtor and confirmed by the receiver. Expense list grouped by day with month filters and totals.
 - Change history (one append-only `history` table, soft delete, optimistic locking).
 - Automatic Google Sheets export per group.
 - **Quick splits** (modes 1 and 2), computed locally, shareable as text.
 
 ### Post-MVP (ordered in [10-roadmap.md](10-roadmap.md))
-Recurring expenses, push notifications, budgets with alerts, comments/reactions/approval, private-expense visibility, multi-group UI, PDF/CSV export and charts, home-screen widget, full offline sync.
+Full offline sync. Push notifications and the multi-group UI, first planned here, are already built.
 
 ### Out of scope
-Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), multi-currency (only the `currency` column exists, always `EUR`), iOS (architecture keeps the door open), AI features (architecture only — see [07](07-future-ai.md)).
+Receipt photos/attachments and OCR (dropped by the product owner, 2026-11-07), recurring expenses, hiding `personal` expenses from other members, category budgets with alerts, the Quick-split result as an image, comments/reactions and an approval flow on expenses, a home-screen widget or "Nuevo gasto" app shortcut, and CSV/PDF export or charts beyond the Insights screen (all dropped 2026-11-26; a later export goes through Google Sheets), multi-currency (only the `currency` column exists, always `EUR`), iOS (architecture keeps the door open), AI features (architecture only — see [07](07-future-ai.md)).
 
 ## Key decisions
 

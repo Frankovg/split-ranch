@@ -762,7 +762,7 @@ export interface components {
              * @default manual
              * @enum {string}
              */
-            source?: "manual" | "ai_text" | "ai_voice" | "recurring";
+            source?: "manual" | "ai_text" | "ai_voice";
             /** Notes */
             notes?: string | null;
         };

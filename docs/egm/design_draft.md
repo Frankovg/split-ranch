@@ -84,13 +84,9 @@ on top of them.
 *   Google Sheets export ([06](../06-google-sheets.md) is marked "pending
     redesign").
 *   Freezing old expenses (no locks, no settle-up cut-offs).
-*   Hiding `personal` expenses from other members (post-MVP in
-    [00](../00-executive-summary.md) and [10](../10-roadmap.md)). Today a
-    `personal` expense is one the payer owes entirely to themself; it is
-    excluded from balances, suggestions and summaries, and others can see it.
 *   Android App Links and a `join/[code]` route (D4: codes are typed by hand).
 *   Enforcing `X-Min-App-Version` in the app (both phones are updated by hand).
-*   Offline edits, budgets, recurring expenses, push notifications.
+*   Offline edits, push notifications.
 *   Drift-report items this change does not touch (rate limiting, account
     deletion, mobile Sentry, OpenAPI client generation, …).
 

@@ -99,4 +99,4 @@ share-sum violations still fail the test. Parity tests read `../../packages/doma
 ## Not implemented yet
 
 Google Sheets sync and push notifications (no tables and no background jobs yet: each will add what
-it needs), `DELETE /me` (account deletion), recurring expenses.
+it needs), `DELETE /me` (account deletion).
