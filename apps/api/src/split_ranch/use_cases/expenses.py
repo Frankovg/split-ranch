@@ -41,7 +41,11 @@ from split_ranch.schemas.expenses import (
     SummaryRead,
 )
 from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec, spec_from_json
-from split_ranch.use_cases.common import check_version, require_active
+from split_ranch.use_cases.common import (
+    check_version,
+    lock_group_for_balance_write,
+    require_active,
+)
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
 from split_ranch.use_cases.split_resolution import (
     Resolution,
@@ -340,6 +344,7 @@ def create_expense(
     require_active(actor)
     if data.source != "manual" and not trusted_source:
         raise Unprocessable("Only manual expenses can be created by clients", code="invalid_source")
+    lock_group_for_balance_write(session, actor.group_id)
 
     if data.id is not None:
         existing = erepo.get_expense(session, actor.group_id, data.id)
@@ -501,6 +506,7 @@ def update_expense(
     notifier: Notifier = _NO_NOTIFIER,
 ) -> ExpenseRead:
     require_active(actor)
+    lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         raise NotFound("Expense not found")
@@ -583,6 +589,7 @@ def delete_expense(
     notifier: Notifier = _NO_NOTIFIER,
 ) -> None:
     require_active(actor)
+    lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         return

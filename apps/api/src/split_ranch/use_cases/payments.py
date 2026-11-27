@@ -25,7 +25,12 @@ from split_ranch.models import Payment
 from split_ranch.repositories import groups as grepo
 from split_ranch.repositories import payments as prepo
 from split_ranch.schemas.payments import PaymentCreate, PaymentDispute, PaymentNote, PaymentRead
-from split_ranch.use_cases.common import audit, check_version, require_active
+from split_ranch.use_cases.common import (
+    audit,
+    check_version,
+    lock_group_for_balance_write,
+    require_active,
+)
 from split_ranch.use_cases.notifications import (
     EventKind,
     NotificationEvent,
@@ -91,6 +96,7 @@ def record_payment(
 ) -> tuple[int, PaymentRead]:
     """Returns (201, created) or (200, stored) for an identical retry of the same id."""
     require_active(actor)
+    lock_group_for_balance_write(session, actor.group_id)
     existing = prepo.get_payment(session, actor.group_id, data.id)
     if existing is not None:
         if not _same_payload(existing, data, actor):

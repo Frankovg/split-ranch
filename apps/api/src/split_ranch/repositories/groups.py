@@ -9,10 +9,16 @@ from sqlalchemy.orm import Session
 from split_ranch.models import Category, CategoryPreset, Group, GroupMember, User
 
 
-def get_group(session: Session, group_id: UUID, *, for_update: bool = False) -> Group | None:
+def get_group(
+    session: Session, group_id: UUID, *, for_update: bool = False, for_share: bool = False
+) -> Group | None:
+    """The live group. `for_update` locks it exclusively (membership changes, deletion);
+    `for_share` locks it shared (balance writes), so the two serialise with each other."""
     stmt = select(Group).where(Group.id == group_id, Group.deleted_at.is_(None))
     if for_update:
         stmt = stmt.with_for_update()
+    elif for_share:
+        stmt = stmt.with_for_update(read=True)
     return session.scalars(stmt).first()
 
 

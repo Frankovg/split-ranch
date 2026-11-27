@@ -8,8 +8,9 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from split_ranch.core.actor import GroupActor
-from split_ranch.core.errors import Forbidden, PreconditionFailed, PreconditionRequired
+from split_ranch.core.errors import Forbidden, NotFound, PreconditionFailed, PreconditionRequired
 from split_ranch.models import History
+from split_ranch.repositories import groups as grepo
 
 
 def require_admin(actor: GroupActor) -> None:
@@ -21,6 +22,18 @@ def require_active(actor: GroupActor) -> None:
     """Members who left are not members any more (the API answers 404 to them)."""
     if actor.status == "left":
         raise Forbidden("Former members cannot change this group")
+
+
+def lock_group_for_balance_write(session: Session, group_id: UUID) -> None:
+    """Take the group row FOR SHARE before validating members of a balance write.
+
+    Leaving, removing a member and deleting the group hold the same row FOR UPDATE while
+    they check the balance, so an expense or payment cannot slip in between that check and
+    the member's departure: it waits, then sees the member as left (or the group as
+    deleted, re-checked by PostgreSQL after the wait). Concurrent writes only share it.
+    """
+    if grepo.get_group(session, group_id, for_share=True) is None:
+        raise NotFound("Group not found")
 
 
 def check_version(
