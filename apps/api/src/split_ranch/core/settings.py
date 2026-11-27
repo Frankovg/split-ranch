@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     jwt_audience: str = "authenticated"
     jwt_leeway_seconds: int = 30
     jwks_cache_seconds: int = 600
+    # How long the last good key set is still trusted while the JWKS endpoint is down.
+    jwks_max_stale_seconds: int = 6 * 3600
 
     # Process-local cache for ensure_user (seconds); 0 disables it.
     ensure_user_cache_seconds: int = 300

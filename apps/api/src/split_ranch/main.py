@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from sqlalchemy import Engine
+from starlette.concurrency import run_in_threadpool
 
 from split_ranch.api.routers import expenses, groups, me, payments, system
 from split_ranch.core.db import create_db_engine, create_session_factory
@@ -25,6 +27,14 @@ from split_ranch.integrations.supabase_admin import AuthAdmin, SupabaseAuthAdmin
 log = structlog.get_logger(__name__)
 
 API_PREFIX = "/v1"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Fetch the JWKS before the first request instead of during it (blocking urllib).
+    verifier: TokenVerifier = app.state.token_verifier
+    await run_in_threadpool(verifier.preload)
+    yield
 
 
 def create_app(
@@ -45,6 +55,7 @@ def create_app(
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,
         redoc_url=None,
+        lifespan=lifespan,
     )
     app.state.settings = settings
     app.state.engine = engine or create_db_engine(settings)
@@ -55,6 +66,7 @@ def create_app(
         audience=settings.jwt_audience,
         leeway_seconds=settings.jwt_leeway_seconds,
         cache_seconds=settings.jwks_cache_seconds,
+        max_stale_seconds=settings.jwks_max_stale_seconds,
     )
 
     # None turns push notifications off (no request ever reaches Expo).

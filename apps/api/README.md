@@ -43,7 +43,7 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `TEST_DATABASE_URL` | tests | optional, see below |
 
 Optional tuning: `LOG_LEVEL`, `LOG_JSON`, `MIN_APP_VERSION`, `PUBLIC_WEB_URL`, `JWT_LEEWAY_SECONDS`,
-`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`, `RATE_LIMIT_PER_MINUTE` (per user, default 120),
+`JWKS_CACHE_SECONDS`, `JWKS_MAX_STALE_SECONDS` (default 21600: how long the last good JWKS is used while Supabase Auth is unreachable), `ENSURE_USER_CACHE_SECONDS`, `RATE_LIMIT_PER_MINUTE` (per user, default 120),
 `INVITE_RATE_LIMIT_PER_MINUTE` (invitation preview/accept, default 10); `0` disables a limit.
 Limits are kept in process memory, which is correct only while the API runs as a single process.
 

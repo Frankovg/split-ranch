@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 
+import jwt
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.conftest import SigningKey, TestUser, make_token
@@ -55,3 +57,20 @@ def test_validation_error_shape(client: TestClient, make_user: Callable[[str], T
     body = r.json()
     assert body["code"] == "validation_error"
     assert body["errors"]
+
+
+class _UnreachableJWKS:
+    def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+        raise jwt.PyJWKClientConnectionError("Fail to fetch data from the url")
+
+
+def test_unreachable_jwks_is_503_not_401(
+    app: FastAPI, client: TestClient, make_user: Callable[[str], TestUser]
+) -> None:
+    """S1: a Supabase Auth outage must not look like a bad token (the app would refresh)."""
+    app.state.token_verifier.key_source = _UnreachableJWKS()
+    r = client.get("/v1/me", headers=make_user("Juli").headers)
+    assert r.status_code == 503
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert r.headers["Retry-After"] == "30"
+    assert r.json()["code"] == "auth_unavailable"
