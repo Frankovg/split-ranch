@@ -145,12 +145,15 @@ def _write_shares(session: Session, expense: Expense, resolution: Resolution) ->
     session.flush()
 
 
-def _stored_shares(session: Session, expense: Expense) -> list[ResolvedShare]:
-    rows = erepo.shares_for(session, expense.group_id, [expense.id]).get(expense.id, [])
+def _resolved(rows: Sequence[ExpenseShare]) -> list[ResolvedShare]:
     return [
         ResolvedShare(s.member_id, s.amount_cents, s.weight, s.basis_points, s.exact_cents)
         for s in rows
     ]
+
+
+def _stored_shares(session: Session, expense: Expense) -> list[ResolvedShare]:
+    return _resolved(erepo.shares_for(session, expense.group_id, [expense.id]).get(expense.id, []))
 
 
 def snapshot_json(session: Session, expense: Expense) -> dict[str, Any]:
@@ -219,7 +222,15 @@ def _shares_read(shares: Sequence[ResolvedShare]) -> list[ShareRead]:
     ]
 
 
-def to_read(session: Session, actor: GroupActor, expense: Expense) -> ExpenseRead:
+def to_read(
+    session: Session,
+    actor: GroupActor,
+    expense: Expense,
+    *,
+    shares: Sequence[ExpenseShare] | None = None,
+) -> ExpenseRead:
+    """`shares` lets a list pass rows it already loaded instead of one query per expense."""
+    stored = _resolved(shares) if shares is not None else _stored_shares(session, expense)
     return ExpenseRead(
         id=expense.id,
         group_id=expense.group_id,
@@ -235,7 +246,7 @@ def to_read(session: Session, actor: GroupActor, expense: Expense) -> ExpenseRea
         participant_mode=expense.participant_mode,
         rule_fallback=expense.rule_fallback,
         source=expense.source,
-        shares=_shares_read(_stored_shares(session, expense)),
+        shares=_shares_read(stored),
         created_by_user_id=expense.created_by_user_id,
         updated_by_user_id=expense.updated_by_user_id,
         created_at=expense.created_at,
@@ -444,7 +455,9 @@ def list_expenses(
         limit=limit + 1,
         after=_decode_cursor(cursor) if cursor else None,
     )
-    items = [to_read(session, actor, e) for e in rows[:limit]]
+    page = rows[:limit]
+    shares = erepo.shares_for(session, actor.group_id, [e.id for e in page])
+    items = [to_read(session, actor, e, shares=shares.get(e.id, [])) for e in page]
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]

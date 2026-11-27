@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from split_ranch.core.ids import uuid7
 from tests.conftest import FrozenClock, TestUser
@@ -423,3 +425,33 @@ def test_edit_involving_member_who_left_is_refused(client: TestClient, house: Ho
         headers=house.h("Juli"),
     )
     assert r.status_code == 422 and r.json()["code"] == "invalid_payer"
+
+
+def _count_list_queries(client: TestClient, house: House, db_session: Session) -> int:
+    statements: list[str] = []
+
+    def count(*args: object) -> None:
+        statements.append(str(args[2]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", count)
+    try:
+        ok(client.get(house.url("/expenses?limit=50"), headers=house.h("Ana")))
+    finally:
+        event.remove(conn, "before_cursor_execute", count)
+    return len(statements)
+
+
+def test_list_loads_shares_in_one_query(
+    client: TestClient, house: House, db_session: Session
+) -> None:
+    """P1: the number of queries does not grow with the page size (no N+1 on shares)."""
+    for day in range(1, 3):
+        add_expense(client, house, "Juli", amount=300, payer="Juli", date=f"2026-03-0{day}")
+    small = _count_list_queries(client, house, db_session)
+    for day in range(3, 7):
+        add_expense(client, house, "Juli", amount=300, payer="Juli", date=f"2026-03-0{day}")
+    page = ok(client.get(house.url("/expenses?limit=50"), headers=house.h("Ana")))
+    assert len(page["items"]) == 6
+    assert all(len(i["shares"]) == 3 for i in page["items"])
+    assert _count_list_queries(client, house, db_session) == small
