@@ -42,7 +42,6 @@ from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec, spec_fro
 from split_ranch.use_cases.common import (
     check_version,
     lock_group_for_balance_write,
-    require_active,
 )
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
 from split_ranch.use_cases.pagination import DEFAULT_PAGE, clamp_limit, decode_cursor, encode_cursor
@@ -248,7 +247,7 @@ def to_read(
         created_at=expense.created_at,
         updated_at=expense.updated_at,
         deleted_at=expense.deleted_at,
-        can_edit=expense.deleted_at is None and actor.status == "active",
+        can_edit=expense.deleted_at is None,
     )
 
 
@@ -361,7 +360,6 @@ def create_expense(
     Idempotent through the client-generated `id`: retrying the same expense returns the
     stored one (200); the same id with a different payload is `409 id_conflict`.
     """
-    require_active(actor)
     if data.source != "manual" and not trusted_source:
         raise Unprocessable("Only manual expenses can be created by clients", code="invalid_source")
     lock_group_for_balance_write(session, actor.group_id)
@@ -521,7 +519,6 @@ def update_expense(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> ExpenseRead:
-    require_active(actor)
     lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
@@ -604,7 +601,6 @@ def delete_expense(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> None:
-    require_active(actor)
     lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:

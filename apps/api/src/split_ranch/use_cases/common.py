@@ -18,12 +18,6 @@ def require_admin(actor: GroupActor) -> None:
         raise Forbidden("Only the group admin can do this")
 
 
-def require_active(actor: GroupActor) -> None:
-    """Members who left are not members any more (the API answers 404 to them)."""
-    if actor.status == "left":
-        raise Forbidden("Former members cannot change this group")
-
-
 def lock_group_for_balance_write(session: Session, group_id: UUID) -> None:
     """Take the group row FOR SHARE before validating members of a balance write.
 

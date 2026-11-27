@@ -11,15 +11,17 @@ class Actor:
 
 @dataclass(frozen=True)
 class GroupActor:
-    """An actor with a verified membership in `group_id` (loaded from the DB)."""
+    """An actor who is an active member of `group_id` (loaded from the DB).
+
+    Only `api.deps.get_group_actor` builds one, and it answers 404 to outsiders and to
+    members who left. Use cases rely on that: they do not check the membership again.
+    """
 
     user_id: UUID
     group_id: UUID
     member_id: UUID
     role: str
-    status: str
 
     @property
     def is_admin(self) -> bool:
-        """Admin rights end when the member has left: their stored role is kept for history."""
-        return self.role == "admin" and self.status != "left"
+        return self.role == "admin"

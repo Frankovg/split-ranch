@@ -67,7 +67,6 @@ def _juli(house: House) -> GroupActor:
         group_id=uuid.UUID(house.id),
         member_id=uuid.UUID(house.members["Juli"]),
         role="admin",
-        status="active",
     )
 
 

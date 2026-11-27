@@ -29,6 +29,8 @@ Esto contradice la regla de [08-security-and-privacy.md](08-security-and-privacy
 
 **✅ Corregido (2026-11-12):** `GroupActor.is_admin` ([actor.py](../apps/api/src/split_ranch/core/actor.py)) ahora devuelve `False` cuando `status == "left"`, lo que cubre `require_admin`, `confirm_transfer` y `_can_edit`. El rol guardado se conserva por historial. Test: `test_former_admin_loses_admin_rights` en [test_groups.py](../apps/api/tests/integration/test_groups.py).
 
+**Actualización (2026-11-27):** `get_group_actor` ya devuelve 404 a todo miembro que no esté activo, así que ese chequeo, `require_active` y `can_edit` dependiente del estado nunca se activaban. Se quitaron junto con `GroupActor.status`: la única barrera es `get_group_actor`, y el docstring de `GroupActor` deja escrito que solo esa dependencia lo construye. El test citado arriba ya no existía; lo reemplaza `test_former_admin_cannot_write_anything` en [test_groups.py](../apps/api/tests/integration/test_groups.py), que comprueba el 404 en escrituras de cada router.
+
 ## 🟠 Riesgos medios
 
 1. **Llamadas sin límite al JWKS con `kid` falsos.** `PyJWKClient` vuelve a descargar el JWKS cada vez que llega un `kid` desconocido. Cualquiera, sin autenticarse, puede mandar tokens con `kid` aleatorios: cada uno provoca una petición saliente a Supabase (con hasta 5 s de timeout) y ocupa un hilo del pool de FastAPI. Es una vía barata para tumbar el servicio. Convendría limitar las recargas (por ejemplo, como mucho una cada 30–60 s) o rechazar el `kid` desconocido hasta la siguiente recarga permitida.

@@ -28,7 +28,6 @@ from split_ranch.use_cases.common import (
     audit,
     check_version,
     lock_group_for_balance_write,
-    require_active,
 )
 from split_ranch.use_cases.notifications import (
     EventKind,
@@ -104,7 +103,6 @@ def record_payment(
     notifier: Notifier = _NO_NOTIFIER,
 ) -> tuple[int, PaymentRead]:
     """Returns (201, created) or (200, stored) for an identical retry of the same id."""
-    require_active(actor)
     lock_group_for_balance_write(session, actor.group_id)
     if (replay := _replay_create(session, actor, data)) is not None:
         return replay
@@ -173,7 +171,6 @@ def transition_payment(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> PaymentRead:
-    require_active(actor)
     who, allowed_from, target = _TRANSITIONS[action]
     payment = prepo.get_payment(session, actor.group_id, payment_id, for_update=True)
     if payment is None:

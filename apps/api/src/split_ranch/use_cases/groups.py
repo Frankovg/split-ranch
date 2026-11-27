@@ -34,7 +34,7 @@ from split_ranch.schemas.groups import (
     MemberRead,
 )
 from split_ranch.use_cases.balance import compute_group_balance
-from split_ranch.use_cases.common import audit, require_active, require_admin
+from split_ranch.use_cases.common import audit, require_admin
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
 
 _NO_NOTIFIER = NullNotifier()
@@ -166,7 +166,6 @@ def get_group(session: Session, actor: GroupActor) -> GroupRead:
 
 
 def update_group(session: Session, actor: GroupActor, data: GroupUpdate) -> GroupRead:
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     changes = data.model_dump(exclude_unset=True)
     if changes.get("timezone") is not None:
@@ -268,7 +267,6 @@ def _invitation_read(group: Group) -> InvitationRead:
 
 def get_or_create_invitation(session: Session, actor: GroupActor) -> InvitationRead:
     """The group's join code: the current one while valid, else a fresh one (7 days)."""
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     if not _invite_valid(group):
         group.invite_code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
@@ -288,7 +286,6 @@ def get_or_create_invitation(session: Session, actor: GroupActor) -> InvitationR
 
 def revoke_invitation(session: Session, actor: GroupActor) -> None:
     """Invalidate the current code; the next invitation gets a new one."""
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     if group.invite_code is not None:
         group.invite_code = None
@@ -445,7 +442,6 @@ def _leave(session: Session, group: Group, member: GroupMember, actor_user_id: U
 
 
 def leave_group(session: Session, actor: GroupActor) -> None:
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     member = repo.get_member(session, group.id, actor.member_id, for_update=True)
     assert member is not None

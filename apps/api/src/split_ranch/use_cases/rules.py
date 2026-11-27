@@ -33,7 +33,7 @@ from split_ranch.schemas.split import (
     spec_from_json,
     spec_to_json,
 )
-from split_ranch.use_cases.common import audit, require_active
+from split_ranch.use_cases.common import audit
 from split_ranch.use_cases.split_resolution import spec_member_ids
 
 __all__ = [
@@ -64,7 +64,6 @@ def list_categories(
 
 
 def create_category(session: Session, actor: GroupActor, data: CategoryCreate) -> CategoryRead:
-    require_active(actor)
     name = data.name
     if hrepo.category_name_taken(session, actor.group_id, name):
         raise Conflict("A category with this name already exists", code="category_exists")
@@ -141,7 +140,6 @@ def _category(session: Session, actor: GroupActor, category_id: UUID) -> Categor
 def update_category(
     session: Session, actor: GroupActor, category_id: UUID, data: CategoryUpdate
 ) -> CategoryRead:
-    require_active(actor)
     category = _category(session, actor, category_id)
     changes = data.model_dump(exclude_unset=True)
     if changes.get("name") and hrepo.category_name_taken(
@@ -172,7 +170,6 @@ def update_category(
 
 
 def archive_category(session: Session, actor: GroupActor, category_id: UUID) -> None:
-    require_active(actor)
     category = _category(session, actor, category_id)
     if category.archived_at is None:
         category.archived_at = clock.now()
@@ -212,7 +209,6 @@ def list_category_presets(session: Session, actor: GroupActor) -> list[CategoryP
 def create_category_preset(
     session: Session, actor: GroupActor, data: CategoryPresetCreate
 ) -> CategoryPresetRead:
-    require_active(actor)
     keyword = data.keyword
     category = hrepo.get_category(session, actor.group_id, data.category_id, include_archived=False)
     if category is None:
@@ -249,7 +245,6 @@ def _delete_preset(session: Session, actor: GroupActor, preset: CategoryPreset) 
 
 
 def delete_category_preset(session: Session, actor: GroupActor, preset_id: UUID) -> None:
-    require_active(actor)
     preset = hrepo.get_category_preset(session, actor.group_id, preset_id)
     if preset is None:
         raise NotFound("Preset not found")
@@ -315,7 +310,6 @@ def _record_rule_change(
 
 
 def set_default_rule(session: Session, actor: GroupActor, spec: SplitSpec) -> SplitSpec:
-    require_active(actor)
     group = _group(session, actor, for_update=True)
     rule = _validated_rule(session, actor, spec)
     _record_rule_change(session, actor, group.id, "set", group.split_rule, rule)
@@ -328,7 +322,6 @@ def set_default_rule(session: Session, actor: GroupActor, spec: SplitSpec) -> Sp
 def set_category_rule(
     session: Session, actor: GroupActor, category_id: UUID, spec: SplitSpec
 ) -> CategoryRuleRead:
-    require_active(actor)
     category = _category(session, actor, category_id)
     if category.archived_at is not None:
         raise Conflict("Category is archived", code="category_archived")
@@ -340,7 +333,6 @@ def set_category_rule(
 
 
 def delete_category_rule(session: Session, actor: GroupActor, category_id: UUID) -> None:
-    require_active(actor)
     category = _category(session, actor, category_id)
     if category.split_rule is None:
         return
