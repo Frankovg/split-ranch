@@ -339,6 +339,19 @@ def _same_create(
     ]
 
 
+def _replay_create(session: Session, actor: GroupActor, data: ExpenseCreate) -> CreateResult | None:
+    """The stored expense for a retry of the same id (200), or None if there is none yet."""
+    if data.id is None:
+        return None
+    existing = erepo.get_expense(session, actor.group_id, data.id)
+    if existing is None:
+        return None
+    if not _same_create(session, actor, existing, data):
+        raise Conflict("An expense with this id already exists", code="id_conflict")
+    body = to_read(session, actor, existing).model_dump(mode="json")
+    return CreateResult(200, body, existing.version)
+
+
 def create_expense(
     session: Session,
     actor: GroupActor,
@@ -357,13 +370,8 @@ def create_expense(
         raise Unprocessable("Only manual expenses can be created by clients", code="invalid_source")
     lock_group_for_balance_write(session, actor.group_id)
 
-    if data.id is not None:
-        existing = erepo.get_expense(session, actor.group_id, data.id)
-        if existing is not None:
-            if not _same_create(session, actor, existing, data):
-                raise Conflict("An expense with this id already exists", code="id_conflict")
-            body = to_read(session, actor, existing).model_dump(mode="json")
-            return CreateResult(200, body, existing.version)
+    if (replay := _replay_create(session, actor, data)) is not None:
+        return replay
 
     _check_payer(session, actor.group_id, data.payer_member_id)
     _check_category(session, actor.group_id, data.category_id)
@@ -400,6 +408,9 @@ def create_expense(
             session.add(expense)
             session.flush()
     except IntegrityError as exc:
+        # A concurrent retry with the same id committed first: answer as a retry does.
+        if (replay := _replay_create(session, actor, data)) is not None:
+            return replay
         # The id is taken in another group: same answer, without saying where.
         raise Conflict("An expense with this id already exists", code="id_conflict") from exc
     _write_shares(session, expense, resolution)

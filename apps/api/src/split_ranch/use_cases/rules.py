@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 from uuid import UUID
 
+import psycopg
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from split_ranch.core import clock
@@ -77,8 +81,8 @@ def create_category(session: Session, actor: GroupActor, data: CategoryCreate) -
         color=data.color,
         sort_key=sort_key,
     )
-    session.add(category)
-    session.flush()
+    with _unique_as_conflict(session):
+        session.add(category)
     audit(
         session,
         group_id=actor.group_id,
@@ -90,6 +94,41 @@ def create_category(session: Session, actor: GroupActor, data: CategoryCreate) -
     )
     session.commit()
     return CategoryRead.model_validate(category)
+
+
+# Unique index → the 409 that the "check, then write" path gives the request that loses.
+_UNIQUE_CONFLICTS = {
+    "uq_categories_group_name": ("A category with this name already exists", "category_exists"),
+    "uq_category_presets_group_keyword": (
+        "A preset with this keyword already exists",
+        "preset_exists",
+    ),
+}
+
+
+def _violated_unique(exc: IntegrityError) -> str | None:
+    """Name of the unique index a failed write hit, or None for any other violation."""
+    if isinstance(exc.orig, psycopg.errors.UniqueViolation):
+        return exc.orig.diag.constraint_name
+    return None
+
+
+@contextmanager
+def _unique_as_conflict(session: Session) -> Generator[None, None, None]:
+    """Write inside a SAVEPOINT and turn a concurrent duplicate into its 409.
+
+    The `*_taken` checks run first, but two requests can both pass them; the second
+    one then hits the unique index when the SAVEPOINT flushes, instead of a 500.
+    """
+    try:
+        with session.begin_nested():
+            yield
+    except IntegrityError as exc:
+        conflict = _UNIQUE_CONFLICTS.get(_violated_unique(exc) or "")
+        if conflict is None:
+            raise
+        message, code = conflict
+        raise Conflict(message, code=code) from exc
 
 
 def _category(session: Session, actor: GroupActor, category_id: UUID) -> Category:
@@ -110,12 +149,14 @@ def update_category(
     ):
         raise Conflict("A category with this name already exists", code="category_exists")
     diff = {}
-    for key, value in changes.items():
-        if key in ("name", "sort_key") and value is None:
-            continue
-        if getattr(category, key) != value:
-            diff[key] = {"before": getattr(category, key), "after": value}
-            setattr(category, key, value)
+    # A concurrent create or rename can take the name after the check above.
+    with _unique_as_conflict(session):
+        for key, value in changes.items():
+            if key in ("name", "sort_key") and value is None:
+                continue
+            if getattr(category, key) != value:
+                diff[key] = {"before": getattr(category, key), "after": value}
+                setattr(category, key, value)
     if diff:
         audit(
             session,
@@ -179,8 +220,8 @@ def create_category_preset(
     if hrepo.category_preset_keyword_taken(session, actor.group_id, keyword):
         raise Conflict("A preset with this keyword already exists", code="preset_exists")
     preset = CategoryPreset(group_id=actor.group_id, category_id=category.id, keyword=keyword)
-    session.add(preset)
-    session.flush()
+    with _unique_as_conflict(session):
+        session.add(preset)
     audit(
         session,
         group_id=actor.group_id,

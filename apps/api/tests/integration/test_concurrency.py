@@ -22,9 +22,11 @@ from split_ranch.core.security import TokenVerifier
 from split_ranch.core.settings import Settings
 from split_ranch.main import create_app
 from split_ranch.schemas.expenses import ExpenseCreate
+from split_ranch.schemas.groups import CategoryCreate, CategoryPresetCreate, CategoryUpdate
 from split_ranch.schemas.payments import PaymentCreate
 from split_ranch.use_cases.expenses import create_expense
 from split_ranch.use_cases.payments import record_payment
+from split_ranch.use_cases.rules import create_category, create_category_preset, update_category
 from tests.conftest import TestUser
 from tests.integration.helpers import House, make_house
 
@@ -147,3 +149,178 @@ def test_write_waits_for_leave_and_sees_the_member_gone(
             {"g": house.id},
         ).one()
     assert tuple(counts) == (0, 0)
+
+
+# ------------------------------------------------- C5: concurrent duplicates
+
+
+def _race(
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    first: Callable[[Session], object],
+    second: Callable[[Session], object],
+) -> dict[str, object]:
+    """Run `first` up to its commit, then `second` in a thread, then commit `first`.
+
+    `second` passes every "already exists?" check (it cannot see uncommitted rows) and
+    blocks on the unique index until `first` commits; its outcome is returned.
+    """
+    outcome: dict[str, object] = {}
+
+    def run() -> None:
+        with Session(engine, expire_on_commit=False) as session:
+            try:
+                outcome["result"] = second(session)
+            except AppError as exc:
+                outcome["error"] = exc
+
+    with Session(engine, expire_on_commit=False) as holder:
+        real_commit = holder.commit
+        # Keep `first`'s rows uncommitted: its own commit only flushes.
+        monkeypatch.setattr(holder, "commit", holder.flush)
+        first(holder)
+        writer = threading.Thread(target=run)
+        writer.start()
+        writer.join(BLOCK_CHECK_SECONDS)
+        try:
+            assert writer.is_alive(), f"the second write did not wait: {outcome}"
+        finally:
+            real_commit()
+    writer.join(FINISH_TIMEOUT_SECONDS)
+    assert not writer.is_alive()
+    return outcome
+
+
+def _conflict_code(outcome: dict[str, object]) -> str:
+    error = outcome.get("error")
+    assert isinstance(error, AppError), f"expected a 409, got {outcome}"
+    assert error.status == 409
+    return error.code
+
+
+def test_concurrent_category_name_is_409(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    house = make_house(committed_client, make_user)
+    data = CategoryCreate(name="Gym")
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: create_category(s, _juli(house), data),
+        lambda s: create_category(s, _juli(house), CategoryCreate(name="gym")),
+    )
+    assert _conflict_code(outcome) == "category_exists"
+
+
+def test_concurrent_category_rename_is_409(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    house = make_house(committed_client, make_user)
+    groceries = uuid.UUID(house.categories["Groceries"])
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: create_category(s, _juli(house), CategoryCreate(name="Gym")),
+        lambda s: update_category(s, _juli(house), groceries, CategoryUpdate(name="Gym")),
+    )
+    assert _conflict_code(outcome) == "category_exists"
+
+
+def test_concurrent_preset_keyword_is_409(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    house = make_house(committed_client, make_user)
+    groceries = uuid.UUID(house.categories["Groceries"])
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: create_category_preset(
+            s, _juli(house), CategoryPresetCreate(keyword="mercadona", category_id=groceries)
+        ),
+        lambda s: create_category_preset(
+            s, _juli(house), CategoryPresetCreate(keyword="Mercadona", category_id=groceries)
+        ),
+    )
+    assert _conflict_code(outcome) == "preset_exists"
+
+
+def test_concurrent_expense_retry_returns_the_stored_one(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The same expense sent twice at once: one creates it, the other gets it back (200)."""
+    house = make_house(committed_client, make_user)
+    data = ExpenseCreate(
+        id=uuid.uuid4(),
+        amount_cents=3000,
+        description="Cena",
+        payer_member_id=uuid.UUID(house.members["Juli"]),
+        expense_date=date(2026, 11, 27),
+    )
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: create_expense(s, _juli(house), data),
+        lambda s: create_expense(s, _juli(house), data),
+    )
+    result = outcome.get("result")
+    assert result is not None and getattr(result, "status", None) == 200, outcome
+
+
+def test_concurrent_expense_with_other_payload_is_id_conflict(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    house = make_house(committed_client, make_user)
+    data = ExpenseCreate(
+        id=uuid.uuid4(),
+        amount_cents=3000,
+        description="Cena",
+        payer_member_id=uuid.UUID(house.members["Juli"]),
+        expense_date=date(2026, 11, 27),
+    )
+    other = data.model_copy(update={"amount_cents": 4000})
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: create_expense(s, _juli(house), data),
+        lambda s: create_expense(s, _juli(house), other),
+    )
+    assert _conflict_code(outcome) == "id_conflict"
+
+
+def test_concurrent_payment_retry_returns_the_stored_one(
+    committed_client: TestClient,
+    make_user: Callable[[str], TestUser],
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    house = make_house(committed_client, make_user)
+    payment = PaymentCreate(
+        id=uuid.uuid4(),
+        from_member_id=uuid.UUID(house.members["Juli"]),
+        to_member_id=uuid.UUID(house.members["Ana"]),
+        amount_cents=1000,
+        method="bizum",
+    )
+    outcome = _race(
+        engine,
+        monkeypatch,
+        lambda s: record_payment(s, _juli(house), payment),
+        lambda s: record_payment(s, _juli(house), payment),
+    )
+    result = outcome.get("result")
+    assert isinstance(result, tuple) and result[0] == 200, outcome

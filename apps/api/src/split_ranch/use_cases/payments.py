@@ -87,6 +87,18 @@ def _same_payload(p: Payment, data: PaymentCreate, actor: GroupActor) -> bool:
     )
 
 
+def _replay_create(
+    session: Session, actor: GroupActor, data: PaymentCreate
+) -> tuple[int, PaymentRead] | None:
+    """The stored payment for a retry of the same id (200), or None if there is none yet."""
+    existing = prepo.get_payment(session, actor.group_id, data.id)
+    if existing is None:
+        return None
+    if not _same_payload(existing, data, actor):
+        raise Conflict("A payment with this id already exists", code="id_conflict")
+    return 200, PaymentRead.model_validate(existing)
+
+
 def record_payment(
     session: Session,
     actor: GroupActor,
@@ -97,11 +109,8 @@ def record_payment(
     """Returns (201, created) or (200, stored) for an identical retry of the same id."""
     require_active(actor)
     lock_group_for_balance_write(session, actor.group_id)
-    existing = prepo.get_payment(session, actor.group_id, data.id)
-    if existing is not None:
-        if not _same_payload(existing, data, actor):
-            raise Conflict("A payment with this id already exists", code="id_conflict")
-        return 200, PaymentRead.model_validate(existing)
+    if (replay := _replay_create(session, actor, data)) is not None:
+        return replay
     if data.from_member_id == data.to_member_id:
         raise Unprocessable("A payment needs two different members", code="invalid_payment")
     if actor.member_id == data.from_member_id:
@@ -134,6 +143,9 @@ def record_payment(
             session.add(payment)
             session.flush()
     except IntegrityError as exc:
+        # A concurrent retry with the same id committed first: answer as a retry does.
+        if (replay := _replay_create(session, actor, data)) is not None:
+            return replay
         # The id exists in another group: same answer, without saying where.
         raise Conflict("A payment with this id already exists", code="id_conflict") from exc
     audit(
