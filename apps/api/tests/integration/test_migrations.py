@@ -33,7 +33,7 @@ def test_round_trip(database_url: str, engine: Engine) -> None:
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar() is None
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0012"
+        assert conn.execute(text("SELECT version_num FROM app.alembic_version")).scalar() == "0013"
         for table in ("users", "groups", "group_members", "payments", "history"):
             assert conn.execute(text(f"SELECT to_regclass('app.{table}')")).scalar(), table
         for table in ("households", "periods", "settlement_transfers"):
@@ -175,3 +175,36 @@ def test_0009_switches_existing_groups_to_the_new_defaults(
             conn.execute(text("DELETE FROM app.groups"))
             conn.execute(text("DELETE FROM app.users"))
         command.upgrade(cfg, "head")
+
+
+def test_0013_live_index_and_pinned_search_path(engine: Engine) -> None:
+    """P4 and B6: the partial list index replaces the old one; functions pin search_path."""
+    with engine.connect() as conn:
+        indexes = dict(
+            conn.execute(
+                text(
+                    "SELECT indexname, indexdef FROM pg_indexes "
+                    "WHERE schemaname = 'app' AND tablename = 'expenses'"
+                )
+            ).all()
+        )
+        assert "ix_expenses_group_date_id" not in indexes
+        live = indexes["ix_expenses_group_live_date"]
+        assert "expense_date DESC, created_at DESC, id DESC" in live
+        assert "WHERE (deleted_at IS NULL)" in live
+        configs = dict(
+            conn.execute(
+                text(
+                    "SELECT p.proname, p.proconfig FROM pg_proc p "
+                    "JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app'"
+                )
+            ).all()
+        )
+        assert configs == {
+            name: ['search_path=""']
+            for name in (
+                "assert_expense_shares_sum",
+                "trg_expense_shares_sum",
+                "trg_history_append_only",
+            )
+        }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from split_ranch.core.ids import uuid7
+from split_ranch.repositories import expenses as erepo
 from tests.conftest import FrozenClock, TestUser
 from tests.integration.helpers import House, add_expense, make_house, ok
 
@@ -463,3 +465,24 @@ def test_invalid_cursor_is_422(client: TestClient, house: House, path: str, curs
     """Garbage, `{}` and `{"t": 1}` are all rejected by the shared cursor decoder."""
     r = client.get(house.url(f"{path}?cursor={cursor}"), headers=house.h("Ana"))
     assert r.status_code == 422, r.text
+
+
+def test_list_reads_the_live_index_in_order(house: House, db_session: Session) -> None:
+    """P4: the list query walks the partial index in its own order, with no sort step."""
+    captured: list[tuple[str, Any]] = []
+
+    def capture(*args: Any) -> None:
+        captured.append((args[2], args[3]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", capture)
+    try:
+        erepo.list_expenses(db_session, uuid.UUID(house.id), erepo.ExpenseFilters(), limit=51)
+    finally:
+        event.remove(conn, "before_cursor_execute", capture)
+    [(statement, params)] = captured
+    # The test tables are tiny, so a sequential scan would win on cost alone.
+    conn.exec_driver_sql("SET LOCAL enable_seqscan = off")
+    plan = "\n".join(r[0] for r in conn.exec_driver_sql(f"EXPLAIN {statement}", params))
+    assert "ix_expenses_group_live_date" in plan, plan
+    assert "Sort" not in plan, plan
