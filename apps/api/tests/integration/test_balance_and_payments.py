@@ -4,10 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
+from split_ranch.domain import (
+    Balance,
+    LedgerExpense,
+    NetEntry,
+    Share,
+    Transfer,
+    compute_balances,
+    settle,
+)
+from split_ranch.models import Payment
+from split_ranch.repositories import balance as brepo
+from split_ranch.repositories import expenses as erepo
+from split_ranch.repositories import groups as grepo
+from split_ranch.repositories import payments as prepo
 from tests.conftest import FrozenClock, TestUser
 from tests.integration.helpers import House, add_expense, make_house, nets, ok, pay
 
@@ -251,3 +268,97 @@ def test_editing_old_expense_moves_balance(client: TestClient, march_house: Hous
     assert updated["updated_by_user_id"] == str(house.users["Ana"].id)
     # Franco paid 30,00 € more and owes 10,00 € more: +20,00 €.
     assert nets(client, house) == {"Juli": 35333, "Franco": 2000, "Ana": -37333}
+
+
+def _domain_balance(db_session: Session, house: House) -> tuple[list[Balance], list[Transfer]]:
+    """The balance as the domain computes it from every row (the pre-P2 algorithm)."""
+    gid = UUID(house.id)
+    order = [str(m.id) for m in grepo.list_members(db_session, gid)]
+    shares = erepo.all_shares(db_session, gid)
+    rows = [
+        LedgerExpense(
+            str(e.payer_member_id),
+            e.amount_cents,
+            [Share(str(s.member_id), s.amount_cents) for s in shares.get(e.id, [])],
+            personal=e.split_type == "personal",
+        )
+        for e in erepo.live_expenses(db_session, gid)
+    ]
+
+    def payment(p: Payment) -> LedgerExpense:
+        return LedgerExpense(
+            str(p.from_member_id), p.amount_cents, [Share(str(p.to_member_id), p.amount_cents)]
+        )
+
+    rows += [payment(p) for p in prepo.payments_with_status(db_session, gid, ["confirmed"])]
+    sent = [payment(p) for p in prepo.payments_with_status(db_session, gid, ["sent"])]
+    projected = compute_balances(order, rows + sent)
+    return compute_balances(order, rows), settle([NetEntry(b.id, b.net_cents) for b in projected])
+
+
+def test_sql_balance_matches_the_domain(
+    client: TestClient, march_house: House, db_session: Session
+) -> None:
+    """P2: the totals summed in SQL equal `compute_balances` over the same rows."""
+    house = march_house
+    e = _march_expenses(client, house)
+    gone = add_expense(client, house, "Juli", amount=99999, payer="Juli", date="2026-03-05")
+    ok(
+        client.delete(
+            house.url(f"/expenses/{gone['id']}"), headers=_if("Juli", house, gone["version"])
+        ),
+        204,
+    )
+    pay(client, house, "Juli", payer="Franco", to="Juli", amount=10000)  # confirmed (cash)
+    pay(client, house, "Ana", payer="Ana", to="Juli", amount=5000)  # sent
+    disputed = pay(client, house, "Franco", payer="Franco", to="Ana", amount=700)
+    ok(
+        client.post(
+            house.url(f"/payments/{disputed['id']}/dispute"),
+            json={"note": "No"},
+            headers=_if("Ana", house, 1),
+        )
+    )
+    cancelled = pay(client, house, "Ana", payer="Ana", to="Franco", amount=300)
+    ok(client.post(house.url(f"/payments/{cancelled['id']}/cancel"), headers=_if("Ana", house, 1)))
+    assert e["E5"]["split_type"] == "personal"
+
+    body = _balance(client, house)
+    balances, transfers = _domain_balance(db_session, house)
+    assert [
+        (b["member_id"], b["paid_cents"], b["owed_cents"], b["net_cents"]) for b in body["balances"]
+    ] == [(b.id, b.paid_cents, b.owed_cents, b.net_cents) for b in balances]
+    assert [
+        (s["from_member_id"], s["to_member_id"], s["amount_cents"]) for s in body["suggestions"]
+    ] == [(t.from_id, t.to_id, t.amount_cents) for t in transfers]
+    assert sum(b["net_cents"] for b in body["balances"]) == 0
+
+
+def _count_balance_queries(client: TestClient, house: House, db_session: Session) -> int:
+    statements: list[str] = []
+
+    def count(*args: object) -> None:
+        statements.append(str(args[2]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", count)
+    try:
+        _balance(client, house)
+    finally:
+        event.remove(conn, "before_cursor_execute", count)
+    return len(statements)
+
+
+def test_balance_reads_one_row_per_member(
+    client: TestClient, march_house: House, db_session: Session
+) -> None:
+    """P2: more expenses do not mean more rows or queries; the totals come summed."""
+    house = march_house
+    add_expense(client, house, "Juli", amount=300, payer="Juli", date="2026-03-01")
+    before = _count_balance_queries(client, house, db_session)
+    for day in range(2, 8):
+        add_expense(client, house, "Ana", amount=300, payer="Ana", date=f"2026-03-0{day}")
+    assert _count_balance_queries(client, house, db_session) == before
+    totals = brepo.paid_and_owed(db_session, UUID(house.id))
+    assert len(totals) == 3
+    assert totals[UUID(house.members["Ana"])] == (1800, 700)
