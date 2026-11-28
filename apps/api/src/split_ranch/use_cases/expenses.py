@@ -263,10 +263,9 @@ def _load(
 def _require_no_left_members(session: Session, expense: Expense) -> None:
     """D2: a member who left has a zero balance that no edit may change."""
     involved = {expense.payer_member_id} | {s.member_id for s in _stored_shares(session, expense)}
-    for member_id in involved:
-        member = grepo.get_member(session, expense.group_id, member_id)
-        if member is None or member.status != "active":
-            raise Conflict("This expense involves a member who left the group", code="member_left")
+    active = {m.id for m in grepo.active_members(session, expense.group_id)}
+    if not involved <= active:
+        raise Conflict("This expense involves a member who left the group", code="member_left")
 
 
 # ----------------------------------------------------------------- create
@@ -523,7 +522,7 @@ def update_expense(
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         raise NotFound("Expense not found")
-    check_version(if_match, expense.version, current_body=to_read(session, actor, expense))
+    check_version(if_match, expense.version, current_body=lambda: to_read(session, actor, expense))
     _require_no_left_members(session, expense)
     fields = data.model_fields_set
 
@@ -605,7 +604,7 @@ def delete_expense(
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         return
-    check_version(if_match, expense.version, current_body=to_read(session, actor, expense))
+    check_version(if_match, expense.version, current_body=lambda: to_read(session, actor, expense))
     _require_no_left_members(session, expense)
     before = snapshot_json(session, expense)
     expense.deleted_at = clock.now()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -34,10 +35,14 @@ def check_version(
     expected: int | None,
     current: int,
     *,
-    current_body: Any = None,
+    current_body: Callable[[], Any] | None = None,
     required: bool = True,
 ) -> None:
-    """Optimistic locking: compare the If-Match version with the stored one."""
+    """Optimistic locking: compare the If-Match version with the stored one.
+
+    `current_body` builds the resource sent back with a 412; it runs only on a mismatch,
+    so a matching version costs no extra query.
+    """
     if expected is None:
         if required:
             raise PreconditionRequired("If-Match header with the current version is required")
@@ -45,7 +50,7 @@ def check_version(
     if expected != current:
         raise PreconditionFailed(
             f"Resource is at version {current}, not {expected}",
-            extra={"current": current_body} if current_body is not None else None,
+            extra={"current": current_body()} if current_body is not None else None,
             headers={"ETag": f'"{current}"'},
         )
 

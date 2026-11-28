@@ -486,3 +486,39 @@ def test_list_reads_the_live_index_in_order(house: House, db_session: Session) -
     plan = "\n".join(r[0] for r in conn.exec_driver_sql(f"EXPLAIN {statement}", params))
     assert "ix_expenses_group_live_date" in plan, plan
     assert "Sort" not in plan, plan
+
+
+def _delete_statements(client: TestClient, house: House, db_session: Session, e: dict) -> list[str]:
+    statements: list[str] = []
+
+    def count(*args: Any) -> None:
+        statements.append(str(args[2]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", count)
+    try:
+        url = house.url(f"/expenses/{e['id']}")
+        ok(client.delete(url, headers=house.h("Juli", **{"If-Match": '"1"'})), 204)
+    finally:
+        event.remove(conn, "before_cursor_execute", count)
+    return statements
+
+
+def test_delete_queries_do_not_grow_with_members(
+    client: TestClient, house: House, db_session: Session
+) -> None:
+    """P3: one query checks every involved member, however many the expense has."""
+    solo = add_expense(
+        client,
+        house,
+        "Juli",
+        amount=900,
+        payer="Juli",
+        date="2026-03-01",
+        split={"split_type": "single", "shares": [{"member_id": house.members["Juli"]}]},
+    )
+    shared = add_expense(client, house, "Juli", amount=900, payer="Ana", date="2026-03-02")
+    assert len(solo["shares"]) == 1 and len(shared["shares"]) == 3
+    one = _delete_statements(client, house, db_session, solo)
+    three = _delete_statements(client, house, db_session, shared)
+    assert len(one) == len(three)

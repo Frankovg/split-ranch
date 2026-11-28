@@ -59,11 +59,14 @@ def create_app(
     configure_logging(settings.log_level, settings.log_json)
     init_sentry(settings)
 
+    # In prod neither the schema nor the docs are served: the app's client is generated
+    # from `app.openapi()` (scripts/export_openapi.py), which works without the route.
+    public_docs = settings.app_env != "prod"
     app = FastAPI(
         title="Splitranch",
         version="0.1.0",
-        openapi_url=f"{API_PREFIX}/openapi.json",
-        docs_url=f"{API_PREFIX}/docs" if settings.app_env != "prod" else None,
+        openapi_url=f"{API_PREFIX}/openapi.json" if public_docs else None,
+        docs_url=f"{API_PREFIX}/docs" if public_docs else None,
         redoc_url=None,
         lifespan=lifespan,
     )

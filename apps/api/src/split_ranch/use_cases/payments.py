@@ -179,7 +179,9 @@ def transition_payment(
     if actor.member_id != party:
         side = "receiver" if who == "to" else "payer"
         raise Forbidden(f"Only the payment's {side} can do this")
-    check_version(if_match, payment.version, current_body=PaymentRead.model_validate(payment))
+    check_version(
+        if_match, payment.version, current_body=lambda: PaymentRead.model_validate(payment)
+    )
     if payment.status not in allowed_from:
         raise Conflict(
             f"Cannot {action} a payment that is {payment.status}",

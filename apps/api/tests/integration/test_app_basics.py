@@ -9,7 +9,12 @@ import jwt
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine
 
+from split_ranch.core.security import TokenVerifier
+from split_ranch.core.settings import Settings
+from split_ranch.integrations.expo_push import ExpoPushClient
+from split_ranch.main import create_app
 from tests.conftest import SigningKey, TestUser, make_token
 
 
@@ -91,3 +96,41 @@ def test_invalid_request_id_is_replaced(client: TestClient, rid: str) -> None:
     echoed = client.get("/healthz", headers={"X-Request-ID": rid}).headers["X-Request-ID"]
     assert echoed != rid
     assert len(echoed) == 32 and echoed.isalnum()
+
+
+def test_config_reports_the_push_setting(
+    settings: Settings, engine: Engine, token_verifier: TokenVerifier
+) -> None:
+    """B4: `features.push` follows `push_enabled` instead of a fixed false."""
+    push_client = ExpoPushClient()
+    try:
+        for enabled in (False, True):
+            app = create_app(
+                settings.model_copy(update={"push_enabled": enabled}),
+                engine=engine,
+                token_verifier=token_verifier,
+                push_client=push_client,
+            )
+            features = TestClient(app).get("/v1/config").json()["features"]
+            assert features == {"sheets": False, "push": enabled}
+    finally:
+        push_client.close()
+
+
+def test_prod_serves_no_schema_or_docs(
+    settings: Settings, engine: Engine, token_verifier: TokenVerifier
+) -> None:
+    """S5: in prod the OpenAPI schema and the docs are not public; the export still works."""
+    prod = create_app(
+        settings.model_copy(update={"app_env": "prod"}),
+        engine=engine,
+        token_verifier=token_verifier,
+    )
+    client = TestClient(prod)
+    assert client.get("/v1/openapi.json").status_code == 404
+    assert client.get("/v1/docs").status_code == 404
+    assert "/v1/groups" in prod.openapi()["paths"]
+
+
+def test_non_prod_serves_the_schema(client: TestClient) -> None:
+    assert client.get("/v1/openapi.json").status_code == 200
