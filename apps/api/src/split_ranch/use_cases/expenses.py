@@ -327,7 +327,7 @@ def _same_create(
             split=data.split,
             participants=data.participants,
         )
-    except Exception:
+    except (DomainError, AppError):
         # The retry's split no longer resolves (a member left, a category was archived):
         # it cannot be the same expense. Any other error is a bug and must surface.
         return False
