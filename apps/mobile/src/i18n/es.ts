@@ -81,6 +81,7 @@ const es = {
     name: 'Nombre',
     admin: 'Administrador',
     leftName: '{{name}} (salió)',
+    formerMember: 'Exmiembro',
     invite: 'Invitar',
     inviteSomeone: 'Invita a alguien para compartir gastos',
     inviteHint: 'Cualquiera del grupo puede invitar. El código caduca a los 7 días.',
@@ -295,6 +296,16 @@ const es = {
     gallery: 'Galería de componentes',
     version: 'Versión {{version}}',
     notifications: 'Notificaciones',
+    deleteAccount: 'Borrar cuenta',
+    deleteTitle: '¿Borrar tu cuenta?',
+    deleteBody:
+      'Saldrás de todos tus grupos y borraremos tu nombre, email y foto. Los gastos que ya están en tus grupos se quedan a nombre de «Exmiembro». No se puede deshacer.',
+    deleteWord: 'BORRAR',
+    deleteConfirmLabel: 'Escribe {{word}} para confirmar',
+    deleteConfirm: 'Borrar mi cuenta',
+    deleteSettleFirst: 'Antes, deja a cero tus saldos en:',
+    deleteFailed: 'No se pudo borrar la cuenta. Inténtalo de nuevo.',
+    deleted: 'Tu cuenta se ha borrado.',
   },
   notifications: {
     title: 'Notificaciones',
@@ -428,6 +439,52 @@ const es = {
     toggleTheme: 'Cambiar tema',
     sample: 'Ejemplo',
     fontScale: 'Prueba la escala de fuente desde los ajustes de Android (200 %).',
+  },
+  privacy: {
+    title: 'Privacidad',
+    heroTitle: 'Tu privacidad, en claro',
+    heroBody: 'Lo esencial en un minuto. El detalle legal, justo debajo.',
+    updated: 'Actualizada el 27 de noviembre de 2026',
+    summary: 'En corto',
+    dataTitle: 'Qué guardamos',
+    dataBody: 'Tu nombre, email y foto de Google, y lo que registras en tus grupos.',
+    localTitle: 'Cuentas rápidas',
+    localBody: 'Se quedan en tu móvil. Nunca llegan a nuestros servidores.',
+    purposeTitle: 'Para qué',
+    purposeBody: 'Solo para que la app funcione. Sin anuncios, sin rastreo y sin vender nada.',
+    whereTitle: 'Dónde',
+    whereBody: 'En servidores de la Unión Europea (Fráncfort).',
+    rightsTitle: 'Tú decides',
+    rightsBody: 'Puedes ver, corregir, llevarte o borrar tus datos cuando quieras.',
+    detail: 'El detalle',
+    controllerTitle: 'Responsable',
+    controllerBody: 'Franco Gabriel Amoroso es el responsable del tratamiento de tus datos. Contacto: {{email}}.',
+    processingTitle: 'Datos, fines y base legal',
+    processingBody:
+      '• Cuenta (nombre, email y foto que da Google al iniciar sesión): para identificarte. Base: ejecución del contrato (art. 6.1.b RGPD).\n' +
+      '• Grupos, gastos, pagos e historial: para calcular quién debe a quién. Los ven los miembros de cada grupo. Base: contrato.\n' +
+      '• Token de notificaciones e idioma del móvil: para avisarte, solo si lo permites. Se desactiva en Ajustes. Base: consentimiento.\n' +
+      '• Registros técnicos (IP, dispositivo, errores): para mantener el servicio seguro y corregir fallos. Base: interés legítimo.\n\n' +
+      'No tomamos decisiones automatizadas ni creamos perfiles.',
+    sharingTitle: 'Con quién y dónde',
+    sharingBody:
+      'Solo con los proveedores que hacen funcionar la app, como encargados del tratamiento: Supabase (base de datos e inicio de sesión, UE), Render (servidor, UE), GitHub (copias de seguridad cifradas), Google (inicio de sesión), Expo (notificaciones) y Sentry (informes de errores).\n\n' +
+      'Si alguno trata datos fuera del Espacio Económico Europeo, lo hace con las cláusulas contractuales tipo de la Comisión Europea o el Marco de Privacidad de Datos UE-EE. UU. Nunca vendemos ni cedemos tus datos.',
+    retentionTitle: 'Cuánto tiempo',
+    retentionBody:
+      'Tu cuenta, mientras la tengas. Los gastos de un grupo, mientras el grupo exista: forman parte de las cuentas de los demás miembros. Los registros técnicos, como máximo 90 días, y las copias de seguridad cifradas, 60 días.',
+    deletionTitle: 'Borrar tu cuenta',
+    deletionBody:
+      'Desde Ajustes → Cuenta, con tus saldos a cero. Sales de tus grupos, borramos tu nombre, email, foto y avisos, y eliminamos tu acceso. Los gastos y pagos que ya están en un grupo se quedan a nombre de «Exmiembro», para que las cuentas de los demás sigan cuadrando.',
+    yourRightsTitle: 'Tus derechos',
+    yourRightsBody:
+      'Puedes pedir acceso a tus datos o una copia en un formato portable, corregirlos, borrarlos, limitar su uso u oponerte a él, y retirar tu consentimiento cuando quieras.\n\n' +
+      'Escribe a {{email}} desde el email de tu cuenta: es gratis y respondemos en un mes como máximo. Si no estás conforme, puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).',
+    minorsTitle: 'Edad y cambios',
+    minorsBody:
+      'Splitranch es para mayores de 14 años. Si cambiamos esta política de forma importante, te avisaremos en la app.',
+    contact: 'Escribir a {{email}}',
+    contactFailed: 'No hay ninguna app de correo. Escríbenos a {{email}}.',
   },
 };
 

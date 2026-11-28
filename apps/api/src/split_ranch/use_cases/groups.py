@@ -34,7 +34,7 @@ from split_ranch.schemas.groups import (
     MemberRead,
 )
 from split_ranch.use_cases.balance import compute_group_balance
-from split_ranch.use_cases.common import audit, require_active, require_admin
+from split_ranch.use_cases.common import audit, require_admin
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
 
 _NO_NOTIFIER = NullNotifier()
@@ -84,6 +84,7 @@ def _group_read(
                 id=m.id,
                 user_id=m.user_id,
                 display_name=u.display_name,
+                account_deleted=u.deleted_at is not None,
                 role=m.role,
                 status=m.status,
                 sort_key=m.sort_key,
@@ -108,7 +109,7 @@ def _locked_group(session: Session, group_id: UUID) -> Group:
 def create_group(session: Session, actor: Actor, data: GroupCreate) -> GroupRead:
     _validate_timezone(data.timezone)
     group = Group(
-        name=data.name.strip(),
+        name=data.name,
         timezone=data.timezone,
         created_by=actor.user_id,
         split_rule=dict(DEFAULT_SPLIT_RULE),
@@ -165,7 +166,6 @@ def get_group(session: Session, actor: GroupActor) -> GroupRead:
 
 
 def update_group(session: Session, actor: GroupActor, data: GroupUpdate) -> GroupRead:
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     changes = data.model_dump(exclude_unset=True)
     if changes.get("timezone") is not None:
@@ -192,9 +192,31 @@ def update_group(session: Session, actor: GroupActor, data: GroupUpdate) -> Grou
     return get_group(session, actor)
 
 
+# Payments waiting for the receiver: a `sent` one may still be confirmed, and a `disputed`
+# one confirmed or cancelled, so either can still move the balance.
+WAITING_PAYMENT_STATUSES = ("sent", "disputed")
+
+
+def _waiting_payments(session: Session, group_id: UUID, member_id: UUID | None = None) -> int:
+    """Payments of the group (or of one member, either side) waiting for confirmation."""
+    stmt = (
+        select(func.count())
+        .select_from(Payment)
+        .where(Payment.group_id == group_id, Payment.status.in_(WAITING_PAYMENT_STATUSES))
+    )
+    if member_id is not None:
+        stmt = stmt.where(
+            (Payment.from_member_id == member_id) | (Payment.to_member_id == member_id)
+        )
+    return int(session.scalar(stmt) or 0)
+
+
 def _open_balances(session: Session, group_id: UUID) -> bool:
+    """Deleting the group needs every net at zero and no payment waiting (sent or disputed)."""
     result = compute_group_balance(session, group_id)
-    return any(b.net_cents != 0 for b in result.balances) or bool(result.pending)
+    return (
+        any(b.net_cents != 0 for b in result.balances) or _waiting_payments(session, group_id) > 0
+    )
 
 
 def _soft_delete(session: Session, group: Group, actor_user_id: UUID) -> None:
@@ -216,7 +238,8 @@ def delete_group(session: Session, actor: GroupActor, data: GroupDeleteIn) -> No
     """Soft delete by the admin, confirmed with the group's name, only with zero balances."""
     require_admin(actor)
     group = _locked_group(session, actor.group_id)
-    if data.confirm_name.strip() != group.name:
+    # Names are stored trimmed; strip anyway for rows saved before that ("Piso ").
+    if data.confirm_name != group.name.strip():
         raise Unprocessable("The confirmation does not match the group name", code="confirm_name")
     if _open_balances(session, group.id):
         raise Conflict(
@@ -244,7 +267,6 @@ def _invitation_read(group: Group) -> InvitationRead:
 
 def get_or_create_invitation(session: Session, actor: GroupActor) -> InvitationRead:
     """The group's join code: the current one while valid, else a fresh one (7 days)."""
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     if not _invite_valid(group):
         group.invite_code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
@@ -264,7 +286,6 @@ def get_or_create_invitation(session: Session, actor: GroupActor) -> InvitationR
 
 def revoke_invitation(session: Session, actor: GroupActor) -> None:
     """Invalidate the current code; the next invitation gets a new one."""
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     if group.invite_code is not None:
         group.invite_code = None
@@ -364,24 +385,21 @@ def accept_invitation(
 # ---------------------------------------------------------------- members
 
 
-def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> None:
-    """D2: leaving needs a zero net and no payment of the member waiting for confirmation."""
+def _open_position(session: Session, group_id: UUID, member: GroupMember) -> tuple[int, int]:
+    """The member's net and how many of their payments wait for confirmation."""
     result = compute_group_balance(session, group_id)
     net = next((b.net_cents for b in result.balances if b.id == str(member.id)), 0)
-    waiting = session.scalar(
-        select(func.count())
-        .select_from(Payment)
-        .where(
-            Payment.group_id == group_id,
-            Payment.status.in_(("sent", "disputed")),
-            (Payment.from_member_id == member.id) | (Payment.to_member_id == member.id),
-        )
-    )
+    return net, _waiting_payments(session, group_id, member.id)
+
+
+def _require_settled(session: Session, group_id: UUID, member: GroupMember) -> None:
+    """D2: leaving needs a zero net and no payment of the member waiting for confirmation."""
+    net, waiting = _open_position(session, group_id, member)
     if net != 0 or waiting:
         raise Conflict(
             "The member's balance must be settled first",
             code="member_has_open_balance",
-            extra={"net_cents": net, "pending_payments": int(waiting or 0)},
+            extra={"net_cents": net, "pending_payments": waiting},
         )
 
 
@@ -424,7 +442,6 @@ def _leave(session: Session, group: Group, member: GroupMember, actor_user_id: U
 
 
 def leave_group(session: Session, actor: GroupActor) -> None:
-    require_active(actor)
     group = _locked_group(session, actor.group_id)
     member = repo.get_member(session, group.id, actor.member_id, for_update=True)
     assert member is not None
@@ -445,3 +462,49 @@ def remove_member(session: Session, actor: GroupActor, member_id: UUID) -> Group
     _leave(session, group, member, actor.user_id)
     session.commit()
     return get_group(session, actor)
+
+
+def leave_every_group(session: Session, user_id: UUID) -> None:
+    """Account deletion: the user leaves each live group they are active in (no commit).
+
+    All or nothing: if any group still has an open position for them, nothing changes and
+    `409 account_has_open_balances` lists those groups. Groups are locked in id order so two
+    concurrent deletions cannot deadlock.
+    """
+    group_ids = session.scalars(
+        select(GroupMember.group_id)
+        .join(Group, Group.id == GroupMember.group_id)
+        .where(
+            GroupMember.user_id == user_id,
+            GroupMember.status == "active",
+            Group.deleted_at.is_(None),
+        )
+        .order_by(GroupMember.group_id)
+    ).all()
+    leaving: list[tuple[Group, GroupMember]] = []
+    unsettled: list[dict[str, object]] = []
+    for group_id in group_ids:
+        group = _locked_group(session, group_id)
+        member = repo.get_membership(session, group.id, user_id)
+        if member is None or member.status != "active":
+            continue  # left meanwhile
+        net, waiting = _open_position(session, group.id, member)
+        if net != 0 or waiting:
+            unsettled.append(
+                {
+                    "group_id": str(group.id),
+                    "group_name": group.name,
+                    "net_cents": net,
+                    "pending_payments": waiting,
+                }
+            )
+        else:
+            leaving.append((group, member))
+    if unsettled:
+        raise Conflict(
+            "Settle every group before deleting the account",
+            code="account_has_open_balances",
+            extra={"groups": unsettled},
+        )
+    for group, member in leaving:
+        _leave(session, group, member, user_id)

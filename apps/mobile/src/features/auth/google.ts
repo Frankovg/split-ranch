@@ -71,11 +71,12 @@ const credentialManagerProvider: GoogleIdTokenProvider = {
     GoogleOneTapSignIn.configure({ webClientId: env.googleWebClientId, nonce: hashedNonce });
     try {
       await GoogleOneTapSignIn.checkPlayServices();
-      // Authorized accounts first, then every account on the device, then the explicit
+      // Every account on the device (already authorized ones included), then the explicit
       // "Sign in with Google" dialog (also covers a device with no Google account yet).
-      let response = await GoogleOneTapSignIn.signIn();
-      if (isNoSavedCredentialFoundResponse(response))
-        response = await GoogleOneTapSignIn.createAccount();
+      // signIn() is skipped on purpose: on Android it only offers accounts that already
+      // authorized the app, so after signing out the user could not pick another account.
+      // An existing account picked here signs in to the same Supabase user (same `sub`).
+      let response = await GoogleOneTapSignIn.createAccount();
       if (isNoSavedCredentialFoundResponse(response))
         response = await GoogleOneTapSignIn.presentExplicitSignIn();
       if (!isSuccessResponse(response)) throw new SignInCancelledError();
@@ -96,7 +97,7 @@ const credentialManagerProvider: GoogleIdTokenProvider = {
     }
   },
   async signOut() {
-    // Also clears the Credential Manager state so the account picker shows again.
+    // Clears the Credential Manager state so the picker does not auto-select the last account.
     const { GoogleOneTapSignIn } = await loadNitroGoogleSignIn();
     await GoogleOneTapSignIn.signOut();
   },
@@ -166,9 +167,12 @@ async function runSignIn(): Promise<void> {
   if (error) throw error;
 }
 
-/** Sign out of Supabase and of the Google library so the account picker shows again. */
-export async function signOut(): Promise<void> {
-  await supabase?.auth.signOut();
+/**
+ * Sign out of Supabase and of the Google library so the account picker shows again.
+ * `local` clears only this device without depending on the server (e.g. a deleted account).
+ */
+export async function signOut(scope: 'global' | 'local' = 'global'): Promise<void> {
+  await supabase?.auth.signOut({ scope });
   try {
     await provider.signOut();
   } catch (error) {

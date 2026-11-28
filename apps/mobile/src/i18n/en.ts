@@ -83,6 +83,7 @@ const en: typeof es = {
     name: 'Name',
     admin: 'Admin',
     leftName: '{{name}} (left)',
+    formerMember: 'Former member',
     invite: 'Invite',
     inviteSomeone: 'Invite someone to share expenses',
     inviteHint: 'Anyone in the group can invite. The code expires after 7 days.',
@@ -296,6 +297,16 @@ const en: typeof es = {
     gallery: 'Component gallery',
     version: 'Version {{version}}',
     notifications: 'Notifications',
+    deleteAccount: 'Delete account',
+    deleteTitle: 'Delete your account?',
+    deleteBody:
+      'You will leave all your groups and we will delete your name, email and photo. Expenses already in your groups stay as “Former member”. This cannot be undone.',
+    deleteWord: 'DELETE',
+    deleteConfirmLabel: 'Type {{word}} to confirm',
+    deleteConfirm: 'Delete my account',
+    deleteSettleFirst: 'First, settle your balances in:',
+    deleteFailed: 'Could not delete the account. Try again.',
+    deleted: 'Your account was deleted.',
   },
   notifications: {
     title: 'Notifications',
@@ -429,6 +440,52 @@ const en: typeof es = {
     toggleTheme: 'Toggle theme',
     sample: 'Sample',
     fontScale: 'Test font scaling from Android settings (200%).',
+  },
+  privacy: {
+    title: 'Privacy',
+    heroTitle: 'Your privacy, plainly',
+    heroBody: 'The essentials in a minute. The legal detail, right below.',
+    updated: 'Updated on 27 November 2026',
+    summary: 'In short',
+    dataTitle: 'What we keep',
+    dataBody: 'Your Google name, email and photo, and what you record in your groups.',
+    localTitle: 'Quick splits',
+    localBody: 'They stay on your phone. They never reach our servers.',
+    purposeTitle: 'What for',
+    purposeBody: 'Only to make the app work. No ads, no tracking and nothing sold.',
+    whereTitle: 'Where',
+    whereBody: 'On servers in the European Union (Frankfurt).',
+    rightsTitle: 'Your call',
+    rightsBody: 'You can see, correct, take or delete your data whenever you want.',
+    detail: 'The detail',
+    controllerTitle: 'Controller',
+    controllerBody: 'Franco Gabriel Amoroso is the controller of your data. Contact: {{email}}.',
+    processingTitle: 'Data, purposes and legal basis',
+    processingBody:
+      '• Account (the name, email and photo Google gives at sign-in): to identify you. Basis: performance of the contract (art. 6.1.b GDPR).\n' +
+      '• Groups, expenses, payments and history: to work out who owes whom. The members of each group see them. Basis: contract.\n' +
+      '• Notification token and phone language: to notify you, only if you allow it. Turn it off in Settings. Basis: consent.\n' +
+      '• Technical logs (IP, device, errors): to keep the service secure and fix bugs. Basis: legitimate interest.\n\n' +
+      'We make no automated decisions and build no profiles.',
+    sharingTitle: 'Who with and where',
+    sharingBody:
+      'Only with the providers that run the app, as processors: Supabase (database and sign-in, EU), Render (server, EU), GitHub (encrypted backups), Google (sign-in), Expo (notifications) and Sentry (error reports).\n\n' +
+      'If any of them processes data outside the European Economic Area, it does so under the European Commission standard contractual clauses or the EU-US Data Privacy Framework. We never sell or share your data.',
+    retentionTitle: 'How long',
+    retentionBody:
+      "Your account, while you have it. A group's expenses, while the group exists: they are part of the other members' accounts. Technical logs, 90 days at most, and encrypted backups, 60 days.",
+    deletionTitle: 'Deleting your account',
+    deletionBody:
+      "From Settings → Account, once your balances are zero. You leave your groups, we delete your name, email, photo and notifications, and remove your sign-in. Expenses and payments already in a group stay there as “Former member”, so the others' accounts still add up.",
+    yourRightsTitle: 'Your rights',
+    yourRightsBody:
+      'You can ask for access to your data or a copy in a portable format, correct it, delete it, restrict or object to its use, and withdraw your consent at any time.\n\n' +
+      "Write to {{email}} from your account's email: it is free and we answer within a month. If you are not satisfied, you can complain to the Spanish Data Protection Agency (aepd.es) or your local authority.",
+    minorsTitle: 'Age and changes',
+    minorsBody:
+      'Splitranch is for people aged 14 and over. If we change this policy in an important way, we will tell you in the app.',
+    contact: 'Write to {{email}}',
+    contactFailed: 'There is no email app. Write to us at {{email}}.',
   },
 };
 

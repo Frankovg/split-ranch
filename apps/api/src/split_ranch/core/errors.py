@@ -92,6 +92,12 @@ class Unprocessable(AppError):
     title = "Unprocessable request"
 
 
+class ServiceUnavailable(AppError):
+    status = 503
+    code = "service_unavailable"
+    title = "Service unavailable"
+
+
 def problem(
     status: int,
     code: str,

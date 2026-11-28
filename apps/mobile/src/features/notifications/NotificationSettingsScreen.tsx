@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { reportError } from '@/lib/sentry';
 import { useNotificationPrefs, useUpdateNotificationPrefs } from './api';
 import { EVENT_PREFS, type EventPref } from './prefs';
 import { pushPermission, requestAndRegister } from './register';
@@ -78,7 +79,10 @@ export function NotificationSettingsScreen() {
     // Turning notifications on is the moment to ask for the system permission.
     void requestAndRegister()
       .then(setPermission)
-      .catch((error: unknown) => console.warn('Failed to register for push notifications', error));
+      .catch((error: unknown) => {
+        console.warn('Failed to register for push notifications', error);
+        reportError(error, 'notifications.register');
+      });
   };
 
   if (!prefs) {

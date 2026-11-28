@@ -10,9 +10,8 @@ is fixed with a payment in the opposite direction.
 
 from __future__ import annotations
 
-import base64
-import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -25,16 +24,18 @@ from split_ranch.models import Payment
 from split_ranch.repositories import groups as grepo
 from split_ranch.repositories import payments as prepo
 from split_ranch.schemas.payments import PaymentCreate, PaymentDispute, PaymentNote, PaymentRead
-from split_ranch.use_cases.common import audit, check_version, require_active
+from split_ranch.use_cases.common import (
+    audit,
+    check_version,
+    lock_group_for_balance_write,
+)
 from split_ranch.use_cases.notifications import (
     EventKind,
     NotificationEvent,
     Notifier,
     NullNotifier,
 )
-
-DEFAULT_PAGE = 50
-MAX_PAGE = 200
+from split_ranch.use_cases.pagination import DEFAULT_PAGE, clamp_limit, decode_cursor, encode_cursor
 
 # Allowed transitions: action -> (who, from statuses, to status)
 _TRANSITIONS: dict[str, tuple[str, tuple[str, ...], str]] = {
@@ -82,6 +83,18 @@ def _same_payload(p: Payment, data: PaymentCreate, actor: GroupActor) -> bool:
     )
 
 
+def _replay_create(
+    session: Session, actor: GroupActor, data: PaymentCreate
+) -> tuple[int, PaymentRead] | None:
+    """The stored payment for a retry of the same id (200), or None if there is none yet."""
+    existing = prepo.get_payment(session, actor.group_id, data.id)
+    if existing is None:
+        return None
+    if not _same_payload(existing, data, actor):
+        raise Conflict("A payment with this id already exists", code="id_conflict")
+    return 200, PaymentRead.model_validate(existing)
+
+
 def record_payment(
     session: Session,
     actor: GroupActor,
@@ -90,12 +103,9 @@ def record_payment(
     notifier: Notifier = _NO_NOTIFIER,
 ) -> tuple[int, PaymentRead]:
     """Returns (201, created) or (200, stored) for an identical retry of the same id."""
-    require_active(actor)
-    existing = prepo.get_payment(session, actor.group_id, data.id)
-    if existing is not None:
-        if not _same_payload(existing, data, actor):
-            raise Conflict("A payment with this id already exists", code="id_conflict")
-        return 200, PaymentRead.model_validate(existing)
+    lock_group_for_balance_write(session, actor.group_id)
+    if (replay := _replay_create(session, actor, data)) is not None:
+        return replay
     if data.from_member_id == data.to_member_id:
         raise Unprocessable("A payment needs two different members", code="invalid_payment")
     if actor.member_id == data.from_member_id:
@@ -128,6 +138,9 @@ def record_payment(
             session.add(payment)
             session.flush()
     except IntegrityError as exc:
+        # A concurrent retry with the same id committed first: answer as a retry does.
+        if (replay := _replay_create(session, actor, data)) is not None:
+            return replay
         # The id exists in another group: same answer, without saying where.
         raise Conflict("A payment with this id already exists", code="id_conflict") from exc
     audit(
@@ -158,7 +171,6 @@ def transition_payment(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> PaymentRead:
-    require_active(actor)
     who, allowed_from, target = _TRANSITIONS[action]
     payment = prepo.get_payment(session, actor.group_id, payment_id, for_update=True)
     if payment is None:
@@ -167,7 +179,9 @@ def transition_payment(
     if actor.member_id != party:
         side = "receiver" if who == "to" else "payer"
         raise Forbidden(f"Only the payment's {side} can do this")
-    check_version(if_match, payment.version, current_body=PaymentRead.model_validate(payment))
+    check_version(
+        if_match, payment.version, current_body=lambda: PaymentRead.model_validate(payment)
+    )
     if payment.status not in allowed_from:
         raise Conflict(
             f"Cannot {action} a payment that is {payment.status}",
@@ -204,18 +218,8 @@ def get_payment(session: Session, actor: GroupActor, payment_id: UUID) -> Paymen
     return PaymentRead.model_validate(payment)
 
 
-def _encode_cursor(ts: datetime, i: UUID) -> str:
-    raw = json.dumps({"t": ts.isoformat(), "i": str(i)}).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> tuple[datetime, UUID]:
-    try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        return datetime.fromisoformat(data["t"]), UUID(data["i"])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise Unprocessable("Invalid cursor") from exc
+def _parse_cursor(data: dict[str, Any]) -> tuple[datetime, UUID]:
+    return datetime.fromisoformat(data["t"]), UUID(data["i"])
 
 
 def list_payments(
@@ -226,17 +230,17 @@ def list_payments(
     cursor: str | None = None,
     status: list[str] | None = None,
 ) -> tuple[list[PaymentRead], str | None]:
-    limit = max(1, min(limit, MAX_PAGE))
+    limit = clamp_limit(limit)
     rows = prepo.list_payments(
         session,
         actor.group_id,
         limit=limit + 1,
-        after=_decode_cursor(cursor) if cursor else None,
+        after=decode_cursor(cursor, _parse_cursor) if cursor else None,
         statuses=status,
     )
     items = [PaymentRead.model_validate(p) for p in rows[:limit]]
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.created_at, last.id)
+        next_cursor = encode_cursor({"t": last.created_at.isoformat(), "i": str(last.id)})
     return items, next_cursor

@@ -9,8 +9,6 @@ existing expenses.
 
 from __future__ import annotations
 
-import base64
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -23,7 +21,8 @@ from sqlalchemy.orm import Session
 
 from split_ranch.core import clock
 from split_ranch.core.actor import GroupActor
-from split_ranch.core.errors import Conflict, NotFound, Unprocessable
+from split_ranch.core.errors import AppError, Conflict, NotFound, Unprocessable
+from split_ranch.domain import DomainError
 from split_ranch.models import Expense, ExpenseShare, History
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import groups as grepo
@@ -41,8 +40,12 @@ from split_ranch.schemas.expenses import (
     SummaryRead,
 )
 from split_ranch.schemas.split import EqualSplit, ShareRead, SplitSpec, spec_from_json
-from split_ranch.use_cases.common import check_version, require_active
+from split_ranch.use_cases.common import (
+    check_version,
+    lock_group_for_balance_write,
+)
 from split_ranch.use_cases.notifications import NotificationEvent, Notifier, NullNotifier
+from split_ranch.use_cases.pagination import DEFAULT_PAGE, clamp_limit, decode_cursor, encode_cursor
 from split_ranch.use_cases.split_resolution import (
     Resolution,
     ResolvedShare,
@@ -53,9 +56,6 @@ from split_ranch.use_cases.split_resolution import (
 )
 
 _NO_NOTIFIER = NullNotifier()
-
-DEFAULT_PAGE = 50
-MAX_PAGE = 200
 
 
 # ---------------------------------------------------------------- helpers
@@ -141,12 +141,15 @@ def _write_shares(session: Session, expense: Expense, resolution: Resolution) ->
     session.flush()
 
 
-def _stored_shares(session: Session, expense: Expense) -> list[ResolvedShare]:
-    rows = erepo.shares_for(session, expense.group_id, [expense.id]).get(expense.id, [])
+def _resolved(rows: Sequence[ExpenseShare]) -> list[ResolvedShare]:
     return [
         ResolvedShare(s.member_id, s.amount_cents, s.weight, s.basis_points, s.exact_cents)
         for s in rows
     ]
+
+
+def _stored_shares(session: Session, expense: Expense) -> list[ResolvedShare]:
+    return _resolved(erepo.shares_for(session, expense.group_id, [expense.id]).get(expense.id, []))
 
 
 def snapshot_json(session: Session, expense: Expense) -> dict[str, Any]:
@@ -215,7 +218,15 @@ def _shares_read(shares: Sequence[ResolvedShare]) -> list[ShareRead]:
     ]
 
 
-def to_read(session: Session, actor: GroupActor, expense: Expense) -> ExpenseRead:
+def to_read(
+    session: Session,
+    actor: GroupActor,
+    expense: Expense,
+    *,
+    shares: Sequence[ExpenseShare] | None = None,
+) -> ExpenseRead:
+    """`shares` lets a list pass rows it already loaded instead of one query per expense."""
+    stored = _resolved(shares) if shares is not None else _stored_shares(session, expense)
     return ExpenseRead(
         id=expense.id,
         group_id=expense.group_id,
@@ -231,13 +242,13 @@ def to_read(session: Session, actor: GroupActor, expense: Expense) -> ExpenseRea
         participant_mode=expense.participant_mode,
         rule_fallback=expense.rule_fallback,
         source=expense.source,
-        shares=_shares_read(_stored_shares(session, expense)),
+        shares=_shares_read(stored),
         created_by_user_id=expense.created_by_user_id,
         updated_by_user_id=expense.updated_by_user_id,
         created_at=expense.created_at,
         updated_at=expense.updated_at,
         deleted_at=expense.deleted_at,
-        can_edit=expense.deleted_at is None and actor.status == "active",
+        can_edit=expense.deleted_at is None,
     )
 
 
@@ -253,10 +264,9 @@ def _load(
 def _require_no_left_members(session: Session, expense: Expense) -> None:
     """D2: a member who left has a zero balance that no edit may change."""
     involved = {expense.payer_member_id} | {s.member_id for s in _stored_shares(session, expense)}
-    for member_id in involved:
-        member = grepo.get_member(session, expense.group_id, member_id)
-        if member is None or member.status != "active":
-            raise Conflict("This expense involves a member who left the group", code="member_left")
+    active = {m.id for m in grepo.active_members(session, expense.group_id)}
+    if not involved <= active:
+        raise Conflict("This expense involves a member who left the group", code="member_left")
 
 
 # ----------------------------------------------------------------- create
@@ -298,7 +308,7 @@ def _same_create(
         existing.created_by_user_id == actor.user_id
         and existing.deleted_at is None
         and existing.amount_cents == data.amount_cents
-        and existing.description == data.description.strip()
+        and existing.description == data.description
         and existing.notes == data.notes
         and existing.category_id == data.category_id
         and existing.payer_member_id == data.payer_member_id
@@ -317,11 +327,26 @@ def _same_create(
             split=data.split,
             participants=data.participants,
         )
-    except Exception:
+    except (DomainError, AppError):
+        # The retry's split no longer resolves (a member left, a category was archived):
+        # it cannot be the same expense. Any other error is a bug and must surface.
         return False
     return res.split_type == existing.split_type and stored == [
         (s.member_id, s.amount_cents) for s in res.shares
     ]
+
+
+def _replay_create(session: Session, actor: GroupActor, data: ExpenseCreate) -> CreateResult | None:
+    """The stored expense for a retry of the same id (200), or None if there is none yet."""
+    if data.id is None:
+        return None
+    existing = erepo.get_expense(session, actor.group_id, data.id)
+    if existing is None:
+        return None
+    if not _same_create(session, actor, existing, data):
+        raise Conflict("An expense with this id already exists", code="id_conflict")
+    body = to_read(session, actor, existing).model_dump(mode="json")
+    return CreateResult(200, body, existing.version)
 
 
 def create_expense(
@@ -337,17 +362,12 @@ def create_expense(
     Idempotent through the client-generated `id`: retrying the same expense returns the
     stored one (200); the same id with a different payload is `409 id_conflict`.
     """
-    require_active(actor)
     if data.source != "manual" and not trusted_source:
         raise Unprocessable("Only manual expenses can be created by clients", code="invalid_source")
+    lock_group_for_balance_write(session, actor.group_id)
 
-    if data.id is not None:
-        existing = erepo.get_expense(session, actor.group_id, data.id)
-        if existing is not None:
-            if not _same_create(session, actor, existing, data):
-                raise Conflict("An expense with this id already exists", code="id_conflict")
-            body = to_read(session, actor, existing).model_dump(mode="json")
-            return CreateResult(200, body, existing.version)
+    if (replay := _replay_create(session, actor, data)) is not None:
+        return replay
 
     _check_payer(session, actor.group_id, data.payer_member_id)
     _check_category(session, actor.group_id, data.category_id)
@@ -365,7 +385,7 @@ def create_expense(
         category_id=data.category_id,
         payer_member_id=data.payer_member_id,
         amount_cents=data.amount_cents,
-        description=data.description.strip(),
+        description=data.description,
         notes=data.notes,
         expense_date=data.expense_date,
         split_type=resolution.split_type,
@@ -384,6 +404,9 @@ def create_expense(
             session.add(expense)
             session.flush()
     except IntegrityError as exc:
+        # A concurrent retry with the same id committed first: answer as a retry does.
+        if (replay := _replay_create(session, actor, data)) is not None:
+            return replay
         # The id is taken in another group: same answer, without saying where.
         raise Conflict("An expense with this id already exists", code="id_conflict") from exc
     _write_shares(session, expense, resolution)
@@ -403,18 +426,8 @@ def get_expense(session: Session, actor: GroupActor, expense_id: UUID) -> Expens
     return to_read(session, actor, _load(session, actor, expense_id))
 
 
-def _encode_cursor(d: date, c: datetime, i: UUID) -> str:
-    raw = json.dumps({"d": d.isoformat(), "c": c.isoformat(), "i": str(i)}).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
-def _decode_cursor(cursor: str) -> tuple[date, datetime, UUID]:
-    try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        return date.fromisoformat(data["d"]), datetime.fromisoformat(data["c"]), UUID(data["i"])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise Unprocessable("Invalid cursor") from exc
+def _parse_cursor(data: dict[str, Any]) -> tuple[date, datetime, UUID]:
+    return date.fromisoformat(data["d"]), datetime.fromisoformat(data["c"]), UUID(data["i"])
 
 
 def _check_range(filters: ExpenseFilters) -> None:
@@ -431,19 +444,27 @@ def list_expenses(
     cursor: str | None = None,
 ) -> tuple[list[ExpenseRead], str | None]:
     _check_range(filters)
-    limit = max(1, min(limit, MAX_PAGE))
+    limit = clamp_limit(limit)
     rows = erepo.list_expenses(
         session,
         actor.group_id,
         filters,
         limit=limit + 1,
-        after=_decode_cursor(cursor) if cursor else None,
+        after=decode_cursor(cursor, _parse_cursor) if cursor else None,
     )
-    items = [to_read(session, actor, e) for e in rows[:limit]]
+    page = rows[:limit]
+    shares = erepo.shares_for(session, actor.group_id, [e.id for e in page])
+    items = [to_read(session, actor, e, shares=shares.get(e.id, [])) for e in page]
     next_cursor = None
     if len(rows) > limit:
         last = rows[limit - 1]
-        next_cursor = _encode_cursor(last.expense_date, last.created_at, last.id)
+        next_cursor = encode_cursor(
+            {
+                "d": last.expense_date.isoformat(),
+                "c": last.created_at.isoformat(),
+                "i": str(last.id),
+            }
+        )
     return items, next_cursor
 
 
@@ -500,11 +521,11 @@ def update_expense(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> ExpenseRead:
-    require_active(actor)
+    lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         raise NotFound("Expense not found")
-    check_version(if_match, expense.version, current_body=to_read(session, actor, expense))
+    check_version(if_match, expense.version, current_body=lambda: to_read(session, actor, expense))
     _require_no_left_members(session, expense)
     fields = data.model_fields_set
 
@@ -551,7 +572,7 @@ def update_expense(
     expense.category_id = category_id
     expense.expense_date = data.expense_date or expense.expense_date
     if data.description is not None:
-        expense.description = data.description.strip()
+        expense.description = data.description
     if "notes" in fields:
         expense.notes = data.notes
     if resolution is not None:
@@ -582,11 +603,11 @@ def delete_expense(
     *,
     notifier: Notifier = _NO_NOTIFIER,
 ) -> None:
-    require_active(actor)
+    lock_group_for_balance_write(session, actor.group_id)
     expense = _load(session, actor, expense_id, for_update=True)
     if expense.deleted_at is not None:
         return
-    check_version(if_match, expense.version, current_body=to_read(session, actor, expense))
+    check_version(if_match, expense.version, current_body=lambda: to_read(session, actor, expense))
     _require_no_left_members(session, expense)
     before = snapshot_json(session, expense)
     expense.deleted_at = clock.now()

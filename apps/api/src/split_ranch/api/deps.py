@@ -94,7 +94,6 @@ def get_group_actor(
         group_id=group_id,
         member_id=member.id,
         role=member.role,
-        status=member.status,
     )
 
 

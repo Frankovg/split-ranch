@@ -177,6 +177,57 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Delete Me",
+        "description": "Delete the account: needs every group settled (`409 account_has_open_balances`).",
+        "operationId": "delete_me_v1_me_delete",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeDeleteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/me/push-tokens": {
@@ -4405,6 +4456,21 @@
         "title": "InvitationRead",
         "description": "The group's join code (one per group, valid 7 days), typed by hand by the invitee."
       },
+      "MeDeleteIn": {
+        "properties": {
+          "confirm": {
+            "type": "string",
+            "const": "DELETE",
+            "title": "Confirm"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "confirm"
+        ],
+        "title": "MeDeleteIn"
+      },
       "MeRead": {
         "properties": {
           "id": {
@@ -4537,6 +4603,10 @@
             ],
             "title": "Display Name"
           },
+          "account_deleted": {
+            "type": "boolean",
+            "title": "Account Deleted"
+          },
           "role": {
             "type": "string",
             "title": "Role"
@@ -4572,6 +4642,7 @@
           "id",
           "user_id",
           "display_name",
+          "account_deleted",
           "role",
           "status",
           "sort_key",

@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Bell, ChevronRight, LogOut, Palette } from 'lucide-react-native';
+import { Bell, ChevronRight, LogOut, Palette, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
@@ -19,6 +20,7 @@ import {
   type ThemePreference,
 } from '@/stores/preferences';
 import { useSessionStore } from '@/stores/session';
+import { DeleteAccountDialog } from './DeleteAccountDialog';
 
 const THEMES: ThemePreference[] = ['system', 'light', 'dark'];
 const LANGUAGES: LanguagePreference[] = ['system', 'es', 'en'];
@@ -43,6 +45,7 @@ export function SettingsScreen() {
       setLanguage: s.setLanguage,
     })),
   );
+  const [deleting, setDeleting] = useState(false);
   // Only the email: the session object changes on every token refresh.
   const email = useSessionStore((s) => s.session?.user.email);
 
@@ -119,8 +122,18 @@ export function SettingsScreen() {
             <Icon as={LogOut} size={18} />
             <Text>{t('auth.signOut')}</Text>
           </Button>
+          <Button variant='outline' className='justify-start' onPress={() => router.navigate('/privacy')}>
+            <Icon as={ShieldCheck} size={18} />
+            <Text className='flex-1 text-left'>{t('auth.privacy')}</Text>
+            <Icon as={ChevronRight} size={18} className='text-muted-foreground' />
+          </Button>
+          <Button variant='ghost' onPress={() => setDeleting(true)}>
+            <Icon as={Trash2} size={18} className='text-destructive' />
+            <Text className='text-destructive'>{t('settings.deleteAccount')}</Text>
+          </Button>
         </CardContent>
       </Card>
+      {deleting ? <DeleteAccountDialog onClose={() => setDeleting(false)} /> : null}
 
       {__DEV__ ? (
         <Card>

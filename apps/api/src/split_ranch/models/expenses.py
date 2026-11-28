@@ -42,8 +42,16 @@ class Expense(Base):
         CheckConstraint(in_check("split_origin", SPLIT_ORIGINS), name="split_origin"),
         CheckConstraint(in_check("participant_mode", ("all", "subset")), name="participant_mode"),
         CheckConstraint(in_check("source", EXPENSE_SOURCES), name="source"),
-        # Keyset pagination and date-range filters (`expense_date` in the group time zone).
-        Index("ix_expenses_group_date_id", "group_id", text("expense_date DESC"), text("id DESC")),
+        # Keyset pagination of live expenses in list order, plus date-range filters
+        # (`expense_date` in the group time zone). Partial: every group read skips deleted.
+        Index(
+            "ix_expenses_group_live_date",
+            "group_id",
+            text("expense_date DESC"),
+            text("created_at DESC"),
+            text("id DESC"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[UUID] = uuid_pk()

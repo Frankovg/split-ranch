@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -203,6 +205,38 @@ def test_delete_group(
     assert ok(client.get("/v1/groups", headers=house.h("Franco"))) == []
 
 
+def test_delete_group_waits_for_sent_and_disputed_payments(
+    client: TestClient, make_user: Callable[[str], TestUser]
+) -> None:
+    """C4: a disputed payment can still be confirmed, so it blocks deletion like a sent one."""
+    house = make_house(client, make_user, ("Juli", "Franco"))
+    body = {"confirm_name": "Casa"}
+
+    def delete() -> Any:
+        return client.request("DELETE", house.url(), json=body, headers=house.h("Juli"))
+
+    payment = pay(client, house, "Franco", payer="Franco", to="Juli", amount=100)  # sent
+    r = delete()
+    assert r.status_code == 409 and r.json()["code"] == "group_has_open_balances"
+    ok(
+        client.post(
+            house.url(f"/payments/{payment['id']}/dispute"),
+            json={"note": "No me llegó"},
+            headers=house.h("Juli", **{"If-Match": '"1"'}),
+        )
+    )
+    r = delete()
+    assert r.status_code == 409 and r.json()["code"] == "group_has_open_balances"
+    ok(
+        client.post(
+            house.url(f"/payments/{payment['id']}/cancel"),
+            json={},
+            headers=house.h("Franco", **{"If-Match": '"2"'}),
+        )
+    )
+    ok(delete(), 204)
+
+
 def test_categories_crud(client: TestClient, make_user: Callable[[str], TestUser]) -> None:
     house = make_house(client, make_user, ("Juli", "Franco"))
     # Any member manages categories.
@@ -364,3 +398,43 @@ def test_rule_precedence_and_fallback(
         headers=house.h("Franco"),
     )
     assert r.status_code == 422 and r.json()["code"] == "split_mismatch"
+
+
+def test_former_admin_cannot_write_anything(
+    client: TestClient, make_user: Callable[[str], TestUser]
+) -> None:
+    """`get_group_actor` is the only membership check: every group write must hit it."""
+    house = make_house(client, make_user, ("Juli", "Franco"))
+    ok(client.post(house.url("/members/me/leave"), headers=house.h("Juli")), 204)
+    juli = house.h("Juli")
+    writes = [
+        ("PATCH", house.url(), {"name": "Mía"}),
+        ("DELETE", house.url(), {"confirm_name": "Casa"}),
+        ("POST", house.url("/invitations"), None),
+        ("DELETE", house.url(f"/members/{house.members['Franco']}"), None),
+        ("POST", house.url("/categories"), {"name": "Gym"}),
+        (
+            "POST",
+            house.url("/expenses"),
+            {
+                "amount_cents": 900,
+                "description": "Cena",
+                "payer_member_id": house.members["Juli"],
+                "expense_date": "2026-03-02",
+            },
+        ),
+        (
+            "POST",
+            house.url("/payments"),
+            {
+                "id": str(uuid.uuid4()),
+                "from_member_id": house.members["Juli"],
+                "to_member_id": house.members["Franco"],
+                "amount_cents": 100,
+                "method": "cash",
+            },
+        ),
+    ]
+    for method, url, body in writes:
+        r = client.request(method, url, json=body, headers=juli)
+        assert r.status_code == 404, f"{method} {url}: {r.status_code} {r.text}"

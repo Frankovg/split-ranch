@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Calculator, LogIn, Palette } from 'lucide-react-native';
+import { Calculator, LogIn, Palette, ShieldCheck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { ScreenBackground } from '@/components/ScreenBackground';
+import { reportError } from '@/lib/sentry';
 import { isGoogleSignInAvailable, signInWithGoogle, SignInCancelledError } from './google';
 
 export function SignInScreen() {
@@ -28,6 +29,7 @@ export function SignInScreen() {
     } catch (error) {
       if (!(error instanceof SignInCancelledError)) {
         console.warn('Google sign-in failed', error);
+        reportError(error, 'auth.google-sign-in');
         toast.error(t('auth.failed'));
       }
     } finally {
@@ -61,7 +63,10 @@ export function SignInScreen() {
         </View>
 
         <View className='items-center gap-1'>
-          {/* TODO: add a link to the published privacy policy URL (t('auth.privacy')) once it exists. */}
+          <Button variant='ghost' size='sm' onPress={() => router.navigate('/privacy')}>
+            <Icon as={ShieldCheck} size={16} className='text-muted-foreground' />
+            <Text className='text-muted-foreground'>{t('auth.privacy')}</Text>
+          </Button>
           {__DEV__ ? (
             <Button variant='ghost' onPress={() => router.navigate('/dev/gallery')}>
               <Icon as={Palette} size={18} />

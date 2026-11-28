@@ -3,7 +3,7 @@
 ## Authentication
 - **Supabase Auth** owns identities and sessions: it verifies the Google ID token (with nonce) and issues access tokens (default 1 h) and refresh tokens (rotated, with reuse detection, handled by Supabase).
 - Supabase project settings to apply: Google as the only enabled provider (email/password, magic link and anonymous sign-ins **disabled**), asymmetric JWT signing keys, access-token lifetime 1 h (shorten to 15–30 min if needed), refresh-token reuse interval default, "Confirm email" irrelevant for Google.
-- FastAPI verifies every request token locally against the JWKS (asymmetric algorithm only, `iss`, `aud=authenticated`, `exp`, `role=authenticated`). Key rotation in Supabase is picked up automatically through `kid`.
+- FastAPI verifies every request token locally against the JWKS (asymmetric algorithm only, `iss`, `aud=authenticated`, `exp`, `role=authenticated`, and `is_anonymous` missing or `false`, so anonymous accounts are refused even if they were turned on in the project). Key rotation in Supabase is picked up automatically through `kid`.
 - Mobile: session persisted by `supabase-js` in encrypted MMKV, key in `expo-secure-store` (Android Keystore-backed).
 - Logout → `supabase.auth.signOut()`; "sign out everywhere" → `signOut({ scope: 'global' })`. Note: an already-issued access token remains valid until it expires (≤ 1 h). Acceptable for this app; if instant revocation is ever needed, the API can check a `sessions_revoked_after` timestamp per user.
 - **Keys**: the publishable (anon) key is public by design and grants nothing on our data (private `app` schema + RLS with no policies). The secret/service-role key is reserved for account deletion on the server and never leaves the server.
@@ -66,7 +66,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 **Principles applied:**
 - Data minimisation: no contacts access, no location, no analytics SDK in MVP beyond Sentry (PII scrubbing on, `sendDefaultPii=false`).
 - Data residency: primary data in the EU (Frankfurt); Google Sheets data lives in the group admin's personal Google Drive (no data-region guarantee; disclosed).
-- Rights: in-app **export my data** (JSON/CSV, async job) and **delete account** (required by Google Play too, with a web URL for deletion requests). Deletion anonymises the member in shared groups (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and finally deletes the Supabase auth user (which removes sessions and identities).
+- Rights: **delete account** in Settings → Account (`DELETE /v1/me`, rules in [03 §5](03-business-rules.md#5-groups-and-membership)): it anonymises the member in shared groups (others' financial records stay coherent), deletes the personal profile and push tokens (Quick splits are only on the phone; uninstalling the app removes them), and deletes the Supabase auth user (which removes sessions and identities). Every other right (access, a portable copy, rectification, restriction, objection) is exercised by email to contact@franamoroso.com, answered within a month; there is no in-app export. Google Play also needs a web URL for deletion requests: not built yet (see the TODO in `PrivacyScreen.tsx`).
 - Sharing to Google Sheets: explained at group creation; per-user opt-out of being shared.
 
 **Retention (defaults):**
@@ -81,7 +81,7 @@ Rotation runbook documented in `infra/README.md` (Phase 7).
 | Logs | 30 days; Sentry 90 days |
 | AI transcripts (future) | With the expense; raw audio not stored |
 
-**Privacy policy** (Phase 7 deliverable): plain-language Spanish + English, linked in the store listing, sign-in screen and settings. Include a Records of Processing Activities (RoPA) entry and a lightweight DPIA note (financial-ish data, small scale → DPIA likely not mandatory, but document the assessment).
+**Privacy policy**: the in-app screen `/privacy` (`features/legal/PrivacyScreen.tsx`, text in the i18n files, Spanish + English), linked from sign-in and Settings → Account. Controller: Franco Gabriel Amoroso, contact@franamoroso.com. The public URL for the store listing is not published yet (TODO in `PrivacyScreen.tsx`). Include a Records of Processing Activities (RoPA) entry and a lightweight DPIA note (financial-ish data, small scale → DPIA likely not mandatory, but document the assessment).
 
 ## Security checklist per release
 - [ ] Tenant-isolation suite green

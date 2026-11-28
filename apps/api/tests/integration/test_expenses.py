@@ -5,11 +5,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from split_ranch.core.ids import uuid7
+from split_ranch.repositories import expenses as erepo
+from split_ranch.use_cases import expenses as expenses_uc
 from tests.conftest import FrozenClock, TestUser
 from tests.integration.helpers import House, add_expense, make_house, ok
 
@@ -423,3 +428,119 @@ def test_edit_involving_member_who_left_is_refused(client: TestClient, house: Ho
         headers=house.h("Juli"),
     )
     assert r.status_code == 422 and r.json()["code"] == "invalid_payer"
+
+
+def _count_list_queries(client: TestClient, house: House, db_session: Session) -> int:
+    statements: list[str] = []
+
+    def count(*args: object) -> None:
+        statements.append(str(args[2]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", count)
+    try:
+        ok(client.get(house.url("/expenses?limit=50"), headers=house.h("Ana")))
+    finally:
+        event.remove(conn, "before_cursor_execute", count)
+    return len(statements)
+
+
+def test_list_loads_shares_in_one_query(
+    client: TestClient, house: House, db_session: Session
+) -> None:
+    """P1: the number of queries does not grow with the page size (no N+1 on shares)."""
+    for day in range(1, 3):
+        add_expense(client, house, "Juli", amount=300, payer="Juli", date=f"2026-03-0{day}")
+    small = _count_list_queries(client, house, db_session)
+    for day in range(3, 7):
+        add_expense(client, house, "Juli", amount=300, payer="Juli", date=f"2026-03-0{day}")
+    page = ok(client.get(house.url("/expenses?limit=50"), headers=house.h("Ana")))
+    assert len(page["items"]) == 6
+    assert all(len(i["shares"]) == 3 for i in page["items"])
+    assert _count_list_queries(client, house, db_session) == small
+
+
+@pytest.mark.parametrize("path", ["/expenses", "/payments"])
+@pytest.mark.parametrize("cursor", ["not-base64!", "e30", "eyJ0IjoxfQ"])
+def test_invalid_cursor_is_422(client: TestClient, house: House, path: str, cursor: str) -> None:
+    """Garbage, `{}` and `{"t": 1}` are all rejected by the shared cursor decoder."""
+    r = client.get(house.url(f"{path}?cursor={cursor}"), headers=house.h("Ana"))
+    assert r.status_code == 422, r.text
+
+
+def test_list_reads_the_live_index_in_order(house: House, db_session: Session) -> None:
+    """P4: the list query walks the partial index in its own order, with no sort step."""
+    captured: list[tuple[str, Any]] = []
+
+    def capture(*args: Any) -> None:
+        captured.append((args[2], args[3]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", capture)
+    try:
+        erepo.list_expenses(db_session, uuid.UUID(house.id), erepo.ExpenseFilters(), limit=51)
+    finally:
+        event.remove(conn, "before_cursor_execute", capture)
+    [(statement, params)] = captured
+    # The test tables are tiny, so a sequential scan would win on cost alone.
+    conn.exec_driver_sql("SET LOCAL enable_seqscan = off")
+    plan = "\n".join(r[0] for r in conn.exec_driver_sql(f"EXPLAIN {statement}", params))
+    assert "ix_expenses_group_live_date" in plan, plan
+    assert "Sort" not in plan, plan
+
+
+def _delete_statements(client: TestClient, house: House, db_session: Session, e: dict) -> list[str]:
+    statements: list[str] = []
+
+    def count(*args: Any) -> None:
+        statements.append(str(args[2]))
+
+    conn = db_session.connection()
+    event.listen(conn, "before_cursor_execute", count)
+    try:
+        url = house.url(f"/expenses/{e['id']}")
+        ok(client.delete(url, headers=house.h("Juli", **{"If-Match": '"1"'})), 204)
+    finally:
+        event.remove(conn, "before_cursor_execute", count)
+    return statements
+
+
+def test_delete_queries_do_not_grow_with_members(
+    client: TestClient, house: House, db_session: Session
+) -> None:
+    """P3: one query checks every involved member, however many the expense has."""
+    solo = add_expense(
+        client,
+        house,
+        "Juli",
+        amount=900,
+        payer="Juli",
+        date="2026-03-01",
+        split={"split_type": "single", "shares": [{"member_id": house.members["Juli"]}]},
+    )
+    shared = add_expense(client, house, "Juli", amount=900, payer="Ana", date="2026-03-02")
+    assert len(solo["shares"]) == 1 and len(shared["shares"]) == 3
+    one = _delete_statements(client, house, db_session, solo)
+    three = _delete_statements(client, house, db_session, shared)
+    assert len(one) == len(three)
+
+
+def test_retry_does_not_hide_unexpected_errors(
+    client: TestClient, house: House, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B5: only an unresolvable split means "not the same expense"; a bug must surface."""
+    body = {
+        "id": str(uuid7()),
+        "amount_cents": 900,
+        "description": "Pan",
+        "payer_member_id": house.members["Juli"],
+        "expense_date": "2026-03-01",
+    }
+    ok(client.post(house.url("/expenses"), json=body, headers=house.h("Juli")), 201)
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("bug in split resolution")
+
+    monkeypatch.setattr(expenses_uc, "_resolve", broken)
+    with pytest.raises(RuntimeError, match="bug in split resolution"):
+        client.post(house.url("/expenses"), json=body, headers=house.h("Juli"))

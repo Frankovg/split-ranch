@@ -5,7 +5,15 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from split_ranch.schemas.common import AmountCents, Day, Id, ReadModel, Reason, StrictModel
+from split_ranch.schemas.common import (
+    AmountCents,
+    Day,
+    Id,
+    NonBlank,
+    ReadModel,
+    Reason,
+    StrictModel,
+)
 from split_ranch.schemas.split import ShareRead, SplitSpec
 
 ExpenseSource = Literal["manual", "ai_text", "ai_voice"]
@@ -15,7 +23,7 @@ class ExpenseCreate(StrictModel):
     # Client-generated id: retrying a create with the same id returns the stored expense.
     id: Id | None = None
     amount_cents: AmountCents
-    description: str = Field(min_length=1, max_length=140)
+    description: NonBlank = Field(max_length=140)
     category_id: Id | None = None
     payer_member_id: Id
     expense_date: Day
@@ -39,7 +47,7 @@ class ExpenseUpdate(StrictModel):
     with today's rules and members; any other edit keeps its participants and inputs."""
 
     amount_cents: AmountCents | None = None
-    description: str | None = Field(default=None, min_length=1, max_length=140)
+    description: NonBlank | None = Field(default=None, max_length=140)
     category_id: Id | None = None
     payer_member_id: Id | None = None
     expense_date: Day | None = None

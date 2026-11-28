@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from split_ranch.core.actor import Actor
-from split_ranch.core.errors import NotFound
+from split_ranch.core.errors import NotFound, Unauthenticated
 from split_ranch.core.security import TokenClaims
 from split_ranch.models import DEFAULT_NOTIFICATION_PREFS, Group, GroupMember, User
 from split_ranch.schemas.groups import MembershipRead, MeRead, MeUpdate, UserRead
@@ -48,6 +48,10 @@ class _EnsureUserCache:
                     self._seen.clear()
             self._seen[user_id] = (now + ttl, fingerprint)
 
+    def forget(self, user_id: UUID) -> None:
+        with self._lock:
+            self._seen.pop(user_id, None)
+
     def __len__(self) -> int:
         return len(self._seen)
 
@@ -66,7 +70,7 @@ def ensure_user(session: Session, claims: TokenClaims, *, cache_seconds: float =
         display_name=claims.display_name,
         avatar_url=claims.avatar_url,
     )
-    stmt = stmt.on_conflict_do_update(
+    upsert = stmt.on_conflict_do_update(
         index_elements=[User.id],
         set_={
             "email": stmt.excluded.email,
@@ -75,14 +79,22 @@ def ensure_user(session: Session, claims: TokenClaims, *, cache_seconds: float =
             "display_name": func.coalesce(User.display_name, stmt.excluded.display_name),
         },
         where=(
-            User.email.is_distinct_from(stmt.excluded.email)
-            | User.display_name.is_(None)
-            | User.avatar_url.is_distinct_from(
-                func.coalesce(stmt.excluded.avatar_url, User.avatar_url)
+            # A deleted account is never written again (its token may live up to an hour).
+            User.deleted_at.is_(None)
+            & (
+                User.email.is_distinct_from(stmt.excluded.email)
+                | User.display_name.is_(None)
+                | User.avatar_url.is_distinct_from(
+                    func.coalesce(stmt.excluded.avatar_url, User.avatar_url)
+                )
             )
         ),
-    )
-    session.execute(stmt)
+    ).returning(User.id)
+    # A row comes back only when it was inserted or updated.
+    written = session.execute(upsert).first() is not None
+    if not written and session.scalar(select(User.deleted_at).where(User.id == claims.user_id)):
+        session.rollback()
+        raise Unauthenticated("This account was deleted", code="account_deleted")
     session.commit()
     ensure_user_cache.remember(claims.user_id, fingerprint, cache_seconds)
     return Actor(user_id=claims.user_id)
@@ -129,7 +141,7 @@ def get_me(session: Session, actor: Actor) -> MeRead:
 def update_profile(session: Session, actor: Actor, data: MeUpdate) -> MeRead:
     user = _user(session, actor.user_id)
     if data.display_name is not None:
-        user.display_name = data.display_name.strip()
+        user.display_name = data.display_name
     if data.locale is not None:
         user.locale = data.locale
     if data.notifications is not None:

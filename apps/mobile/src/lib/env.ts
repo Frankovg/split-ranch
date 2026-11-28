@@ -7,7 +7,10 @@ export const env = {
   supabasePublishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
   apiUrl: (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/+$/, ''),
+  // A Sentry DSN is public by design (it only allows sending events).
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
 } as const;
 
 export const isSupabaseConfigured = env.supabaseUrl !== '' && env.supabasePublishableKey !== '';
 export const isApiConfigured = env.apiUrl !== '';
+export const isSentryConfigured = env.sentryDsn !== '';

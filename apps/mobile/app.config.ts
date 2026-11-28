@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import type { ExpoConfig } from 'expo/config';
+
+// The user-facing version lives in package.json and is bumped by hand for a release. The
+// build number (versionCode) is separate and auto-incremented by EAS (eas.json `autoIncrement`).
+const { version } = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8')) as { version: string };
 
 // Readex Pro (the brand typeface) files, resolved through the package so the path
 // works whether pnpm links it under this app or hoists it to the workspace root.
@@ -20,7 +25,7 @@ const config: ExpoConfig = {
   name: 'Splitranch',
   slug: 'split-ranch',
   scheme: 'splitranch',
-  version: '0.1.0',
+  version,
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
@@ -93,6 +98,12 @@ const config: ExpoConfig = {
         defaultChannel: 'expenses',
       },
     ],
+    // Sentry: native crash reporting and source map upload on release builds (EU region).
+    // Org, project and auth token come from the SENTRY_ORG / SENTRY_PROJECT /
+    // SENTRY_AUTH_TOKEN env vars (EAS environment variables), never from this file, so the
+    // native fingerprint does not depend on them. Without a token, set
+    // SENTRY_DISABLE_AUTO_UPLOAD=true for local release builds.
+    ['@sentry/react-native/expo', { url: 'https://de.sentry.io/' }],
     // Google sign-in (react-native-nitro-google-signin) needs no config plugin on Android:
     // the native module is autolinked and the web client id is passed at runtime via
     // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Its plugin only adds the iOS URL scheme and throws

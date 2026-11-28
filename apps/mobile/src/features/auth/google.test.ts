@@ -69,7 +69,7 @@ describe('readIdTokenNonce', () => {
 describe('signInWithGoogle', () => {
   it('puts the hashed nonce in the ID token request and sends the raw nonce to Supabase', async () => {
     const response = success();
-    nativeSignIn.mockResolvedValue(response);
+    createAccount.mockResolvedValue(response);
 
     await signInWithGoogle();
 
@@ -81,8 +81,17 @@ describe('signInWithGoogle', () => {
     });
   });
 
-  it('falls back to createAccount and then the explicit sign-in dialog', async () => {
-    nativeSignIn.mockResolvedValue(noCredential);
+  it('offers every device account and never only the authorized ones', async () => {
+    createAccount.mockResolvedValue(success());
+
+    await signInWithGoogle();
+
+    expect(createAccount).toHaveBeenCalledOnce();
+    expect(nativeSignIn).not.toHaveBeenCalled();
+    expect(presentExplicitSignIn).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the explicit sign-in dialog when no account is available', async () => {
     createAccount.mockResolvedValue(noCredential);
     presentExplicitSignIn.mockResolvedValue(success());
 
@@ -94,7 +103,7 @@ describe('signInWithGoogle', () => {
   });
 
   it('maps a cancelled picker to SignInCancelledError without calling Supabase', async () => {
-    nativeSignIn.mockResolvedValue({ type: 'cancelled', data: null });
+    createAccount.mockResolvedValue({ type: 'cancelled', data: null });
 
     await expect(signInWithGoogle()).rejects.toBeInstanceOf(SignInCancelledError);
     expect(signInWithIdToken).not.toHaveBeenCalled();
@@ -104,14 +113,14 @@ describe('signInWithGoogle', () => {
     ['a different nonce', { nonce: 'other' }],
     ['no nonce', { sub: '1' }],
   ])('rejects an ID token with %s before it reaches Supabase', async (_label, claims) => {
-    nativeSignIn.mockResolvedValue(success(claims));
+    createAccount.mockResolvedValue(success(claims));
 
     await expect(signInWithGoogle()).rejects.toThrow('expected nonce');
     expect(signInWithIdToken).not.toHaveBeenCalled();
   });
 
   it('runs a single flow for concurrent calls so the nonce is not overwritten', async () => {
-    nativeSignIn.mockResolvedValue(success());
+    createAccount.mockResolvedValue(success());
 
     const first = signInWithGoogle();
     const second = signInWithGoogle();

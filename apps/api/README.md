@@ -35,7 +35,7 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `DATABASE_URL_SESSION` | migrations | session pooler (IPv4 on Supabase Free). Falls back to `DATABASE_URL` |
 | `SUPABASE_URL` | API | JWKS is fetched from `$SUPABASE_URL/auth/v1/.well-known/jwks.json` (cached 10 min) |
 | `SUPABASE_JWT_ISSUER` | API | expected `iss`; defaults to `$SUPABASE_URL/auth/v1` |
-| `SUPABASE_SECRET_KEY` | API | account deletion only (not implemented yet) |
+| `SUPABASE_SECRET_KEY` | API | account deletion only (`DELETE /v1/me` answers 503 without it) |
 | `SENTRY_DSN` | API | Sentry is initialised only when set (`send_default_pii=False`) |
 | `EXPO_ACCESS_TOKEN` | API | optional bearer token for the Expo Push Service; required once "enhanced security for push notifications" is on for the Expo account. Secret |
 | `PUSH_ENABLED` | API | `false` stops all push notifications (default `true`; tests turn it off) |
@@ -43,7 +43,7 @@ Read from the environment or `apps/api/.env` (names match the root `.env.example
 | `TEST_DATABASE_URL` | tests | optional, see below |
 
 Optional tuning: `LOG_LEVEL`, `LOG_JSON`, `MIN_APP_VERSION`, `PUBLIC_WEB_URL`, `JWT_LEEWAY_SECONDS`,
-`JWKS_CACHE_SECONDS`, `ENSURE_USER_CACHE_SECONDS`, `RATE_LIMIT_PER_MINUTE` (per user, default 120),
+`JWKS_CACHE_SECONDS`, `JWKS_MAX_STALE_SECONDS` (default 21600: how long the last good JWKS is used while Supabase Auth is unreachable), `ENSURE_USER_CACHE_SECONDS`, `RATE_LIMIT_PER_MINUTE` (per user, default 120),
 `INVITE_RATE_LIMIT_PER_MINUTE` (invitation preview/accept, default 10); `0` disables a limit.
 Limits are kept in process memory, which is correct only while the API runs as a single process.
 

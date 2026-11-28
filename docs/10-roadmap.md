@@ -115,7 +115,7 @@ Decided 2026-11-16; design and review in [egm/design_draft.md](egm/design_draft.
 
 | Task | AC |
 |---|---|
-| T-7.1 Privacy policy, account deletion (in-app + web URL), data export | Play Console data-safety form completed |
+| T-7.1 Privacy policy and account deletion in-app (done); public policy URL and web deletion URL (pending); data export by email request only | Play Console data-safety form completed |
 | T-7.2 Sentry release tracking (API + mobile source maps) | Errors show readable stacks |
 | T-7.3 Maestro E2E: sign-in (test account), create group, add expenses, record and confirm a payment | Green in CI |
 | T-7.4 Prod environment (free tiers; restore drill of the GitHub Actions backup into the local stack) | Restore tested |

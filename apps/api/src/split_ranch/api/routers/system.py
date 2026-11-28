@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -26,8 +26,9 @@ def readyz(session: SessionDep) -> JSONResponse:
 
 
 @router.get("/config")
-def config(request: Request, settings: SettingsDep) -> dict[str, Any]:
+def config(settings: SettingsDep) -> dict[str, Any]:
     return {
         "min_app_version": settings.min_app_version,
-        "features": {"sheets": False, "push": False},
+        # Google Sheets export is not built yet; push follows the server setting.
+        "features": {"sheets": False, "push": settings.push_enabled},
     }
