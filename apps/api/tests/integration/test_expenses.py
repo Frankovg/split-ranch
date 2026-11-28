@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from split_ranch.core.ids import uuid7
 from split_ranch.repositories import expenses as erepo
+from split_ranch.use_cases import expenses as expenses_uc
 from tests.conftest import FrozenClock, TestUser
 from tests.integration.helpers import House, add_expense, make_house, ok
 
@@ -522,3 +523,24 @@ def test_delete_queries_do_not_grow_with_members(
     one = _delete_statements(client, house, db_session, solo)
     three = _delete_statements(client, house, db_session, shared)
     assert len(one) == len(three)
+
+
+def test_retry_does_not_hide_unexpected_errors(
+    client: TestClient, house: House, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """B5: only an unresolvable split means "not the same expense"; a bug must surface."""
+    body = {
+        "id": str(uuid7()),
+        "amount_cents": 900,
+        "description": "Pan",
+        "payer_member_id": house.members["Juli"],
+        "expense_date": "2026-03-01",
+    }
+    ok(client.post(house.url("/expenses"), json=body, headers=house.h("Juli")), 201)
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("bug in split resolution")
+
+    monkeypatch.setattr(expenses_uc, "_resolve", broken)
+    with pytest.raises(RuntimeError, match="bug in split resolution"):
+        client.post(house.url("/expenses"), json=body, headers=house.h("Juli"))

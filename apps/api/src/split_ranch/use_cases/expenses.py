@@ -21,7 +21,8 @@ from sqlalchemy.orm import Session
 
 from split_ranch.core import clock
 from split_ranch.core.actor import GroupActor
-from split_ranch.core.errors import Conflict, NotFound, Unprocessable
+from split_ranch.core.errors import AppError, Conflict, NotFound, Unprocessable
+from split_ranch.domain import DomainError
 from split_ranch.models import Expense, ExpenseShare, History
 from split_ranch.repositories import expenses as erepo
 from split_ranch.repositories import groups as grepo
@@ -327,6 +328,8 @@ def _same_create(
             participants=data.participants,
         )
     except Exception:
+        # The retry's split no longer resolves (a member left, a category was archived):
+        # it cannot be the same expense. Any other error is a bug and must surface.
         return False
     return res.split_type == existing.split_type and stored == [
         (s.member_id, s.amount_cents) for s in res.shares
