@@ -159,7 +159,7 @@ def test_same_device_moves_to_the_new_account(
 def test_new_expense_notifies_everyone_but_the_author(
     client: TestClient, house: House, expo: FakeExpo
 ) -> None:
-    e = add_expense(
+    add_expense(
         client, house, "Juli", amount=2340, payer="Juli", date="2026-11-01", description="Súper"
     )
     assert sorted(expo.to()) == [token_of("Ana"), token_of("Franco")]
@@ -170,7 +170,7 @@ def test_new_expense_notifies_everyone_but_the_author(
     assert message["data"] == {
         "type": "expense_created",
         "group_id": house.id,
-        "url": f"/group/{house.id}/expense/{e['id']}",
+        "url": f"/group/{house.id}",
     }
 
 

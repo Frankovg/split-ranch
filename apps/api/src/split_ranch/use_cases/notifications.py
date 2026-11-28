@@ -132,7 +132,9 @@ class _Content:
 
 def _url(event: NotificationEvent) -> str:
     group = f"/group/{event.group_id}"
-    if event.kind in ("expense_created", "expense_updated"):
+    # A new expense opens the group, so the list shows it among the others; an edit opens
+    # the expense itself to show what changed.
+    if event.kind == "expense_updated":
         return f"{group}/expense/{event.entity_id}"
     if event.kind.startswith("payment_"):
         return f"{group}/settle"
