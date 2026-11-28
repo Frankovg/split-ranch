@@ -115,6 +115,14 @@ The app generates each expense and payment `id` (UUIDv7) before sending it. Re-s
 ## Migrations
 - Alembic with autogenerate **reviewed by hand**; one migration per PR; naming `YYYYMMDD_HHMM_<slug>.py`.
 - Expand → migrate → contract for breaking changes (add nullable column, backfill, then add constraint) so the API can deploy without downtime. Exception: 0006 rebuilt the group tables on an empty database (the cloud data was test data and was reset first); it refuses to run if those tables hold rows.
+- **Every migration must work with the release that is already running.** Render runs `alembic upgrade head` at the end of the build while the previous release keeps serving, and if the deploy fails after that the previous release stays on the new schema. So in one migration:
+  - Fine: add a table, an index, a nullable column or one with a constant default (no table rewrite), or a constraint the old code already satisfies.
+  - Not fine: drop or rename a column or table the old code maps (SQLAlchemy selects every mapped column), add a `NOT NULL` column without a server default, or forbid a value the old code still writes. Do it in two releases: first the code stops using it, then a later migration removes it (0012 dropped the `recurring` values only because no release ever wrote them).
+- **Long locks on large tables.** Today the tables are small and a plain migration is fine (0012 and 0013 do it). Once a table is large:
+  - Constraints: `ADD CONSTRAINT ... NOT VALID` (no scan, short lock), then `VALIDATE CONSTRAINT` (scans under `SHARE UPDATE EXCLUSIVE`, which does not block reads or writes). `env.py` runs the whole upgrade in **one transaction**, so the `VALIDATE` must go in an `op.get_context().autocommit_block()` or in a later migration; in the same transaction the first lock is held until the commit and nothing is gained.
+  - `SET NOT NULL`: add and validate `CHECK (col IS NOT NULL)` first; Postgres then skips the scan.
+  - Indexes: `op.create_index(..., postgresql_concurrently=True)` inside `autocommit_block()` (it cannot run in a transaction; if it fails it leaves an invalid index to drop).
+  - Start with `SET lock_timeout = '5s'` so a migration waiting for a lock fails instead of queueing every request behind it.
 - `migrations/sql` holds SQL used only by old migrations (0002, and 0005's downgrade): migrations are history and are never edited.
 - `env.py` sets `version_table_schema='app'` and an `include_name` filter so autogenerate never sees Supabase schemas. Without a URL in the Alembic config it uses `DATABASE_URL_SESSION` (the cloud database): pass a local URL explicitly when experimenting.
 - CI checks (against a plain `postgres` service container): `alembic upgrade head` on an empty DB, a full downgrade/upgrade round trip, and `alembic check` (no pending autogenerate diff).
